@@ -48,7 +48,9 @@ Press Ctrl+C to stop early. A partial summary is printed and the exit code is 1.
 
 A test is a `.ts` or `.js` file that exports a default function. Every VU
 calls it repeatedly until the duration ends. See
-[`examples/basic.ts`](examples/basic.ts).
+[`examples/basic.ts`](examples/basic.ts), or
+[`examples/basic.js`](examples/basic.js) for the same test in plain
+JavaScript.
 
 ```typescript
 export default function () {

@@ -389,10 +389,16 @@ func BenchmarkIterateHTTPGet(b *testing.B) {
 }
 
 func TestExamplesLoad(t *testing.T) {
-	paths, err := filepath.Glob(filepath.Join("..", "..", "examples", "*.ts"))
+	dir := filepath.Join("..", "..", "examples")
+	ts, err := filepath.Glob(filepath.Join(dir, "*.ts"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	js, err := filepath.Glob(filepath.Join(dir, "*.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths := append(ts, js...)
 	var loaded int
 	for _, path := range paths {
 		if strings.HasSuffix(path, ".d.ts") {
