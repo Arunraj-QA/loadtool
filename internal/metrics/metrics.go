@@ -14,6 +14,9 @@ import (
 type Recorder struct {
 	latencies []time.Duration
 	failures  int
+
+	scriptErrors     int
+	firstScriptError string
 }
 
 // Record stores the latency and outcome of one completed request.
@@ -22,6 +25,15 @@ func (r *Recorder) Record(latency time.Duration, ok bool) {
 	if !ok {
 		r.failures++
 	}
+}
+
+// RecordScriptError counts an iteration that ended with a script error.
+// The first message is kept so the summary can show an example.
+func (r *Recorder) RecordScriptError(msg string) {
+	if r.scriptErrors == 0 {
+		r.firstScriptError = msg
+	}
+	r.scriptErrors++
 }
 
 // Summary is the aggregated result of a test run.
@@ -34,6 +46,11 @@ type Summary struct {
 
 	Min, Mean, Max     time.Duration
 	P50, P90, P95, P99 time.Duration
+
+	// ScriptErrors counts iterations that ended with a script error.
+	ScriptErrors int
+	// FirstScriptError is one example message, empty if there were none.
+	FirstScriptError string
 }
 
 // Merge aggregates recorders into a Summary. The recorders must no longer
@@ -44,6 +61,10 @@ func Merge(recorders []*Recorder) Summary {
 	for _, r := range recorders {
 		total += len(r.latencies)
 		s.Failures += r.failures
+		s.ScriptErrors += r.scriptErrors
+		if s.FirstScriptError == "" {
+			s.FirstScriptError = r.firstScriptError
+		}
 	}
 	if total == 0 {
 		return s

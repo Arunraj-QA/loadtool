@@ -85,6 +85,32 @@ func TestAllFailures(t *testing.T) {
 	}
 }
 
+func TestMergeScriptErrors(t *testing.T) {
+	a, b, c := &Recorder{}, &Recorder{}, &Recorder{}
+	b.RecordScriptError("first")
+	b.RecordScriptError("second")
+	c.RecordScriptError("third")
+	c.Record(time.Millisecond, true)
+
+	s := Merge([]*Recorder{a, b, c})
+	if s.ScriptErrors != 3 || s.FirstScriptError != "first" {
+		t.Fatalf("ScriptErrors=%d FirstScriptError=%q, want 3 and %q",
+			s.ScriptErrors, s.FirstScriptError, "first")
+	}
+	if s.Requests != 1 || s.Failures != 0 {
+		t.Fatalf("script errors must not change request counts: %+v", s)
+	}
+}
+
+func TestMergeScriptErrorsWithoutRequests(t *testing.T) {
+	r := &Recorder{}
+	r.RecordScriptError("boom")
+	s := Merge([]*Recorder{r})
+	if s.ScriptErrors != 1 || s.FirstScriptError != "boom" || s.Requests != 0 {
+		t.Fatalf("unexpected summary %+v", s)
+	}
+}
+
 func BenchmarkRecorderRecord(b *testing.B) {
 	r := &Recorder{}
 	b.ReportAllocs()
