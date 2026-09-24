@@ -77,9 +77,10 @@ module `export` statements. A `goja.Runtime` is not goroutine-safe.
 ## Consequences
 
 - Binary size grows to about 28 MB (esbuild and goja).
-- Each VU allocates about 40 KB while it is created
-  (`BenchmarkNewVU`, 458 allocations). Retained memory per VU has not been
-  measured separately yet.
+- Each VU allocates about 40 KB while it is created (`BenchmarkNewVU`,
+  458 allocations) and keeps about 30 KB (`BenchmarkVURetainedMemory`).
+  About 22 KB of that comes from esbuild's CommonJS interop helpers, which
+  every runtime executes; see `benchmarks/2026-09-24-vu-memory.md`.
 - Calling the default function costs about 370 ns and 4 allocations per
   iteration before any request (`BenchmarkIterateEmpty`).
 - `async` default functions are not supported: there is no event loop, and
