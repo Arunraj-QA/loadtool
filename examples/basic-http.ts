@@ -1,7 +1,7 @@
 /// <reference path="./loadtool.d.ts" />
 
 // Run with:
-//   loadtool run examples/basic.ts --vus 10 --duration 30s
+//   loadtool run examples/basic-http.ts --vus 10 --duration 10s
 //
 // Top-level code runs once per VU before the test starts.
 // HTTP requests are only allowed inside the default function.

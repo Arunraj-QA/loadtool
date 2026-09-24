@@ -1,9 +1,9 @@
 /// <reference path="./loadtool.d.ts" />
 
-// The same test as basic.ts, written in plain JavaScript.
+// The same test as basic-http.ts, written in plain JavaScript.
 //
 // Run with:
-//   loadtool run examples/basic.js --vus 10 --duration 30s
+//   loadtool run examples/basic-http.js --vus 10 --duration 10s
 //
 // Top-level code runs once per VU before the test starts.
 // HTTP requests are only allowed inside the default function.

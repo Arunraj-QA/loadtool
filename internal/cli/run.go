@@ -19,7 +19,7 @@ func newRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "run <script>",
 		Short:   "Run a load test script",
-		Example: "  loadtool run examples/basic.ts --vus 100 --duration 30s",
+		Example: "  loadtool run examples/basic-http.ts --vus 10 --duration 10s",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg.Script = args[0]

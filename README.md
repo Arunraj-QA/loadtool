@@ -34,7 +34,7 @@ Requires Go (see `go.mod` for the minimum version).
 
 ```bash
 go build -o bin/loadtool ./cmd/loadtool
-./bin/loadtool run examples/basic.ts --vus 100 --duration 30s
+./bin/loadtool run examples/basic-http.ts --vus 10 --duration 10s
 ```
 
 | Flag | Default | Meaning |
@@ -48,8 +48,8 @@ Press Ctrl+C to stop early. A partial summary is printed and the exit code is 1.
 
 A test is a `.ts` or `.js` file that exports a default function. Every VU
 calls it repeatedly until the duration ends. See
-[`examples/basic.ts`](examples/basic.ts), or
-[`examples/basic.js`](examples/basic.js) for the same test in plain
+[`examples/basic-http.ts`](examples/basic-http.ts), or
+[`examples/basic-http.js`](examples/basic-http.js) for the same test in plain
 JavaScript.
 
 ```typescript
