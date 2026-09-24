@@ -2,6 +2,7 @@ package httpclient
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -22,11 +23,15 @@ func statusServer(t *testing.T, status int) *httptest.Server {
 	return srv
 }
 
+func get(url string) Request {
+	return Request{Method: http.MethodGet, URL: url}
+}
+
 func summarize(rec *metrics.Recorder) metrics.Summary {
 	return metrics.Merge([]*metrics.Recorder{rec})
 }
 
-func TestGetOutcome(t *testing.T) {
+func TestDoOutcome(t *testing.T) {
 	tests := []struct {
 		status int
 		wantOK bool
@@ -41,7 +46,7 @@ func TestGetOutcome(t *testing.T) {
 		t.Run(http.StatusText(tt.status), func(t *testing.T) {
 			srv := statusServer(t, tt.status)
 			rec := &metrics.Recorder{}
-			Get(context.Background(), New(1, DefaultTimeout), srv.URL, rec)
+			Do(context.Background(), New(1, DefaultTimeout), get(srv.URL), rec)
 
 			s := summarize(rec)
 			if s.Requests != 1 {
@@ -54,7 +59,7 @@ func TestGetOutcome(t *testing.T) {
 	}
 }
 
-func TestGetRecordsLatency(t *testing.T) {
+func TestDoRecordsLatency(t *testing.T) {
 	const delay = 20 * time.Millisecond
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(delay)
@@ -62,26 +67,26 @@ func TestGetRecordsLatency(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	rec := &metrics.Recorder{}
-	Get(context.Background(), New(1, DefaultTimeout), srv.URL, rec)
+	Do(context.Background(), New(1, DefaultTimeout), get(srv.URL), rec)
 	// Allow for coarse clocks: Windows' monotonic clock ticks every ~0.5ms.
 	if got := summarize(rec).Max; got < delay-2*time.Millisecond {
 		t.Fatalf("latency = %v, want at least ~%v", got, delay)
 	}
 }
 
-func TestGetTransportErrorIsFailure(t *testing.T) {
+func TestDoTransportErrorIsFailure(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	url := srv.URL
 	srv.Close() // nothing is listening any more
 
 	rec := &metrics.Recorder{}
-	Get(context.Background(), New(1, DefaultTimeout), url, rec)
+	Do(context.Background(), New(1, DefaultTimeout), get(url), rec)
 	if s := summarize(rec); s.Requests != 1 || s.Failures != 1 {
 		t.Fatalf("got %+v, want 1 failed request", s)
 	}
 }
 
-func TestGetTimeoutIsFailure(t *testing.T) {
+func TestDoTimeoutIsFailure(t *testing.T) {
 	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		<-release
@@ -90,13 +95,13 @@ func TestGetTimeoutIsFailure(t *testing.T) {
 	t.Cleanup(func() { close(release) })
 
 	rec := &metrics.Recorder{}
-	Get(context.Background(), New(1, 50*time.Millisecond), srv.URL, rec)
+	Do(context.Background(), New(1, 50*time.Millisecond), get(srv.URL), rec)
 	if s := summarize(rec); s.Failures != 1 {
 		t.Fatalf("got %+v, want 1 failed request", s)
 	}
 }
 
-func TestGetCancelledIsNotRecorded(t *testing.T) {
+func TestDoCancelledIsNotRecorded(t *testing.T) {
 	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		<-release
@@ -108,13 +113,13 @@ func TestGetCancelledIsNotRecorded(t *testing.T) {
 	time.AfterFunc(20*time.Millisecond, cancel)
 
 	rec := &metrics.Recorder{}
-	Get(ctx, New(1, DefaultTimeout), srv.URL, rec)
+	Do(ctx, New(1, DefaultTimeout), get(srv.URL), rec)
 	if s := summarize(rec); s.Requests != 0 {
 		t.Fatalf("cancelled request was recorded: %+v", s)
 	}
 }
 
-func TestGetReusesConnections(t *testing.T) {
+func TestDoReusesConnections(t *testing.T) {
 	var conns atomic.Int64
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("hello"))
@@ -130,7 +135,7 @@ func TestGetReusesConnections(t *testing.T) {
 	client := New(1, DefaultTimeout)
 	rec := &metrics.Recorder{}
 	for range 20 {
-		Get(context.Background(), client, srv.URL, rec)
+		Do(context.Background(), client, get(srv.URL), rec)
 	}
 	if s := summarize(rec); s.Successes != 20 {
 		t.Fatalf("got %+v, want 20 successes", s)
@@ -140,7 +145,7 @@ func TestGetReusesConnections(t *testing.T) {
 	}
 }
 
-func TestGetDoesNotFollowRedirects(t *testing.T) {
+func TestDoDoesNotFollowRedirects(t *testing.T) {
 	var hits atomic.Int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
@@ -149,7 +154,7 @@ func TestGetDoesNotFollowRedirects(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	rec := &metrics.Recorder{}
-	Get(context.Background(), New(1, DefaultTimeout), srv.URL, rec)
+	Do(context.Background(), New(1, DefaultTimeout), get(srv.URL), rec)
 	if n := hits.Load(); n != 1 {
 		t.Fatalf("server hit %d times, want 1 (redirect must not be followed)", n)
 	}
@@ -169,7 +174,7 @@ func TestClientUsesHTTP1OverTLS(t *testing.T) {
 	client.Transport.(*http.Transport).TLSClientConfig = srv.Client().Transport.(*http.Transport).TLSClientConfig
 
 	rec := &metrics.Recorder{}
-	Get(context.Background(), client, srv.URL, rec)
+	Do(context.Background(), client, get(srv.URL), rec)
 	if s := summarize(rec); s.Successes != 1 {
 		t.Fatalf("got %+v, want 1 success", s)
 	}
@@ -178,7 +183,7 @@ func TestClientUsesHTTP1OverTLS(t *testing.T) {
 	}
 }
 
-func BenchmarkGet(b *testing.B) {
+func BenchmarkDo(b *testing.B) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	}))
@@ -190,6 +195,62 @@ func BenchmarkGet(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		Get(ctx, client, srv.URL, rec)
+		Do(ctx, client, get(srv.URL), rec)
+	}
+}
+
+func TestDoSendsMethodBodyAndHeaders(t *testing.T) {
+	type seen struct{ method, body, header string }
+	got := make(chan seen, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		got <- seen{r.Method, string(b), r.Header.Get("X-Test")}
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(srv.Close)
+
+	rec := &metrics.Recorder{}
+	res := Do(context.Background(), New(1, DefaultTimeout), Request{
+		Method: http.MethodPost,
+		URL:    srv.URL,
+		Body:   `{"a":1}`,
+		Header: http.Header{"X-Test": {"yes"}},
+	}, rec)
+
+	if res.Status != http.StatusCreated || !res.OK() || res.Err != nil {
+		t.Fatalf("result = %+v, want 201 OK", res)
+	}
+	want := seen{http.MethodPost, `{"a":1}`, "yes"}
+	if s := <-got; s != want {
+		t.Errorf("server saw %+v, want %+v", s, want)
+	}
+}
+
+func TestDoInvalidRequest(t *testing.T) {
+	rec := &metrics.Recorder{}
+	res := Do(context.Background(), New(1, DefaultTimeout), Request{Method: "BAD METHOD", URL: "http://x"}, rec)
+	if res.Err == nil || res.OK() {
+		t.Fatalf("result = %+v, want error", res)
+	}
+	if s := summarize(rec); s.Failures != 1 {
+		t.Fatalf("got %+v, want 1 failure", s)
+	}
+}
+
+func TestResultOK(t *testing.T) {
+	tests := []struct {
+		res  Result
+		want bool
+	}{
+		{Result{Status: 200}, true},
+		{Result{Status: 399}, true},
+		{Result{Status: 400}, false},
+		{Result{Status: 0}, false},
+		{Result{Status: 200, Err: io.ErrUnexpectedEOF}, false},
+	}
+	for _, tt := range tests {
+		if got := tt.res.OK(); got != tt.want {
+			t.Errorf("%+v.OK() = %v, want %v", tt.res, got, tt.want)
+		}
 	}
 }

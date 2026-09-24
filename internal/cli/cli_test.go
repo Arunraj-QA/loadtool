@@ -27,14 +27,20 @@ func executeContext(t *testing.T, ctx context.Context, args ...string) (stdout, 
 	return out.String(), errOut.String(), err
 }
 
-// scriptFile creates an empty script file and returns its path.
-func scriptFile(t *testing.T) string {
+// scriptFile writes src to a test.ts file and returns its path.
+func scriptFile(t *testing.T, src string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.ts")
-	if err := os.WriteFile(path, []byte("export default function () {}\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// getScript returns a script whose iteration sends one GET to url.
+func getScript(t *testing.T, url string) string {
+	t.Helper()
+	return scriptFile(t, `export default function (): void { http.get("`+url+`"); }`)
 }
 
 func statusServer(t *testing.T, status int) *httptest.Server {
@@ -71,12 +77,11 @@ func TestRootCommand(t *testing.T) {
 
 func TestRunSuccessfulRequests(t *testing.T) {
 	srv := statusServer(t, http.StatusOK)
-	out, stderr, err := execute(t, "run", scriptFile(t),
-		"--url", srv.URL, "--vus", "3", "--duration", "150ms")
+	out, _, err := execute(t, "run", getScript(t, srv.URL), "--vus", "3", "--duration", "150ms")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, want := range []string{"VUs:         3", "Status:      completed", "Errors:      0 (0.00%)", "p99"} {
+	for _, want := range []string{"VUs:         3", "Status:      completed", "Errors:      0 (0.00%)", "Script errs: 0", "p99"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("summary missing %q:\n%s", want, out)
 		}
@@ -84,15 +89,11 @@ func TestRunSuccessfulRequests(t *testing.T) {
 	if strings.Contains(out, "Requests:    0 ") {
 		t.Errorf("expected requests to be sent:\n%s", out)
 	}
-	if !strings.Contains(stderr, "script execution is not implemented yet") {
-		t.Errorf("expected script note on stderr, got %q", stderr)
-	}
 }
 
 func TestRunFailedRequests(t *testing.T) {
 	srv := statusServer(t, http.StatusInternalServerError)
-	out, _, err := execute(t, "run", scriptFile(t),
-		"--url", srv.URL, "--vus", "2", "--duration", "100ms")
+	out, _, err := execute(t, "run", getScript(t, srv.URL), "--vus", "2", "--duration", "100ms")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,14 +104,29 @@ func TestRunFailedRequests(t *testing.T) {
 	}
 }
 
+func TestRunScriptErrorsDoNotStopTest(t *testing.T) {
+	path := scriptFile(t, `export default function () { throw new Error("kaboom"); }`)
+	out, _, err := execute(t, "run", path, "--vus", "2", "--duration", "100ms")
+	if err != nil {
+		t.Fatalf("script errors must not fail the run: %v", err)
+	}
+	for _, want := range []string{"Status:      completed", "kaboom", "Latency:     no completed requests"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("summary missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "Script errs: 0\n") {
+		t.Errorf("expected script errors to be counted:\n%s", out)
+	}
+}
+
 func TestRunInterrupted(t *testing.T) {
 	srv := statusServer(t, http.StatusOK)
 	ctx, cancel := context.WithCancel(context.Background())
 	time.AfterFunc(100*time.Millisecond, cancel)
 
 	start := time.Now()
-	out, _, err := executeContext(t, ctx, "run", scriptFile(t),
-		"--url", srv.URL, "--vus", "2", "--duration", "1h")
+	out, _, err := executeContext(t, ctx, "run", getScript(t, srv.URL), "--vus", "2", "--duration", "1h")
 	if time.Since(start) > 10*time.Second {
 		t.Fatal("run did not stop on cancellation")
 	}
@@ -122,8 +138,29 @@ func TestRunInterrupted(t *testing.T) {
 	}
 }
 
+func TestRunScriptLoadErrors(t *testing.T) {
+	tests := []struct {
+		name, src, wantErr string
+	}{
+		{"syntax error", "export default function ( {", "load script"},
+		{"no default export", "export const x = 1;", "must export a default function"},
+		{"init error", `throw new Error("init boom"); export default function () {}`, "init boom"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, _, err := execute(t, "run", scriptFile(t, tt.src), "--duration", "1h")
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v, want it to contain %q", err, tt.wantErr)
+			}
+			if out != "" {
+				t.Errorf("no summary expected when the script cannot load, got:\n%s", out)
+			}
+		})
+	}
+}
+
 func TestRunValidation(t *testing.T) {
-	script := scriptFile(t)
+	script := scriptFile(t, "export default function () {}")
 	tests := []struct {
 		name    string
 		args    []string
@@ -131,10 +168,9 @@ func TestRunValidation(t *testing.T) {
 	}{
 		{"missing script arg", []string{"run"}, "accepts 1 arg"},
 		{"too many scripts", []string{"run", "a.ts", "b.ts"}, "accepts 1 arg"},
-		{"missing url", []string{"run", script}, "url is required"},
-		{"zero vus", []string{"run", script, "--url", "http://x", "--vus", "0"}, "vus must be at least 1"},
-		{"bad duration", []string{"run", script, "--url", "http://x", "--duration", "soon"}, "invalid argument"},
-		{"script not found", []string{"run", filepath.Join(t.TempDir(), "nope.ts"), "--url", "http://x"}, "script"},
+		{"zero vus", []string{"run", script, "--vus", "0"}, "vus must be at least 1"},
+		{"bad duration", []string{"run", script, "--duration", "soon"}, "invalid argument"},
+		{"script not found", []string{"run", filepath.Join(t.TempDir(), "nope.ts")}, "load script"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

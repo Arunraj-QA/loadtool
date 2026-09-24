@@ -6,6 +6,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -17,6 +18,11 @@ import (
 // VU, so the function must not share it with other goroutines.
 type IterationFunc func(ctx context.Context, rec *metrics.Recorder)
 
+// NewVUFunc creates the per-VU state and returns the iteration to run. It is
+// called once per VU, sequentially, before the test clock starts, so any
+// state it creates is owned by exactly one VU.
+type NewVUFunc func(id int) (IterationFunc, error)
+
 // Result is the outcome of a run.
 type Result struct {
 	Summary metrics.Summary
@@ -25,17 +31,31 @@ type Result struct {
 	Elapsed time.Duration
 }
 
-// Run starts vus goroutines that each call iter in a loop until duration
-// elapses or ctx is cancelled. It returns only after every VU goroutine has
-// exited.
-func Run(ctx context.Context, vus int, duration time.Duration, iter IterationFunc) Result {
+// Run initializes vus VUs with newVU, then starts one goroutine per VU that
+// calls its iteration in a loop until duration elapses or ctx is cancelled.
+// It returns only after every VU goroutine has exited. If any VU fails to
+// initialize, no load is generated and the error is returned.
+func Run(ctx context.Context, vus int, duration time.Duration, newVU NewVUFunc) (Result, error) {
+	iters := make([]IterationFunc, vus)
+	for i := range iters {
+		if err := ctx.Err(); err != nil {
+			return Result{}, err
+		}
+		iter, err := newVU(i)
+		if err != nil {
+			return Result{}, fmt.Errorf("initialize VU %d: %w", i, err)
+		}
+		iters[i] = iter
+	}
+
+	// The clock starts only after every VU is ready.
 	ctx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
 
 	recorders := make([]*metrics.Recorder, vus)
 	var wg sync.WaitGroup
 	start := time.Now()
-	for i := range recorders {
+	for i, iter := range iters {
 		rec := &metrics.Recorder{}
 		recorders[i] = rec
 		wg.Go(func() { runVU(ctx, rec, iter) })
@@ -43,7 +63,7 @@ func Run(ctx context.Context, vus int, duration time.Duration, iter IterationFun
 	wg.Wait()
 	elapsed := time.Since(start)
 
-	return Result{Summary: metrics.Merge(recorders), Elapsed: elapsed}
+	return Result{Summary: metrics.Merge(recorders), Elapsed: elapsed}, nil
 }
 
 func runVU(ctx context.Context, rec *metrics.Recorder, iter IterationFunc) {

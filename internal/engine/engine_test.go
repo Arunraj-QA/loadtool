@@ -2,6 +2,8 @@ package engine
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -22,9 +24,24 @@ func sleepIteration(d time.Duration) IterationFunc {
 	}
 }
 
+// shared gives every VU the same stateless iteration.
+func shared(iter IterationFunc) NewVUFunc {
+	return func(int) (IterationFunc, error) { return iter, nil }
+}
+
+// run calls Run and fails the test on an initialization error.
+func run(t *testing.T, ctx context.Context, vus int, d time.Duration, iter IterationFunc) Result {
+	t.Helper()
+	res, err := Run(ctx, vus, d, shared(iter))
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	return res
+}
+
 func TestRunStopsAfterDuration(t *testing.T) {
 	const duration = 100 * time.Millisecond
-	res := Run(context.Background(), 4, duration, sleepIteration(5*time.Millisecond))
+	res := run(t, context.Background(), 4, duration, sleepIteration(5*time.Millisecond))
 
 	if res.Elapsed < duration {
 		t.Errorf("Run returned after %v, before duration %v", res.Elapsed, duration)
@@ -43,7 +60,7 @@ func TestRunCancellation(t *testing.T) {
 	time.AfterFunc(50*time.Millisecond, cancel)
 
 	start := time.Now()
-	Run(ctx, 4, time.Hour, sleepIteration(time.Millisecond))
+	run(t, ctx, 4, time.Hour, sleepIteration(time.Millisecond))
 	if took := time.Since(start); took > 5*time.Second {
 		t.Fatalf("Run did not stop on cancellation, took %v", took)
 	}
@@ -52,11 +69,16 @@ func TestRunCancellation(t *testing.T) {
 func TestRunAlreadyCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	var calls atomic.Int64
-	res := Run(ctx, 8, time.Hour, func(context.Context, *metrics.Recorder) { calls.Add(1) })
-	if calls.Load() != 0 || res.Summary.Requests != 0 {
-		t.Fatalf("iterations ran on a cancelled context: calls=%d requests=%d",
-			calls.Load(), res.Summary.Requests)
+	var inits atomic.Int64
+	_, err := Run(ctx, 8, time.Hour, func(int) (IterationFunc, error) {
+		inits.Add(1)
+		return func(context.Context, *metrics.Recorder) {}, nil
+	})
+	if err == nil {
+		t.Fatal("expected error for a cancelled context")
+	}
+	if inits.Load() != 0 {
+		t.Fatalf("%d VUs were initialized on a cancelled context", inits.Load())
 	}
 }
 
@@ -71,7 +93,7 @@ func TestRunStartsEveryVUWithOwnRecorder(t *testing.T) {
 		rec.Record(time.Millisecond, true)
 		<-ctx.Done()
 	}
-	res := Run(context.Background(), vus, 50*time.Millisecond, iter)
+	res := run(t, context.Background(), vus, 50*time.Millisecond, iter)
 
 	if len(seen) != vus {
 		t.Errorf("saw %d distinct recorders, want %d", len(seen), vus)
@@ -90,8 +112,54 @@ func TestRunWaitsForAllVUs(t *testing.T) {
 		// Simulate slow cleanup after cancellation.
 		time.Sleep(10 * time.Millisecond)
 	}
-	Run(context.Background(), 20, 20*time.Millisecond, iter)
+	run(t, context.Background(), 20, 20*time.Millisecond, iter)
 	if n := active.Load(); n != 0 {
 		t.Fatalf("%d VU iterations still running after Run returned", n)
+	}
+}
+
+func TestRunInitializesEachVUOnce(t *testing.T) {
+	const vus = 10
+	var ids []int
+	iterCalls := make([]atomic.Int64, vus)
+	newVU := func(id int) (IterationFunc, error) {
+		ids = append(ids, id) // sequential: no lock needed
+		return func(ctx context.Context, rec *metrics.Recorder) {
+			iterCalls[id].Add(1)
+			<-ctx.Done()
+		}, nil
+	}
+	if _, err := Run(context.Background(), vus, 20*time.Millisecond, newVU); err != nil {
+		t.Fatal(err)
+	}
+	for i, id := range ids {
+		if id != i {
+			t.Fatalf("ids = %v, want 0..%d in order", ids, vus-1)
+		}
+	}
+	if len(ids) != vus {
+		t.Fatalf("initialized %d VUs, want %d", len(ids), vus)
+	}
+	for id := range iterCalls {
+		if iterCalls[id].Load() != 1 {
+			t.Errorf("VU %d iterated %d times, want 1", id, iterCalls[id].Load())
+		}
+	}
+}
+
+func TestRunInitErrorStopsBeforeLoad(t *testing.T) {
+	var iterations atomic.Int64
+	newVU := func(id int) (IterationFunc, error) {
+		if id == 3 {
+			return nil, errors.New("bad script")
+		}
+		return func(context.Context, *metrics.Recorder) { iterations.Add(1) }, nil
+	}
+	_, err := Run(context.Background(), 5, time.Hour, newVU)
+	if err == nil || !strings.Contains(err.Error(), "VU 3") || !strings.Contains(err.Error(), "bad script") {
+		t.Fatalf("error = %v, want VU 3 init error", err)
+	}
+	if n := iterations.Load(); n != 0 {
+		t.Fatalf("%d iterations ran despite init failure", n)
 	}
 }

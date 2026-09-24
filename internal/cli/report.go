@@ -22,14 +22,19 @@ func printSummary(w io.Writer, cfg config.Config, res engine.Result, interrupted
 	}
 
 	fmt.Fprintf(w, "\nLoadTool summary\n\n")
-	fmt.Fprintf(w, "  Target:      GET %s\n", cfg.URL)
+	fmt.Fprintf(w, "  Script:      %s\n", cfg.Script)
 	fmt.Fprintf(w, "  VUs:         %d\n", cfg.VUs)
 	fmt.Fprintf(w, "  Duration:    %s (elapsed %s)\n", cfg.Duration, formatDuration(res.Elapsed))
 	fmt.Fprintf(w, "  Status:      %s\n\n", status)
 
 	fmt.Fprintf(w, "  Requests:    %s (%.1f req/s)\n", formatCount(s.Requests), rps)
 	fmt.Fprintf(w, "  Success:     %s\n", formatCount(s.Successes))
-	fmt.Fprintf(w, "  Errors:      %s (%.2f%%)\n\n", formatCount(s.Failures), s.ErrorRate*100)
+	fmt.Fprintf(w, "  Errors:      %s (%.2f%%)\n", formatCount(s.Failures), s.ErrorRate*100)
+	fmt.Fprintf(w, "  Script errs: %s\n", formatCount(s.ScriptErrors))
+	if s.FirstScriptError != "" {
+		fmt.Fprintf(w, "    first:     %s\n", s.FirstScriptError)
+	}
+	fmt.Fprintln(w)
 
 	if s.Requests == 0 {
 		fmt.Fprintf(w, "  Latency:     no completed requests\n")
