@@ -26,8 +26,8 @@ type NewVUFunc func(id int) (IterationFunc, error)
 // Result is the outcome of a run.
 type Result struct {
 	Summary metrics.Summary
-	// Elapsed is the wall-clock time from starting the VUs until the last
-	// one stopped.
+	// Elapsed is the wall-clock time from the start of the test clock until
+	// the last VU stopped.
 	Elapsed time.Duration
 }
 
@@ -48,13 +48,14 @@ func Run(ctx context.Context, vus int, duration time.Duration, newVU NewVUFunc) 
 		iters[i] = iter
 	}
 
-	// The clock starts only after every VU is ready.
+	// The clock starts only after every VU is ready. start is taken before
+	// the deadline is set so Elapsed is never shorter than duration.
+	start := time.Now()
 	ctx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
 
 	recorders := make([]*metrics.Recorder, vus)
 	var wg sync.WaitGroup
-	start := time.Now()
 	for i, iter := range iters {
 		rec := &metrics.Recorder{}
 		recorders[i] = rec
