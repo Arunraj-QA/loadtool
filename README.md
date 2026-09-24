@@ -4,9 +4,9 @@ LoadTool is an open-source API performance and load-testing engine written
 in Go. Test scenarios are written in TypeScript and run by a Go engine that
 uses one goroutine per virtual user (VU).
 
-> **Status: early development (Phase 0).** `loadtool run` generates HTTP/1.1
-> GET load against a URL and prints a summary. The script file must exist
-> but is **not executed yet**; goja script execution is the next step.
+> **Status: early development (Phase 0).** `loadtool run` executes a
+> TypeScript or JavaScript test script with goja, generates HTTP/1.1 load
+> from one goroutine per VU, and prints a summary.
 
 ## Phase 0 goal
 
@@ -34,21 +34,60 @@ Requires Go (see `go.mod` for the minimum version).
 
 ```bash
 go build -o bin/loadtool ./cmd/loadtool
-./bin/loadtool run test.ts --url http://localhost:8080/ --vus 100 --duration 30s
+./bin/loadtool run examples/basic.ts --vus 100 --duration 30s
 ```
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--url` | (required) | Target requested by every iteration (`GET`) |
 | `-u, --vus` | `1` | Concurrent virtual users (one goroutine each) |
 | `-d, --duration` | `10s` | How long VUs keep iterating |
 
 Press Ctrl+C to stop early. A partial summary is printed and the exit code is 1.
 
+## Writing a test
+
+A test is a `.ts` or `.js` file that exports a default function. Every VU
+calls it repeatedly until the duration ends. See
+[`examples/basic.ts`](examples/basic.ts).
+
+```typescript
+export default function () {
+  const res = http.get("http://localhost:8080/");
+  if (res.status !== 200) {
+    throw new Error(`unexpected status ${res.status}`);
+  }
+}
+```
+
+The Phase 0 script API is intentionally small. It is a single `http` global:
+
+| Call | Returns |
+|---|---|
+| `http.get(url, params?)` | response |
+| `http.request(method, url, body?, params?)` | response |
+
+- `params` is `{ headers: { name: value } }`.
+- A response is `{ status, error, timings: { duration } }`, with the
+  duration in milliseconds.
+- Response bodies are not exposed to scripts yet.
+- Type declarations for editors are in
+  [`examples/loadtool.d.ts`](examples/loadtool.d.ts).
+
 How results are counted:
-- A request succeeds when it gets a 2xx or 3xx response.
-- Redirects are not followed.
+- A request succeeds when it gets a 2xx or 3xx response. Redirects are not
+  followed.
+- A transport failure (connection refused, timeout) does not throw. The
+  response has `status: 0` and an `error` message, and the request counts as
+  failed.
+- If the script throws, that iteration ends and is counted under
+  **Script errs**. The test keeps running, and the first error message is
+  shown in the summary.
+- Top-level code runs once per VU before the test starts. HTTP requests are
+  not allowed there.
 - Requests cut off by the end of the test are not counted.
+
+TypeScript types are stripped (with esbuild) but **not type-checked**.
+Error locations refer to the original `.ts` lines.
 
 ## Development
 
@@ -66,18 +105,19 @@ for every push, and runs vet and tests on Linux and Windows.
 ## Repository layout
 
 ```text
-cmd/loadtool/      CLI entrypoint
+cmd/loadtool/        CLI entrypoint
 internal/cli/        Cobra commands and console summary
 internal/config/     Run settings and validation
 internal/engine/     Goroutine-per-VU scheduler (protocol-agnostic)
+internal/script/     TypeScript/JavaScript loading and per-VU goja runtimes
 internal/httpclient/ HTTP/1.1 request execution
 internal/metrics/    Per-VU recording and percentile aggregation
+examples/            Example test scripts
 benchmarks/          Recorded benchmark results
 docs/adr/            Architecture decision records
 ```
 
-See [ADR 0001](docs/adr/0001-cli-and-repository-layout.md) and
-[ADR 0002](docs/adr/0002-http-load-generator.md).
+See the [architecture decision records](docs/adr/).
 
 ## License
 
