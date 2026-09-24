@@ -109,7 +109,9 @@ License:
 14. Performance-sensitive code must have benchmarks.
 15. Avoid unnecessary allocations in the hot path.
 16. Do not silently change architecture decisions.
-17. Create an ADR when making a significant architecture decision.
+17. Create an ADR when making a significant architecture decision. Store it
+    as `docs/decisions/ADR-NNN-short-name.md` using the next free number,
+    and add it to `docs/decisions/README.md`.
 
 ## Development Workflow
 

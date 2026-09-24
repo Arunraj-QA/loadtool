@@ -1,7 +1,8 @@
-# ADR 0001: CLI and repository layout
+# ADR-002: CLI and repository layout
 
 - Status: Accepted
 - Date: 2026-09-24
+- Previously: `docs/adr/0001-cli-and-repository-layout.md` (ADR 0001)
 
 ## Context
 

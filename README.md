@@ -117,10 +117,10 @@ internal/httpclient/ HTTP/1.1 request execution
 internal/metrics/    Per-VU recording and percentile aggregation
 examples/            Example test scripts
 benchmarks/          Recorded benchmark results
-docs/adr/            Architecture decision records
+docs/decisions/      Architecture decision records (ADR-NNN)
 ```
 
-See the [architecture decision records](docs/adr/).
+See the [architecture decision records](docs/decisions/).
 
 ## License
 

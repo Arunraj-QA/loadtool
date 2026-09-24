@@ -1,7 +1,8 @@
-# ADR 0003: Script execution with goja
+# ADR-001: Script runtime (goja)
 
 - Status: Accepted
 - Date: 2026-09-24
+- Previously: `docs/adr/0003-script-execution-with-goja.md` (ADR 0003)
 
 ## Context
 

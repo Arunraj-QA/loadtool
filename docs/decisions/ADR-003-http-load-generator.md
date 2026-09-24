@@ -1,7 +1,8 @@
-# ADR 0002: Minimal HTTP/1.1 load generator
+# ADR-003: Minimal HTTP/1.1 load generator
 
 - Status: Accepted
 - Date: 2026-09-24
+- Previously: `docs/adr/0002-http-load-generator.md` (ADR 0002)
 
 ## Context
 
