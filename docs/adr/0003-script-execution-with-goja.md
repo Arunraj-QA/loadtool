@@ -13,13 +13,25 @@ module `export` statements. A `goja.Runtime` is not goroutine-safe.
 ## Decision
 
 1. **Transpile with esbuild's Go API** (`github.com/evanw/esbuild/pkg/api`).
-   - It strips TypeScript types, converts ES module exports to CommonJS,
-     targets ES2017, and emits an inline source map.
-   - goja reads that source map, so errors point at the original `.ts`
-     line.
+   - It strips TypeScript types and targets ES2017.
    - esbuild is pure Go (no cgo, no Node.js).
    - Types are **not** checked; that needs the TypeScript compiler, which
      runs on Node.js.
+   - **How the default export is resolved:** esbuild bundles a generated
+     entry, `import fn from "loadtool:script"; globalThis.__loadtool_default = fn;`.
+     A plugin serves the user's script for that import from memory.
+     Because the default import is bound inside one bundle, the output
+     contains no CommonJS interop helpers.
+   - The first version converted scripts to CommonJS instead. Its helpers
+     were about 75% of each VU's retained heap (30 KB → 6 KB per VU after
+     the change; see `benchmarks/2026-09-24-vu-memory.md`).
+   - **Imports:** every other import is rejected at compile time with
+     "imports are not supported yet".
+   - **Source maps:** the map is produced separately and its file names
+     are stripped of the esbuild namespace. It is then inlined, so goja
+     reports errors at the original `.ts` line (e.g. `test.ts:4:9`).
+   - **CommonJS-style `.js` scripts** follow Node semantics: `default` is
+     the whole `module.exports`.
 2. **Compile once and share.** The transpiled code is compiled once into a
    `*goja.Program`. goja documents compiled programs as safe for concurrent
    use, so all VUs share it.
@@ -77,10 +89,12 @@ module `export` statements. A `goja.Runtime` is not goroutine-safe.
 ## Consequences
 
 - Binary size grows to about 28 MB (esbuild and goja).
-- Each VU allocates about 40 KB while it is created (`BenchmarkNewVU`,
-  458 allocations) and keeps about 30 KB (`BenchmarkVURetainedMemory`).
-  About 22 KB of that comes from esbuild's CommonJS interop helpers, which
-  every runtime executes; see `benchmarks/2026-09-24-vu-memory.md`.
+- Each VU allocates about 6 KB while it is created (`BenchmarkNewVU`, 54
+  allocations) and keeps about 6 KB (`BenchmarkVURetainedMemory`); see
+  `benchmarks/2026-09-24-vu-memory.md`.
+- A smaller live heap makes Go's GC run more often. On an
+  allocation-heavy script at 1,000 VUs, GC CPU rose from 8% to 11% while
+  peak process memory fell by about half.
 - Calling the default function costs about 370 ns and 4 allocations per
   iteration before any request (`BenchmarkIterateEmpty`).
 - `async` default functions are not supported: there is no event loop, and

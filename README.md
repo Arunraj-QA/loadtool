@@ -84,6 +84,7 @@ How results are counted:
   shown in the summary.
 - Top-level code runs once per VU before the test starts. HTTP requests are
   not allowed there.
+- A script is a single file: `import` statements are not supported yet.
 - Requests cut off by the end of the test are not counted.
 
 TypeScript types are stripped (with esbuild) but **not type-checked**.
