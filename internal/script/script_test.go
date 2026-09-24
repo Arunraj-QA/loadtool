@@ -92,7 +92,9 @@ func TestLoad(t *testing.T) {
 	}
 }
 
-func TestNewVUErrors(t *testing.T) {
+// TestLoadErrors covers scripts that must be rejected before load starts,
+// either when compiling or when a VU runs the top-level code.
+func TestLoadErrors(t *testing.T) {
 	tests := []struct {
 		name    string
 		src     string
@@ -100,17 +102,44 @@ func TestNewVUErrors(t *testing.T) {
 	}{
 		{"no default export", `export const x = 1;`, "must export a default function"},
 		{"default not a function", `export default 42;`, "must export a default function"},
-		{"no exports at all", `module.exports = undefined;`, "has no exports"},
+		{"commonjs without default", `module.exports = undefined;`, "must export a default function"},
 		{"top-level throw", `throw new Error("init failed"); export default function () {}`, "init failed"},
 		{"request in init", `http.get("http://127.0.0.1:1/"); export default function () {}`, "not allowed in the script's top-level code"},
+		{"import", `import { f } from "./other"; export default function () { f(); }`, `imports are not supported yet (importing "./other")`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := compile(t, "test.js", tt.src).NewVU(http.DefaultClient)
+			p, err := Compile("test.ts", []byte(tt.src))
+			if err == nil {
+				_, err = p.NewVU(http.DefaultClient)
+			}
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("error = %v, want it to contain %q", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+// TestTranspileHasNoInteropHelpers guards per-VU memory: esbuild's
+// CommonJS interop helpers cost about 22 KB in every VU runtime.
+func TestTranspileHasNoInteropHelpers(t *testing.T) {
+	code, err := transpile("test.ts", []byte(`
+let count: number = 0;
+export default function (): void { count++; }`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, helper := range []string{"__export", "__copyProps", "__toCommonJS", "__toESM"} {
+		if strings.Contains(code, helper) {
+			t.Errorf("output contains %s:\n%s", helper, code)
+		}
+	}
+}
+
+func TestCompileErrorLocationHasNoNamespace(t *testing.T) {
+	_, err := Compile("bad.ts", []byte("export default function ( {\n"))
+	if err == nil || strings.Contains(err.Error(), scriptNamespace+":") {
+		t.Fatalf("error = %v, want a location without the %q prefix", err, scriptNamespace)
 	}
 }
 
@@ -195,8 +224,8 @@ export default function () {
 		t.Fatalf("ScriptErrors = %d, want 2", s.ScriptErrors)
 	}
 	// The source map should point at the original TypeScript line.
-	if !strings.Contains(s.FirstScriptError, "boom") || !strings.Contains(s.FirstScriptError, "test.ts:4") {
-		t.Errorf("first error %q should mention boom at test.ts:4", s.FirstScriptError)
+	if !strings.Contains(s.FirstScriptError, "boom") || !strings.Contains(s.FirstScriptError, "(test.ts:4:") {
+		t.Errorf("first error %q should mention boom at (test.ts:4:", s.FirstScriptError)
 	}
 }
 
