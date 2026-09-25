@@ -2,7 +2,7 @@
 #
 # Usage (from the repository root):
 #   go build -o bin/loadtool.exe ./cmd/loadtool
-#   ./benchmarks/tools/peak-memory.ps1 -Script examples/basic-http.ts -VUs 1000 -Duration 10s
+#   ./benchmarks/loadtool/peak-memory.ps1 -Script examples/basic-http.ts -VUs 1000 -Duration 10s
 #
 # Samples every 100 ms; peaks shorter than that may be missed.
 param(

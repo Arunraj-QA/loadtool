@@ -25,7 +25,7 @@ module `export` statements. A `goja.Runtime` is not goroutine-safe.
      contains no CommonJS interop helpers.
    - The first version converted scripts to CommonJS instead. Its helpers
      were about 75% of each VU's retained heap (30 KB → 6 KB per VU after
-     the change; see `benchmarks/2026-09-24-vu-memory.md`).
+     the change; see `benchmarks/results/2026-09-24-vu-memory.md`).
    - **Imports:** every other import is rejected at compile time with
      "imports are not supported yet".
    - **Source maps:** the map is produced separately and its file names
@@ -92,7 +92,7 @@ module `export` statements. A `goja.Runtime` is not goroutine-safe.
 - Binary size grows to about 28 MB (esbuild and goja).
 - Each VU allocates about 6 KB while it is created (`BenchmarkNewVU`, 54
   allocations) and keeps about 6 KB (`BenchmarkVURetainedMemory`); see
-  `benchmarks/2026-09-24-vu-memory.md`.
+  `benchmarks/results/2026-09-24-vu-memory.md`.
 - A smaller live heap makes Go's GC run more often. On an
   allocation-heavy script at 1,000 VUs, GC CPU rose from 8% to 11% while
   peak process memory fell by about half.

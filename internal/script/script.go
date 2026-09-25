@@ -58,7 +58,7 @@ const (
 // global. Bundling this entry lets esbuild bind the default export
 // directly, so the output needs no CommonJS interop helpers. Every VU runs
 // the output, and those helpers made up about 75% of per-VU memory (see
-// benchmarks/2026-09-24-vu-memory.md).
+// benchmarks/results/2026-09-24-vu-memory.md).
 var entrySource = fmt.Sprintf("import fn from %q;\nglobalThis.%s = fn;\n", scriptImport, defaultExportGlobal)
 
 var errNoDefaultExport = errors.New("script must export a default function: `export default function () { ... }`")
