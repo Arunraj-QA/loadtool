@@ -8,7 +8,7 @@
 // LoadTool has no environment variables in scripts yet, so change
 // TARGET here when the server runs on another machine.
 
-const TARGET = "http://127.0.0.1:8080/";
+const TARGET = "http://127.0.0.1:8080/api/test";
 
 export default function (): void {
   const res = http.get(TARGET);
