@@ -36,6 +36,15 @@ separate task, so the engine must work before scripts exist.
    - Recorders are merged once, after all VUs stop.
    - All latency samples are kept exactly, and percentiles use the
      nearest-rank method.
+   - Successful and failed latencies are kept in separate slices.
+     - The summary reports percentiles over all sent requests
+       (comparable with k6 and JMeter) and over successful requests only,
+       because fast failures such as refused connections otherwise pull
+       percentiles down.
+     - All-request percentiles are selected from the two sorted slices
+       directly, so no merged copy is made.
+   - A request that was never sent (an invalid request) counts as a
+     failure without a latency sample. It previously added a 0 ms sample.
 6. **HTTP client.**
    - One shared `http.Client` per run, with idle connections per host
      equal to the VU count, so each VU can keep its connection alive.

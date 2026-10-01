@@ -92,6 +92,15 @@ How results are counted:
   (`maximum call stack size of 2500 frames exceeded`); `try/catch` cannot
   catch it.
 - Requests cut off by the end of the test are not counted.
+- The summary shows latency twice:
+  - **all requests sent**, failed ones included. This is the same
+    population k6's `http_req_duration` and JMeter use.
+  - **successful requests only.** Fast failures such as refused
+    connections pull the first set down; the second is unaffected.
+- A request that could not be sent at all (for example an invalid URL)
+  counts as a failed request but adds no latency sample.
+- LoadTool sends only the headers the script sets. It does not add
+  `Accept-Encoding: gzip` on its own.
 
 TypeScript types are stripped (with esbuild) but **not type-checked**.
 Error locations refer to the original `.ts` lines.
