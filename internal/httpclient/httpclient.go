@@ -28,11 +28,16 @@ const DefaultTimeout = 30 * time.Second
 // "thread exhaustion" after exceeding Go's 10,000-thread limit.
 //
 // Redirects are not followed, so each request is measured on its own.
+//
+// Only headers the script sets are sent: Go's transport would otherwise add
+// "Accept-Encoding: gzip" and decompress responses, which k6 and JMeter do
+// not do and which changes the work the server and the client perform.
 func New(maxConnsPerHost int, timeout time.Duration) *http.Client {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.MaxConnsPerHost = maxConnsPerHost
 	t.MaxIdleConns = maxConnsPerHost
 	t.MaxIdleConnsPerHost = maxConnsPerHost
+	t.DisableCompression = true
 	// Phase 0 is HTTP/1.1 only: disable HTTP/2 negotiation over TLS.
 	t.ForceAttemptHTTP2 = false
 	t.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}

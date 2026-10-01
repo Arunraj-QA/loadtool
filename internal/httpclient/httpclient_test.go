@@ -302,3 +302,27 @@ func TestNewCapsConnectionsPerHost(t *testing.T) {
 		t.Errorf("opened %d connections at once, want at most %d", m, limit)
 	}
 }
+
+// TestDoSendsNoImplicitAcceptEncoding keeps LoadTool's requests equivalent
+// to k6 and JMeter, which do not ask for compression unless told to.
+func TestDoSendsNoImplicitAcceptEncoding(t *testing.T) {
+	got := make(chan string, 2)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got <- r.Header.Get("Accept-Encoding")
+	}))
+	t.Cleanup(srv.Close)
+	client := New(1, DefaultTimeout)
+	rec := &metrics.Recorder{}
+
+	Do(context.Background(), client, get(srv.URL), rec)
+	if ae := <-got; ae != "" {
+		t.Errorf("default request sent Accept-Encoding %q, want none", ae)
+	}
+
+	Do(context.Background(), client, Request{
+		Method: http.MethodGet, URL: srv.URL, Header: http.Header{"Accept-Encoding": {"br"}},
+	}, rec)
+	if ae := <-got; ae != "br" {
+		t.Errorf("explicit Accept-Encoding = %q, want %q", ae, "br")
+	}
+}
