@@ -16,13 +16,21 @@ import (
 // DefaultTimeout bounds a single request, including reading the body.
 const DefaultTimeout = 30 * time.Second
 
-// New returns an HTTP/1.1 client tuned for load testing. It keeps up to
-// maxConnsPerHost idle connections per host, so each VU can reuse its own
-// keep-alive connection instead of dialing per request.
+// New returns an HTTP/1.1 client tuned for load testing. Pass the VU count
+// as maxConnsPerHost: each VU needs at most one connection per host, and
+// keeps it alive between requests.
+//
+// maxConnsPerHost caps open plus dialing connections, not just idle ones.
+// Without that cap the transport starts extra background dials whenever a
+// request waits for a connection; against a target that refuses
+// connections those dials pile up, and on Windows each one blocked in
+// socket creation holds an OS thread. A 1,000-VU run crashed that way with
+// "thread exhaustion" after exceeding Go's 10,000-thread limit.
 //
 // Redirects are not followed, so each request is measured on its own.
 func New(maxConnsPerHost int, timeout time.Duration) *http.Client {
 	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.MaxConnsPerHost = maxConnsPerHost
 	t.MaxIdleConns = maxConnsPerHost
 	t.MaxIdleConnsPerHost = maxConnsPerHost
 	// Phase 0 is HTTP/1.1 only: disable HTTP/2 negotiation over TLS.

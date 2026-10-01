@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -252,5 +253,52 @@ func TestResultOK(t *testing.T) {
 		if got := tt.res.OK(); got != tt.want {
 			t.Errorf("%+v.OK() = %v, want %v", tt.res, got, tt.want)
 		}
+	}
+}
+
+// TestNewCapsConnectionsPerHost guards against unbounded background dials:
+// requests beyond the cap must wait for a connection instead of opening more.
+func TestNewCapsConnectionsPerHost(t *testing.T) {
+	const limit, requests = 2, 10
+	var open, maxOpen atomic.Int64
+	release := make(chan struct{})
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+	}))
+	srv.Config.ConnState = func(_ net.Conn, s http.ConnState) {
+		switch s {
+		case http.StateNew:
+			n := open.Add(1)
+			for {
+				m := maxOpen.Load()
+				if n <= m || maxOpen.CompareAndSwap(m, n) {
+					break
+				}
+			}
+		case http.StateClosed, http.StateHijacked:
+			open.Add(-1)
+		}
+	}
+	srv.Start()
+	t.Cleanup(srv.Close)
+
+	client := New(limit, DefaultTimeout)
+	t.Cleanup(client.CloseIdleConnections)
+	rec := make([]*metrics.Recorder, requests)
+	var wg sync.WaitGroup
+	for i := range requests {
+		rec[i] = &metrics.Recorder{}
+		wg.Go(func() { Do(context.Background(), client, get(srv.URL), rec[i]) })
+	}
+	// Let every request reach the transport before any response is sent.
+	time.Sleep(200 * time.Millisecond)
+	close(release)
+	wg.Wait()
+
+	if s := metrics.Merge(rec); s.Successes != requests {
+		t.Fatalf("got %+v, want %d successes", s, requests)
+	}
+	if m := maxOpen.Load(); m > limit {
+		t.Errorf("opened %d connections at once, want at most %d", m, limit)
 	}
 }
