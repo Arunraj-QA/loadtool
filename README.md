@@ -87,6 +87,10 @@ How results are counted:
 - Top-level code runs once per VU before the test starts. HTTP requests are
   not allowed there.
 - A script is a single file: `import` statements are not supported yet.
+- JavaScript call depth is limited to 2,500 nested calls per VU. Deeper
+  recursion ends the iteration with a script error
+  (`maximum call stack size of 2500 frames exceeded`); `try/catch` cannot
+  catch it.
 - Requests cut off by the end of the test are not counted.
 
 TypeScript types are stripped (with esbuild) but **not type-checked**.

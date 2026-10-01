@@ -98,5 +98,17 @@ module `export` statements. A `goja.Runtime` is not goroutine-safe.
   peak process memory fell by about half.
 - Calling the default function costs about 370 ns and 4 allocations per
   iteration before any request (`BenchmarkIterateEmpty`).
+- **Call depth is limited to 2,500 frames per VU**
+  (`Runtime.SetMaxCallStackSize`). goja's default is effectively unlimited
+  and keeps its call stack on the heap, so a runaway recursive script grew
+  memory without bound (measured: about 33 MB/s for one VU) and could
+  terminate the whole test.
+  - Exceeding the limit raises an uncatchable error, recorded as a script
+    error.
+  - A VU keeps the stack's memory after hitting the limit, so the limit
+    sets the worst case. Measured per VU: 1,000 frames ~0.8 MB, 2,500
+    ~1.7 MB, 10,000 ~4.8 MB.
+  - 2,500 was chosen to allow deep legitimate recursion while keeping
+    1,000 runaway VUs near 1.7 GB.
 - `async` default functions are not supported: there is no event loop, and
   the `http` API is synchronous.
