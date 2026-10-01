@@ -14,8 +14,10 @@ $rows = Get-Content -Encoding UTF8 $Runs | Where-Object { $_.Trim() } | ForEach-
 
 $metrics = [ordered]@{
   cpuPercent       = 'CPU %'
-  peakPrivateMB    = 'Peak memory MB'
-  avgPrivateMB     = 'Avg memory MB'
+  peakPrivateMB    = 'Peak memory MB (private bytes)'
+  avgPrivateMB     = 'Avg memory MB (private bytes)'
+  peakWorkingSetMB = 'Peak working set MB'
+  avgWorkingSetMB  = 'Avg working set MB'
   requestsPerSec   = 'Requests/sec'
   p50Ms            = 'p50 ms'
   p95Ms            = 'p95 ms'

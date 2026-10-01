@@ -186,7 +186,7 @@ function Find-Child([int] $parentId, [string] $name) {
 }
 
 function Read-Result([string] $tool, $cmd, [string] $stdout) {
-  $r = @{ Requests = $null; RequestsPerSec = $null; P50Ms = $null; P95Ms = $null; P99Ms = $null; Errors = $null; Source = $null }
+  $r = @{ Requests = $null; RequestsPerSec = $null; P50Ms = $null; P95Ms = $null; P99Ms = $null; Errors = $null; Source = $null; JtlRequests = $null; JtlErrors = $null }
   switch ($tool) {
     'loadtool' {
       $r.Source = 'loadtool console summary'
@@ -211,14 +211,16 @@ function Read-Result([string] $tool, $cmd, [string] $stdout) {
       $r.P95Ms = [double]$m.http_req_duration.'p(95)'; $r.P99Ms = [double]$m.http_req_duration.'p(99)'
     }
     'jmeter' {
-      $r.Source = 'calculated from JMeter JTL (nearest rank; throughput = requests / first-to-last sample span)'
+      $r.Source = 'JMeter summariser (requests, rate, errors); percentiles calculated from JTL (nearest rank)'
+      # The last "summary =" line is JMeter's cumulative total for the run.
+      $line = Get-Content $stdout | Where-Object { $_ -match '^summary =' } | Select-Object -Last 1
+      if ($line -match '^summary =\s+(\d+) in [\d:]+ =\s+([\d.]+)/s.*Err:\s+(\d+)') {
+        $r.Requests = [long]$Matches[1]; $r.RequestsPerSec = Get-Parsed $Matches[2]; $r.Errors = [long]$Matches[3]
+      }
       if (-not (Test-Path $cmd.Jtl) -or (Get-Item $cmd.Jtl).Length -eq 0) { return $r }
       $s = [JtlStats]::Read((Resolve-Path $cmd.Jtl).Path)
-      $r.Requests = $s.Requests; $r.Errors = $s.Errors
-      if ($s.Requests -gt 0) {
-        $r.RequestsPerSec = $s.Requests / $s.SpanSec
-        $r.P50Ms = $s.P50; $r.P95Ms = $s.P95; $r.P99Ms = $s.P99
-      }
+      $r.JtlRequests = $s.Requests; $r.JtlErrors = $s.Errors
+      if ($s.Requests -gt 0) { $r.P50Ms = $s.P50; $r.P95Ms = $s.P95; $r.P99Ms = $s.P99 }
     }
   }
   return $r
@@ -244,13 +246,13 @@ function Invoke-Run([string] $tool, [int] $vus, [int] $seconds, [string] $kind, 
 
   $samples = New-Object System.Collections.Generic.List[string]
   $samples.Add('elapsed_s,private_mb,working_set_mb')
-  $peakPrivate = 0; $peakWS = 0; $sumPrivate = 0; $n = 0
+  $peakPrivate = 0; $peakWS = 0; $sumPrivate = 0; $sumWS = 0; $n = 0
   while (-not $p.HasExited) {
     try {
       $p.Refresh()
       $priv = $p.PrivateMemorySize64; $ws = $p.WorkingSet64
       $peakPrivate = [Math]::Max($peakPrivate, $priv); $peakWS = [Math]::Max($peakWS, $ws)
-      $sumPrivate += $priv; $n++
+      $sumPrivate += $priv; $sumWS += $ws; $n++
       $samples.Add([string]::Format($inv, '{0:F2},{1:F1},{2:F1}', ((Get-Date) - $started).TotalSeconds, ($priv / 1MB), ($ws / 1MB)))
     } catch {}
     Start-Sleep -Milliseconds 250
@@ -266,8 +268,10 @@ function Invoke-Run([string] $tool, [int] $vus, [int] $seconds, [string] $kind, 
 
   $errorRate = $null
   if ($r.Requests -gt 0 -and $null -ne $r.Errors) { $errorRate = 100.0 * $r.Errors / $r.Requests }
-  $avgPrivate = $null
-  if ($n -gt 0) { $avgPrivate = [Math]::Round($sumPrivate / $n / 1MB, 1) }
+  $avgPrivate = $null; $avgWS = $null
+  if ($n -gt 0) {
+    $avgPrivate = [Math]::Round($sumPrivate / $n / 1MB, 1); $avgWS = [Math]::Round($sumWS / $n / 1MB, 1)
+  }
   $jtlInfo = $null
   if ($cmd.Jtl -and (Test-Path $cmd.Jtl)) {
     $jtlInfo = @{ path = $cmd.Jtl; bytes = (Get-Item $cmd.Jtl).Length; sha256 = (Get-FileHash -Algorithm SHA256 $cmd.Jtl).Hash }
@@ -287,9 +291,11 @@ function Invoke-Run([string] $tool, [int] $vus, [int] $seconds, [string] $kind, 
     cpuPercent = [Math]::Round($cpuSec / $wall / $logicalCPUs * 100, 2)
     cpuCores = [Math]::Round($cpuSec / $wall, 2)
     avgPrivateMB = $avgPrivate
+    avgWorkingSetMB = $avgWS
     errorRatePct = $errorRate
     serverCpuPercent = [Math]::Round($serverCpu / $serverWall / $logicalCPUs * 100, 2)
     jtl = $jtlInfo
+    jtlRequests = $r.JtlRequests; jtlErrors = $r.JtlErrors   # cross-check of JMeter's own counts
   }
   Write-Utf8 $runsFile (($rec | ConvertTo-Json -Compress -Depth 4) + "`n") -Append
   return [pscustomobject]$rec
