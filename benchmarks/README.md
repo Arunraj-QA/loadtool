@@ -143,7 +143,7 @@ so data from different sessions is never mixed.
 | Average memory | calculated | Mean of those samples, over the whole process lifetime. |
 | Requests, errors | measured | LoadTool: console summary. k6: `--summary-export` (`http_reqs.count`, `http_req_failed.passes`). JMeter: counted from the JTL (`success` column). |
 | Requests/sec | measured (LoadTool, k6) / calculated (JMeter) | LoadTool and k6 report their own rate. JMeter: requests ÷ time from the first sample start to the last sample end in the JTL. |
-| p50, p95, p99 | measured (LoadTool, k6) / calculated (JMeter) | LoadTool and k6 report their own percentiles. JMeter: nearest rank over the JTL `elapsed` column (whole milliseconds). |
+| p50, p95, p99 | measured (LoadTool, k6) / calculated (JMeter) | LoadTool and k6 report their own percentiles. Since ADR-004, LoadTool's are histogram values within ±0.78 % of exact. JMeter: nearest rank over the JTL `elapsed` column (whole milliseconds). |
 | Error rate | calculated | errors ÷ requests × 100. |
 | Server CPU % | calculated | CPU time used by the benchmark server during the run ÷ wall time ÷ logical CPUs. |
 

@@ -35,7 +35,9 @@ separate task, so the engine must work before scripts exist.
      atomics.
    - Recorders are merged once, after all VUs stop.
    - All latency samples are kept exactly, and percentiles use the
-     nearest-rank method.
+     nearest-rank method. **Superseded by
+     [ADR-004](ADR-004-latency-histogram.md):** latencies now go into
+     fixed-size histograms, and percentiles are within ±0.78 %.
    - Successful and failed latencies are kept in separate slices.
      - The summary reports percentiles over all sent requests
        (comparable with k6 and JMeter) and over successful requests only,

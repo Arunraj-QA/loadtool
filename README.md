@@ -97,6 +97,10 @@ How results are counted:
     population k6's `http_req_duration` and JMeter use.
   - **successful requests only.** Fast failures such as refused
     connections pull the first set down; the second is unaffected.
+- Percentiles come from a fixed-size histogram and are within ±0.78 % of
+  the exact value. Min, max, mean and counts are exact. Memory does not
+  grow with test length
+  ([ADR-004](docs/decisions/ADR-004-latency-histogram.md)).
 - A request that could not be sent at all (for example an invalid URL)
   counts as a failed request but adds no latency sample.
 - LoadTool sends only the headers the script sets. It does not add
