@@ -81,7 +81,7 @@ func TestRunSuccessfulRequests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, want := range []string{"VUs:         3", "Status:      completed", "Errors:      0 (0.00%)", "Script errs: 0", "p99"} {
+	for _, want := range []string{"VUs:         3", "Status:      completed", "Errors:      0 (0.00%)", "Script errs: 0", "p99", "Latency (successful requests):"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("summary missing %q:\n%s", want, out)
 		}
@@ -110,7 +110,7 @@ func TestRunScriptErrorsDoNotStopTest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("script errors must not fail the run: %v", err)
 	}
-	for _, want := range []string{"Status:      completed", "kaboom", "Latency:     no completed requests"} {
+	for _, want := range []string{"Status:      completed", "kaboom", "Latency:     no requests were sent"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("summary missing %q:\n%s", want, out)
 		}

@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"math/rand/v2"
+	"slices"
 	"testing"
 	"time"
 )
@@ -31,6 +33,7 @@ func TestMergeAggregatesAcrossRecorders(t *testing.T) {
 		Requests:  100,
 		Successes: 90,
 		Failures:  10,
+		Sent:      100,
 		ErrorRate: 0.1,
 		Min:       1 * time.Millisecond,
 		Mean:      50500 * time.Microsecond,
@@ -39,6 +42,11 @@ func TestMergeAggregatesAcrossRecorders(t *testing.T) {
 		P90:       90 * time.Millisecond,
 		P95:       95 * time.Millisecond,
 		P99:       99 * time.Millisecond,
+		// Successes are 1..99 ms without the multiples of 10 (90 values).
+		SuccessP50: 49 * time.Millisecond, // rank 45
+		SuccessP90: 89 * time.Millisecond, // rank 81
+		SuccessP95: 95 * time.Millisecond, // rank 86
+		SuccessP99: 99 * time.Millisecond, // rank 90
 	}
 	if got != want {
 		t.Fatalf("Merge =\n %+v\nwant\n %+v", got, want)
@@ -68,10 +76,90 @@ func TestPercentile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := percentile(tt.sorted, tt.p); got != tt.want {
+			if got := percentile(tt.sorted, nil, tt.p); got != tt.want {
 				t.Errorf("percentile(p%d) = %v, want %v", tt.p, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestKthMatchesSortedUnion checks the two-slice selection against sorting
+// the concatenation, over many deterministic random cases including empty
+// slices and duplicates.
+func TestKthMatchesSortedUnion(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1, 2))
+	for c := 0; c < 2000; c++ {
+		a := randomSorted(rng, rng.IntN(12))
+		b := randomSorted(rng, rng.IntN(12))
+		union := slices.Sorted(slices.Values(append(slices.Clone(a), b...)))
+		for k := range union {
+			if got := kth(a, b, k); got != union[k] {
+				t.Fatalf("kth(%v, %v, %d) = %v, want %v", a, b, k, got, union[k])
+			}
+		}
+	}
+}
+
+func randomSorted(rng *rand.Rand, n int) []time.Duration {
+	s := make([]time.Duration, n)
+	for i := range s {
+		s[i] = time.Duration(rng.IntN(20)) // small range: many duplicates
+	}
+	slices.Sort(s)
+	return s
+}
+
+func TestRecordUnsentAddsNoLatency(t *testing.T) {
+	r := &Recorder{}
+	r.Record(10*time.Millisecond, true)
+	r.RecordUnsent()
+	r.RecordUnsent()
+	s := Merge([]*Recorder{r})
+	if s.Requests != 3 || s.Failures != 2 || s.Sent != 1 {
+		t.Fatalf("Requests=%d Failures=%d Sent=%d, want 3, 2, 1", s.Requests, s.Failures, s.Sent)
+	}
+	if s.Min != 10*time.Millisecond || s.P50 != 10*time.Millisecond {
+		t.Fatalf("unsent requests changed latency: Min=%v P50=%v, want 10ms", s.Min, s.P50)
+	}
+}
+
+func TestOnlyUnsentRequests(t *testing.T) {
+	r := &Recorder{}
+	r.RecordUnsent()
+	s := Merge([]*Recorder{r})
+	if s.Requests != 1 || s.Failures != 1 || s.Sent != 0 || s.ErrorRate != 1 || s.Max != 0 {
+		t.Fatalf("unexpected summary %+v", s)
+	}
+}
+
+// TestSuccessPercentilesExcludeFastFailures reproduces the benchmark case:
+// refused connections fail in microseconds and pull all-request
+// percentiles down, while success-only percentiles stay true.
+func TestSuccessPercentilesExcludeFastFailures(t *testing.T) {
+	r := &Recorder{}
+	for range 60 {
+		r.Record(50*time.Millisecond, true)
+	}
+	for range 40 {
+		r.Record(100*time.Microsecond, false) // connection refused
+	}
+	s := Merge([]*Recorder{r})
+	if s.P50 != 50*time.Millisecond || s.SuccessP50 != 50*time.Millisecond {
+		t.Fatalf("P50=%v SuccessP50=%v, want 50ms both", s.P50, s.SuccessP50)
+	}
+	if s.Min != 100*time.Microsecond {
+		t.Errorf("Min = %v, want the fast failures included (100µs)", s.Min)
+	}
+	r2 := &Recorder{}
+	for range 40 {
+		r2.Record(50*time.Millisecond, true)
+	}
+	for range 60 {
+		r2.Record(100*time.Microsecond, false)
+	}
+	s2 := Merge([]*Recorder{r2})
+	if s2.P50 != 100*time.Microsecond || s2.SuccessP50 != 50*time.Millisecond {
+		t.Fatalf("P50=%v SuccessP50=%v, want 100µs (distorted) and 50ms (true)", s2.P50, s2.SuccessP50)
 	}
 }
 

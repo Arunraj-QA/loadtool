@@ -233,8 +233,8 @@ func TestDoInvalidRequest(t *testing.T) {
 	if res.Err == nil || res.OK() {
 		t.Fatalf("result = %+v, want error", res)
 	}
-	if s := summarize(rec); s.Failures != 1 {
-		t.Fatalf("got %+v, want 1 failure", s)
+	if s := summarize(rec); s.Failures != 1 || s.Sent != 0 || s.Max != 0 {
+		t.Fatalf("got %+v, want 1 failure and no latency sample (nothing was sent)", s)
 	}
 }
 

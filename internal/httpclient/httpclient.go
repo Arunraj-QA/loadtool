@@ -86,7 +86,7 @@ func Do(ctx context.Context, client *http.Client, r Request, rec *metrics.Record
 	}
 	req, err := http.NewRequestWithContext(ctx, r.Method, r.URL, body)
 	if err != nil {
-		rec.Record(0, false)
+		rec.RecordUnsent()
 		return Result{Err: err}
 	}
 	if r.Header != nil {

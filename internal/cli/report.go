@@ -36,19 +36,35 @@ func printSummary(w io.Writer, cfg config.Config, res engine.Result, interrupted
 	}
 	fmt.Fprintln(w)
 
-	if s.Requests == 0 {
-		fmt.Fprintf(w, "  Latency:     no completed requests\n")
+	if s.Sent == 0 {
+		fmt.Fprintf(w, "  Latency:     no requests were sent\n")
 		return
 	}
-	fmt.Fprintf(w, "  Latency:\n")
-	for _, row := range []struct {
-		name string
-		d    time.Duration
-	}{
+	// All requests first: benchmarks/measure.ps1 reads the first p50/p95/p99
+	// lines, which keeps LoadTool comparable with k6 and JMeter.
+	fmt.Fprintf(w, "  Latency (all requests sent, failed included):\n")
+	printLatencies(w, []latencyRow{
 		{"min", s.Min}, {"mean", s.Mean},
 		{"p50", s.P50}, {"p90", s.P90}, {"p95", s.P95}, {"p99", s.P99},
 		{"max", s.Max},
-	} {
+	})
+	if s.Successes == 0 {
+		fmt.Fprintf(w, "  Latency (successful requests): none succeeded\n")
+		return
+	}
+	fmt.Fprintf(w, "  Latency (successful requests):\n")
+	printLatencies(w, []latencyRow{
+		{"p50", s.SuccessP50}, {"p90", s.SuccessP90}, {"p95", s.SuccessP95}, {"p99", s.SuccessP99},
+	})
+}
+
+type latencyRow struct {
+	name string
+	d    time.Duration
+}
+
+func printLatencies(w io.Writer, rows []latencyRow) {
+	for _, row := range rows {
 		fmt.Fprintf(w, "    %-5s %10s\n", row.name, formatDuration(row.d))
 	}
 }
