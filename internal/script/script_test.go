@@ -419,3 +419,63 @@ func TestExamplesLoad(t *testing.T) {
 		t.Fatal("no examples found")
 	}
 }
+
+const recursionScript = `
+let mode = "recurse";
+function f(n: number): number { return f(n + 1) + 1; }
+export default function () {
+	if (mode === "recurse") {
+		mode = "normal";
+		f(0);
+	}
+}`
+
+func TestRunawayRecursionIsAScriptError(t *testing.T) {
+	vu := newVU(t, compile(t, "test.ts", recursionScript))
+	rec := &metrics.Recorder{}
+	vu.Iterate(context.Background(), rec) // overflows
+	vu.Iterate(context.Background(), rec) // the VU must still work afterwards
+	s := metrics.Merge([]*metrics.Recorder{rec})
+
+	if s.ScriptErrors != 1 {
+		t.Fatalf("ScriptErrors = %d, want 1 (overflow, then a clean iteration)", s.ScriptErrors)
+	}
+	for _, want := range []string{"maximum call stack size of 2500 frames exceeded", "test.ts:3"} {
+		if !strings.Contains(s.FirstScriptError, want) {
+			t.Errorf("error %q does not contain %q", s.FirstScriptError, want)
+		}
+	}
+}
+
+func TestStackOverflowCannotBeCaughtByScript(t *testing.T) {
+	src := `
+function f(): number { return f() + 1; }
+export default function () {
+	try { f(); } catch (e) { /* must not swallow the overflow */ }
+}`
+	s := iterate(newVU(t, compile(t, "test.ts", src)))
+	if s.ScriptErrors != 1 || !strings.Contains(s.FirstScriptError, "maximum call stack size") {
+		t.Fatalf("got %d script errors, first %q; want the overflow recorded", s.ScriptErrors, s.FirstScriptError)
+	}
+}
+
+func TestRecursionInInitFailsLoad(t *testing.T) {
+	_, err := compile(t, "test.ts", `
+function f(): number { return f() + 1; }
+f();
+export default function () {}`).NewVU(http.DefaultClient)
+	if err == nil || !strings.Contains(err.Error(), "maximum call stack size of 2500 frames exceeded") {
+		t.Fatalf("error = %v, want a call stack size error", err)
+	}
+}
+
+func TestDeepButFiniteRecursionAllowed(t *testing.T) {
+	src := `
+function depth(n: number): number { return n === 0 ? 0 : depth(n - 1) + 1; }
+export default function () {
+	if (depth(2000) !== 2000) throw new Error("wrong depth");
+}`
+	if s := iterate(newVU(t, compile(t, "test.ts", src))); s.ScriptErrors != 0 {
+		t.Fatalf("2,000-deep recursion failed: %s", s.FirstScriptError)
+	}
+}

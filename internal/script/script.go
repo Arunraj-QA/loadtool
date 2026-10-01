@@ -190,6 +190,27 @@ func buildError(filename string, msgs []api.Message) error {
 // errStopped is the interrupt value used when the test context ends.
 var errStopped = errors.New("test stopped")
 
+// maxCallStackSize bounds JavaScript call depth in each VU. goja's default
+// is effectively unlimited and its call stack lives on the heap, so runaway
+// recursion would grow memory until the whole process runs out (measured:
+// about 33 MB/s for a single VU).
+//
+// A VU that hits the limit keeps the stack's memory, so the limit sets the
+// worst case for a runaway script. Measured per VU: 1,000 frames ~0.8 MB,
+// 2,500 ~1.7 MB, 10,000 ~4.8 MB. 2,500 allows deep legitimate recursion
+// while keeping 1,000 runaway VUs near 1.7 GB.
+const maxCallStackSize = 2_500
+
+// scriptErrorMessage describes a script error. goja's stack overflow error
+// only names the frame where it happened, so the cause is added.
+func scriptErrorMessage(err error) string {
+	var so *goja.StackOverflowError
+	if errors.As(err, &so) {
+		return fmt.Sprintf("maximum call stack size of %d frames exceeded%s", maxCallStackSize, err.Error())
+	}
+	return err.Error()
+}
+
 // VU is one virtual user's JavaScript runtime. It must only be used by a
 // single goroutine.
 type VU struct {
@@ -208,13 +229,14 @@ type VU struct {
 // safe for concurrent use.
 func (p *Program) NewVU(client *http.Client) (*VU, error) {
 	rt := goja.New()
+	rt.SetMaxCallStackSize(maxCallStackSize)
 	vu := &VU{rt: rt, client: client}
 
 	if err := rt.Set("http", vu.newHTTPModule()); err != nil {
 		return nil, err
 	}
 	if _, err := rt.RunProgram(p.prog); err != nil {
-		return nil, fmt.Errorf("script init: %w", err)
+		return nil, fmt.Errorf("script init: %s", scriptErrorMessage(err))
 	}
 
 	fn, ok := goja.AssertFunction(rt.Get(defaultExportGlobal))
@@ -242,6 +264,6 @@ func (vu *VU) Iterate(ctx context.Context, rec *metrics.Recorder) {
 	vu.ctx, vu.rec = nil, nil
 
 	if err != nil && ctx.Err() == nil {
-		rec.RecordScriptError(err.Error())
+		rec.RecordScriptError(scriptErrorMessage(err))
 	}
 }
