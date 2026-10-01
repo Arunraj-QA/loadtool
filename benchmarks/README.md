@@ -5,11 +5,12 @@ Performance claims in this project must link to a result in
 
 ```text
 benchmarks/
-├── server/    Deterministic target server (Go standard library only)
-├── loadtool/  LoadTool scenario and peak-memory measurement script
-├── k6/        The same scenario for k6
-├── jmeter/    The same scenario for JMeter
-└── results/   Recorded results, one file per run: YYYY-MM-DD-topic.md
+├── measure.ps1  Runs the tools and measures CPU, memory, req/s, latency, errors
+├── server/      Deterministic target server (Go standard library only)
+├── loadtool/    LoadTool scenario
+├── k6/          The same scenario for k6
+├── jmeter/      The same scenario for JMeter
+└── results/     Recorded results, one file per run: YYYY-MM-DD-topic.md
 ```
 
 ## Purpose
@@ -82,11 +83,11 @@ first on Windows, and failed IPv6 dials inflate error counts.
 4. For every run, record the tool's own summary and:
    - **Peak memory** of the tool's process: private bytes on Windows, max
      RSS on Linux. For JMeter, measure the `java` process.
-     [loadtool/peak-memory.ps1](loadtool/peak-memory.ps1) does this for
-     LoadTool on Windows; k6 and JMeter need the same sampling of their
-     process.
    - **CPU use** of the tool's process.
    - Throughput, error rate, and p50 / p90 / p95 / p99 latency.
+
+   [`measure.ps1`](measure.ps1) automates steps 2 to 4 on Windows for
+   LoadTool and k6 (see below).
 5. Report every run, not just the best one. Give the median and range.
 6. Check the error rate. Runs with target errors (refused connections,
    timeouts) measure the environment, not the tool; fix the environment
@@ -102,6 +103,31 @@ k6 run -e TARGET=http://<host>:8080/api/test --vus 1000 --duration 60s benchmark
 
 jmeter -n -t benchmarks/jmeter/scenario.jmx -Jhost=<host> -Jvus=1000 -Jduration=60 -l jmeter.jtl
 ```
+
+## measure.ps1
+
+Runs the methodology for LoadTool and k6 on Windows and prints every run
+plus the median and range per tool:
+
+```powershell
+go build -o bin/loadtool.exe ./cmd/loadtool
+./benchmarks/measure.ps1 -VUs 1000 -DurationSec 60 -Runs 3 -WarmupSec 30 -Target http://<host>:8080/api/test
+```
+
+| Column | How it is measured |
+|---|---|
+| CPU % | CPU time of the tool's process ÷ wall time ÷ logical CPUs, i.e. share of the whole machine. `CPUCores` is the same figure in cores. Covers the whole process lifetime, including start-up. |
+| Memory MB | Peak private bytes of the tool's process, sampled every 250 ms. |
+| Requests/sec, p50, p95, p99, Errors | From the tool's own summary: LoadTool's console summary, k6's `--summary-export` JSON. Errors are failed requests. |
+
+- **Target:** `-Target` is passed to k6 with `-e TARGET` and substituted
+  into a copy of the LoadTool scenario.
+- **k6 process:** the real `k6.exe` is measured, not a Chocolatey
+  launcher.
+- **Output:** each run is appended as a JSON line to
+  `bench-out/<timestamp>-runs.jsonl`, and tool output is kept next to it.
+  `bench-out/` is git-ignored.
+- **JMeter** is not supported by the script yet.
 
 ## Known limits
 

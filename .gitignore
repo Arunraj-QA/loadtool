@@ -29,3 +29,6 @@ Thumbs.db
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Benchmark run output (benchmarks/measure.ps1)
+/bench-out/
