@@ -5,12 +5,13 @@ Performance claims in this project must link to a result in
 
 ```text
 benchmarks/
-├── measure.ps1  Runs the tools and measures CPU, memory, req/s, latency, errors
-├── server/      Deterministic target server (Go standard library only)
-├── loadtool/    LoadTool scenario
-├── k6/          The same scenario for k6
-├── jmeter/      The same scenario for JMeter
-└── results/     Recorded results, one file per run: YYYY-MM-DD-topic.md
+├── measure.ps1    Phase 0 harness: runs all tools at each VU level and records the metrics
+├── summarize.ps1  Median and range per tool and VU level from a runs.jsonl
+├── server/        Deterministic target server (Go standard library only)
+├── loadtool/      LoadTool scenario
+├── k6/            The same scenario for k6
+├── jmeter/        The same scenario for JMeter
+└── results/       Reports (YYYY-MM-DD-topic.md or YYYY-MM-DD-topic/) with raw data
 ```
 
 ## Purpose
@@ -86,8 +87,8 @@ first on Windows, and failed IPv6 dials inflate error counts.
    - **CPU use** of the tool's process.
    - Throughput, error rate, and p50 / p90 / p95 / p99 latency.
 
-   [`measure.ps1`](measure.ps1) automates steps 2 to 4 on Windows for
-   LoadTool and k6 (see below).
+   [`measure.ps1`](measure.ps1) automates steps 1 to 4 on Windows (see
+   below).
 5. Report every run, not just the best one. Give the median and range.
 6. Check the error rate. Runs with target errors (refused connections,
    timeouts) measure the environment, not the tool; fix the environment
@@ -104,35 +105,87 @@ k6 run -e TARGET=http://<host>:8080/api/test --vus 1000 --duration 60s benchmark
 jmeter -n -t benchmarks/jmeter/scenario.jmx -Jhost=<host> -Jvus=1000 -Jduration=60 -l jmeter.jtl
 ```
 
-## measure.ps1
+## measure.ps1 (the Phase 0 harness)
 
-Runs the methodology for LoadTool and k6 on Windows and prints every run
-plus the median and range per tool:
+Runs the methodology on Windows for LoadTool, k6 and JMeter.
 
 ```powershell
+# from the repository root, in PowerShell
 go build -o bin/loadtool.exe ./cmd/loadtool
-./benchmarks/measure.ps1 -VUs 1000 -DurationSec 60 -Runs 3 -WarmupSec 30 -Target http://<host>:8080/api/test
+go build -o bin/benchserver.exe ./benchmarks/server
+$env:JMETER_HOME = "$env:LOCALAPPDATA\loadtool-bench-tools\apache-jmeter-5.6.3"
+./benchmarks/measure.ps1                     # 100, 250, 500, 750, 1000 VUs; 60 s; 3 runs; 30 s warm-up
+./benchmarks/measure.ps1 -Tools loadtool,k6 -VUs 100,1000 -OutDir benchmarks/results/<name>/raw
 ```
 
-| Column | How it is measured |
-|---|---|
-| CPU % | CPU time of the tool's process ÷ wall time ÷ logical CPUs, i.e. share of the whole machine. `CPUCores` is the same figure in cores. Covers the whole process lifetime, including start-up. |
-| Memory MB | Peak private bytes of the tool's process, sampled every 250 ms. |
-| Requests/sec, p50, p95, p99, Errors | From the tool's own summary: LoadTool's console summary, k6's `--summary-export` JSON. Errors are failed requests. |
+Run it from a PowerShell prompt or through `powershell -Command "& ./benchmarks/measure.ps1 ..."`.
+With `powershell -File`, list values such as `loadtool,k6` arrive as one
+string and are rejected.
 
-- **Target:** `-Target` is passed to k6 with `-e TARGET` and substituted
-  into a copy of the LoadTool scenario.
-- **k6 process:** the real `k6.exe` is measured, not a Chocolatey
-  launcher.
-- **Output:** each run is appended as a JSON line to
-  `bench-out/<timestamp>-runs.jsonl`, and tool output is kept next to it.
-  `bench-out/` is git-ignored.
-- **JMeter** is not supported by the script yet.
+What it does:
+1. Records the environment (CPU, RAM, OS, power, tool versions, commit)
+   in `environment.json`.
+2. Starts `bin/benchserver.exe` and waits for `/health`.
+3. For each VU level, runs a discarded warm-up per tool, then the measured
+   runs, alternating tools. It pauses `-CooldownSec` (5 s) between runs.
+4. Stops the server.
+
+It refuses to write into an output folder that already has `runs.jsonl`,
+so data from different sessions is never mixed.
+
+### Metrics
+
+| Metric | Type | How it is obtained |
+|---|---|---|
+| Process CPU time, wall time | measured | The tool's process (`java.exe` for JMeter): `TotalProcessorTime`, and `ExitTime − StartTime`. |
+| CPU % | calculated | CPU time ÷ wall time ÷ logical CPUs: share of the whole machine. `cpuCores` is the same figure in cores. Covers the whole process lifetime, including start-up. |
+| Peak memory | measured | Highest private bytes over samples taken every 250 ms (kept per run in `*-memory.csv`). |
+| Average memory | calculated | Mean of those samples, over the whole process lifetime. |
+| Requests, errors | measured | LoadTool: console summary. k6: `--summary-export` (`http_reqs.count`, `http_req_failed.passes`). JMeter: counted from the JTL (`success` column). |
+| Requests/sec | measured (LoadTool, k6) / calculated (JMeter) | LoadTool and k6 report their own rate. JMeter: requests ÷ time from the first sample start to the last sample end in the JTL. |
+| p50, p95, p99 | measured (LoadTool, k6) / calculated (JMeter) | LoadTool and k6 report their own percentiles. JMeter: nearest rank over the JTL `elapsed` column (whole milliseconds). |
+| Error rate | calculated | errors ÷ requests × 100. |
+| Server CPU % | calculated | CPU time used by the benchmark server during the run ÷ wall time ÷ logical CPUs. |
+
+Percentile methods differ: LoadTool and the JMeter calculation use
+nearest rank, and k6 interpolates. JMeter records whole milliseconds,
+while LoadTool and k6 report fractions of a millisecond.
+
+### How each tool is launched
+
+- **LoadTool:** `bin/loadtool.exe run <copy of scenario.ts with TARGET set>`.
+- **k6:** the real `k6.exe`, not a Chocolatey launcher, with
+  `-e TARGET=…`.
+- **JMeter:** `bin\jmeter.bat -n`, so JMeter's default JVM settings
+  apply (including its default heap). The measured process is its
+  `java.exe` child.
+  - The JTL is reduced to `timeStamp`, `elapsed`, `success` and
+    `responseCode`, using `-Jjmeter.save.saveservice.*=false`. This
+    lowers JMeter's disk work, which favours JMeter.
+
+### Output
+
+All written to `-OutDir`:
+- `runs.jsonl`: one JSON line per run, warm-ups included (`kind`).
+  Missing values are empty, never estimated.
+- `environment.json`
+- per run: the tool's stdout and stderr, `*-memory.csv` samples, the k6
+  summary JSON, and the JMeter log
+- JMeter JTLs, which can be tens of MB, go to `-BulkDir`
+  (`bench-out/jtl`, git-ignored). Their size and SHA-256 are recorded in
+  `runs.jsonl`.
+
+Then generate the median (min–max) tables:
+
+```powershell
+./benchmarks/summarize.ps1 -Runs <OutDir>/runs.jsonl   # writes summary.csv and summary.md
+```
 
 ## Known limits
 
-- The JMeter plan was written by hand and has not yet been run with
-  JMeter, because JMeter is not installed on the development machine.
+- The JMeter plan and the harness's JMeter path have not been run yet.
+  JMeter could not be downloaded on the development machine's network
+  (see [results/2026-10-01-phase0](results/2026-10-01-phase0/README.md)).
 - LoadTool scripts cannot read environment variables yet, so the LoadTool
   target is edited in the scenario file.
 - Latency timing on Windows has about 0.5 ms resolution (see
