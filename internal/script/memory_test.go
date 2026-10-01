@@ -50,7 +50,7 @@ export default function (): void {
 				vus := make([]*VU, retainedVUs)
 				before := liveHeap()
 				for i := range vus {
-					vu, err := p.NewVU(http.DefaultClient)
+					vu, err := p.NewVU(context.Background(), http.DefaultClient)
 					if err != nil {
 						b.Fatal(err)
 					}

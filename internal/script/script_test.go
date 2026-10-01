@@ -2,6 +2,7 @@ package script
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -27,7 +28,7 @@ func compile(t *testing.T, filename, src string) *Program {
 
 func newVU(t *testing.T, p *Program) *VU {
 	t.Helper()
-	vu, err := p.NewVU(httpclient.New(1, httpclient.DefaultTimeout))
+	vu, err := p.NewVU(context.Background(), httpclient.New(1, httpclient.DefaultTimeout))
 	if err != nil {
 		t.Fatalf("NewVU: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestLoadErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p, err := Compile("test.ts", []byte(tt.src))
 			if err == nil {
-				_, err = p.NewVU(http.DefaultClient)
+				_, err = p.NewVU(context.Background(), http.DefaultClient)
 			}
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("error = %v, want it to contain %q", err, tt.wantErr)
@@ -281,7 +282,7 @@ export default function () {
 	recs := make([]*metrics.Recorder, vus)
 	var wg sync.WaitGroup
 	for i := range vus {
-		vu, err := p.NewVU(client)
+		vu, err := p.NewVU(context.Background(), client)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -343,7 +344,7 @@ func BenchmarkNewVU(b *testing.B) {
 	client := httpclient.New(1, httpclient.DefaultTimeout)
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := p.NewVU(client); err != nil {
+		if _, err := p.NewVU(context.Background(), client); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -354,7 +355,7 @@ func BenchmarkIterateEmpty(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	vu, err := p.NewVU(http.DefaultClient)
+	vu, err := p.NewVU(context.Background(), http.DefaultClient)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -376,7 +377,7 @@ func BenchmarkIterateHTTPGet(b *testing.B) {
 	}
 	client := httpclient.New(1, httpclient.DefaultTimeout)
 	defer client.CloseIdleConnections()
-	vu, err := p.NewVU(client)
+	vu, err := p.NewVU(context.Background(), client)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -409,7 +410,7 @@ func TestExamplesLoad(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Load: %v", err)
 			}
-			if _, err := p.NewVU(http.DefaultClient); err != nil {
+			if _, err := p.NewVU(context.Background(), http.DefaultClient); err != nil {
 				t.Fatalf("NewVU: %v", err)
 			}
 		})
@@ -463,7 +464,7 @@ func TestRecursionInInitFailsLoad(t *testing.T) {
 	_, err := compile(t, "test.ts", `
 function f(): number { return f() + 1; }
 f();
-export default function () {}`).NewVU(http.DefaultClient)
+export default function () {}`).NewVU(context.Background(), http.DefaultClient)
 	if err == nil || !strings.Contains(err.Error(), "maximum call stack size of 2500 frames exceeded") {
 		t.Fatalf("error = %v, want a call stack size error", err)
 	}
@@ -477,5 +478,27 @@ export default function () {
 }`
 	if s := iterate(newVU(t, compile(t, "test.ts", src))); s.ScriptErrors != 0 {
 		t.Fatalf("2,000-deep recursion failed: %s", s.FirstScriptError)
+	}
+}
+
+// TestNewVUInterruptsTopLevelCode makes Ctrl+C work during VU start-up: a
+// script whose top-level code never finishes must stop when ctx ends.
+func TestNewVUInterruptsTopLevelCode(t *testing.T) {
+	p := compile(t, "test.js", "for (;;) {}\nexport default function () {}")
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(50*time.Millisecond, cancel)
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := p.NewVU(ctx, http.DefaultClient)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("error = %v, want context.Canceled", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("top-level code was not interrupted by ctx")
 	}
 }

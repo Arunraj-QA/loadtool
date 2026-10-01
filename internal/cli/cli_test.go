@@ -209,3 +209,25 @@ func TestFormatDuration(t *testing.T) {
 		}
 	}
 }
+
+// TestRunInterruptedDuringStartup covers Ctrl+C while VUs start: top-level
+// script code that never finishes must not hang the command.
+func TestRunInterruptedDuringStartup(t *testing.T) {
+	path := scriptFile(t, "for (;;) {}\nexport default function () {}")
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(100*time.Millisecond, cancel)
+
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := executeContext(t, ctx, "run", path, "--vus", "2", "--duration", "1h")
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("error = %v, want context.Canceled", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("run hung in script start-up after cancellation")
+	}
+}

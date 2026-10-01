@@ -226,8 +226,9 @@ type VU struct {
 
 // NewVU creates a runtime, runs the script's top-level (init) code once, and
 // resolves its default export. client is shared between VUs; http.Client is
-// safe for concurrent use.
-func (p *Program) NewVU(client *http.Client) (*VU, error) {
+// safe for concurrent use. If ctx ends while the top-level code runs (for
+// example on Ctrl+C), the code is interrupted and ctx's error is returned.
+func (p *Program) NewVU(ctx context.Context, client *http.Client) (*VU, error) {
 	rt := goja.New()
 	rt.SetMaxCallStackSize(maxCallStackSize)
 	vu := &VU{rt: rt, client: client}
@@ -235,7 +236,13 @@ func (p *Program) NewVU(client *http.Client) (*VU, error) {
 	if err := rt.Set("http", vu.newHTTPModule()); err != nil {
 		return nil, err
 	}
-	if _, err := rt.RunProgram(p.prog); err != nil {
+	stop := context.AfterFunc(ctx, func() { rt.Interrupt(errStopped) })
+	_, err := rt.RunProgram(p.prog)
+	stop()
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("script init: %w", context.Cause(ctx))
+		}
 		return nil, fmt.Errorf("script init: %s", scriptErrorMessage(err))
 	}
 

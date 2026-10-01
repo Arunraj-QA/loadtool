@@ -47,15 +47,16 @@ func runTest(cmd *cobra.Command, cfg config.Config) error {
 	client := httpclient.New(cfg.VUs, httpclient.DefaultTimeout)
 	defer client.CloseIdleConnections()
 
+	ctx := cmd.Context()
 	newVU := func(int) (engine.IterationFunc, error) {
-		vu, err := prog.NewVU(client)
+		// ctx lets Ctrl+C interrupt a script's top-level code.
+		vu, err := prog.NewVU(ctx, client)
 		if err != nil {
 			return nil, err
 		}
 		return vu.Iterate, nil
 	}
 
-	ctx := cmd.Context()
 	res, err := engine.Run(ctx, cfg.VUs, cfg.Duration, newVU)
 	if err != nil {
 		return err
