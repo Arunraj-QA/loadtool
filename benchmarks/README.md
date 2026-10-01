@@ -183,9 +183,9 @@ Then generate the median (min–max) tables:
 
 ## Known limits
 
-- The JMeter plan and the harness's JMeter path have not been run yet.
-  JMeter could not be downloaded on the development machine's network
-  (see [results/2026-10-01-phase0](results/2026-10-01-phase0/README.md)).
+- JMeter must be stock 5.6.3 with no third-party plugins in `lib/ext`.
+  Plugins add start-up memory and CPU (see
+  [results/2026-10-01-phase0-all-tools](results/2026-10-01-phase0-all-tools/README.md)).
 - LoadTool scripts cannot read environment variables yet, so the LoadTool
   target is edited in the scenario file.
 - Latency timing on Windows has about 0.5 ms resolution (see

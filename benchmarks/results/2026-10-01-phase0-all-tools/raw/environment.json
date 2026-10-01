@@ -1,0 +1,27 @@
+{
+    "capturedAt":  "2026-10-01T14:36:03.6154959+05:30",
+    "cpu":  "12th Gen Intel(R) Core(TM) i5-1235U",
+    "cores":  10,
+    "logicalCPUs":  12,
+    "ramGB":  15.7,
+    "os":  "Microsoft Windows 11 Pro 10.0.26200 (build 26200)",
+    "onACPower":  true,
+    "loadtoolCommit":  "3b7b523",
+    "goVersion":  "go version go1.27.0 windows/amd64",
+    "k6Version":  "k6.exe v1.7.1 (commit/9f82e6f1fc, go1.26.1, windows/amd64)",
+    "jmeterVersion":  "apache-jmeter-5.6.3",
+    "javaVersion":  "openjdk version \"17.0.19\" 2026-04-21",
+    "target":  "http://127.0.0.1:8080/api/test",
+    "serverDelay":  "10ms",
+    "vus":  [
+                100,
+                250,
+                500,
+                750,
+                1000
+            ],
+    "durationSec":  60,
+    "runs":  3,
+    "warmupSec":  30,
+    "cooldownSec":  5
+}

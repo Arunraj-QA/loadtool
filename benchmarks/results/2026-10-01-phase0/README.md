@@ -1,5 +1,10 @@
 # 2026-10-01 — Phase 0 comparison: LoadTool and k6 (JMeter not measured)
 
+> **Superseded for the Phase 0 question.** JMeter was measured later the
+> same day, together with LoadTool and k6, in
+> [2026-10-01-phase0-all-tools](../2026-10-01-phase0-all-tools/README.md).
+> This report stays as recorded.
+
 **Status: incomplete.** LoadTool and k6 were measured at all five VU
 levels. **JMeter was not measured**: it could not be downloaded in time
 (see [Missing results](#missing-results)). The Phase 0 question compares

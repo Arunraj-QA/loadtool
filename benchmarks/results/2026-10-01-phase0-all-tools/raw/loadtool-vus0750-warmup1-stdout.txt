@@ -1,0 +1,22 @@
+
+LoadTool summary
+
+  Script:      benchmarks\results\2026-10-01-phase0-all-tools\raw\loadtool-vus0750-warmup1-scenario.ts
+  VUs:         750
+  Duration:    30s (elapsed 30.04s)
+  Status:      completed
+
+  Requests:    439,316 (14622.1 req/s)
+  Success:     437,054
+  Errors:      2,262 (0.51%)
+  Script errs: 2,262
+    first:     Error: status 0 Get "http://127.0.0.1:8080/api/test": dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it. at loadtool_vus0750_warmup1_scenario_default (loadtool-vus0750-warmup1-scenario.ts:16:10(21))
+
+  Latency:
+    min       0.00µs
+    mean     48.56ms
+    p50      40.78ms
+    p90      85.39ms
+    p95     106.51ms
+    p99     161.38ms
+    max        2.01s

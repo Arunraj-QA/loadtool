@@ -1,0 +1,100 @@
+{
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "status is 200": {
+                    "name": "status is 200",
+                    "path": "::status is 200",
+                    "id": "6210a8cd14cd70477eba5c5e4cb3fb5f",
+                    "passes": 589196,
+                    "fails": 145
+                }
+            }
+    },
+    "metrics": {
+        "http_reqs": {
+            "count": 589341,
+            "rate": 9816.653183463484
+        },
+        "http_req_failed": {
+            "passes": 145,
+            "fails": 589196,
+            "value": 0.00024603752326751407
+        },
+        "http_req_blocked": {
+            "med": 0,
+            "p(95)": 0,
+            "p(99)": 0.516
+        },
+        "http_req_sending": {
+            "med": 0,
+            "p(95)": 0,
+            "p(99)": 2.960439999999979
+        },
+        "iteration_duration": {
+            "med": 41.0887,
+            "p(95)": 116.601,
+            "p(99)": 233.43319999999935
+        },
+        "http_req_duration": {
+            "med": 39.8811,
+            "p(95)": 110.6359,
+            "p(99)": 214.85281999999984
+        },
+        "data_sent": {
+            "rate": 765510.557637341,
+            "count": 45957288
+        },
+        "http_req_tls_handshaking": {
+            "med": 0,
+            "p(95)": 0,
+            "p(99)": 0
+        },
+        "http_req_receiving": {
+            "med": 0,
+            "p(95)": 4.5635,
+            "p(99)": 109.1957
+        },
+        "iterations": {
+            "count": 589341,
+            "rate": 9816.653183463484
+        },
+        "vus": {
+            "value": 500,
+            "min": 500,
+            "max": 500
+        },
+        "http_req_waiting": {
+            "med": 39.474,
+            "p(95)": 92.5412,
+            "p(99)": 129.57593999999978
+        },
+        "http_req_connecting": {
+            "med": 0,
+            "p(95)": 0,
+            "p(99)": 0
+        },
+        "http_req_duration{expected_response:true}": {
+            "med": 39.88575,
+            "p(95)": 110.64395,
+            "p(99)": 214.86531
+        },
+        "vus_max": {
+            "value": 500,
+            "min": 500,
+            "max": 500
+        },
+        "data_received": {
+            "count": 80719852,
+            "rate": 1344550.5948245605
+        },
+        "checks": {
+            "passes": 589196,
+            "fails": 145,
+            "value": 0.9997539624767325
+        }
+    }
+}

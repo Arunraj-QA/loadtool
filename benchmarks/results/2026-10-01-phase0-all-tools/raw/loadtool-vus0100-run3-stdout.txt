@@ -1,0 +1,21 @@
+
+LoadTool summary
+
+  Script:      benchmarks\results\2026-10-01-phase0-all-tools\raw\loadtool-vus0100-run3-scenario.ts
+  VUs:         100
+  Duration:    1m0s (elapsed 60.01s)
+  Status:      completed
+
+  Requests:    273,907 (4564.0 req/s)
+  Success:     273,907
+  Errors:      0 (0.00%)
+  Script errs: 0
+
+  Latency:
+    min      10.00ms
+    mean     21.68ms
+    p50      15.12ms
+    p90      31.93ms
+    p95      47.97ms
+    p99     153.52ms
+    max     641.76ms
