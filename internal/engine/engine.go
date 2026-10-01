@@ -54,11 +54,10 @@ func Run(ctx context.Context, vus int, duration time.Duration, newVU NewVUFunc) 
 	ctx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
 
-	recorders := make([]*metrics.Recorder, vus)
+	recorders := metrics.NewRecorders(vus)
 	var wg sync.WaitGroup
 	for i, iter := range iters {
-		rec := &metrics.Recorder{}
-		recorders[i] = rec
+		rec := recorders[i]
 		wg.Go(func() { runVU(ctx, rec, iter) })
 	}
 	wg.Wait()

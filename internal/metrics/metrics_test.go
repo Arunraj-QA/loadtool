@@ -1,11 +1,29 @@
 package metrics
 
 import (
+	"math"
 	"math/rand/v2"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 )
+
+// maxRelErr is the documented percentile precision: half of the widest
+// bucket (1/64 of its lower bound).
+const maxRelErr = 1.0 / subBuckets / 2
+
+// near reports whether got is within the histogram's precision of want.
+func near(got, want time.Duration) bool {
+	return math.Abs(float64(got-want)) <= maxRelErr*float64(want)+1
+}
+
+func assertNear(t *testing.T, name string, got, want time.Duration) {
+	t.Helper()
+	if !near(got, want) {
+		t.Errorf("%s = %v, want %v ±%.2f%%", name, got, want, maxRelErr*100)
+	}
+}
 
 func TestMergeEmpty(t *testing.T) {
 	if got := Merge(nil); got != (Summary{}) {
@@ -14,99 +32,157 @@ func TestMergeEmpty(t *testing.T) {
 	if got := Merge([]*Recorder{{}, {}}); got != (Summary{}) {
 		t.Fatalf("Merge(empty recorders) = %+v, want zero Summary", got)
 	}
+	if got := Merge(NewRecorders(4)); got != (Summary{}) {
+		t.Fatalf("Merge(unused shared recorders) = %+v, want zero Summary", got)
+	}
 }
 
 func TestMergeAggregatesAcrossRecorders(t *testing.T) {
-	// 1ms..100ms spread over two recorders in reverse order, every 10th
-	// request failing, so both merging and sorting are exercised.
-	a, b := &Recorder{}, &Recorder{}
+	// 1ms..100ms over shared-shard recorders in reverse order, every 10th
+	// request failing.
+	recs := NewRecorders(3)
 	for i := 100; i >= 1; i-- {
-		r := a
-		if i%2 == 0 {
-			r = b
-		}
-		r.Record(time.Duration(i)*time.Millisecond, i%10 != 0)
+		recs[i%3].Record(time.Duration(i)*time.Millisecond, i%10 != 0)
 	}
+	s := Merge(recs)
 
-	got := Merge([]*Recorder{a, b})
-	want := Summary{
-		Requests:  100,
-		Successes: 90,
-		Failures:  10,
-		Sent:      100,
-		ErrorRate: 0.1,
-		Min:       1 * time.Millisecond,
-		Mean:      50500 * time.Microsecond,
-		Max:       100 * time.Millisecond,
-		P50:       50 * time.Millisecond,
-		P90:       90 * time.Millisecond,
-		P95:       95 * time.Millisecond,
-		P99:       99 * time.Millisecond,
-		// Successes are 1..99 ms without the multiples of 10 (90 values).
-		SuccessP50: 49 * time.Millisecond, // rank 45
-		SuccessP90: 89 * time.Millisecond, // rank 81
-		SuccessP95: 95 * time.Millisecond, // rank 86
-		SuccessP99: 99 * time.Millisecond, // rank 90
+	// Exact values.
+	if s.Requests != 100 || s.Successes != 90 || s.Failures != 10 || s.Sent != 100 || s.ErrorRate != 0.1 {
+		t.Fatalf("counts wrong: %+v", s)
 	}
-	if got != want {
-		t.Fatalf("Merge =\n %+v\nwant\n %+v", got, want)
+	if s.Min != time.Millisecond || s.Max != 100*time.Millisecond || s.Mean != 50500*time.Microsecond {
+		t.Fatalf("Min=%v Max=%v Mean=%v, want 1ms, 100ms, 50.5ms exactly", s.Min, s.Max, s.Mean)
+	}
+	// Percentiles, within the histogram's precision of the exact
+	// nearest-rank values.
+	assertNear(t, "P50", s.P50, 50*time.Millisecond)
+	assertNear(t, "P90", s.P90, 90*time.Millisecond)
+	assertNear(t, "P95", s.P95, 95*time.Millisecond)
+	assertNear(t, "P99", s.P99, 99*time.Millisecond)
+	// Successes are 1..99 ms without multiples of 10 (90 values).
+	assertNear(t, "SuccessP50", s.SuccessP50, 49*time.Millisecond) // rank 45
+	assertNear(t, "SuccessP90", s.SuccessP90, 89*time.Millisecond) // rank 81
+	assertNear(t, "SuccessP95", s.SuccessP95, 95*time.Millisecond) // rank 86
+	assertNear(t, "SuccessP99", s.SuccessP99, 99*time.Millisecond) // rank 90
+}
+
+// TestBucketBounds checks that every value falls in a bucket whose
+// midpoint is within the documented precision, across the tracked range.
+func TestBucketBounds(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1, 2))
+	check := func(v int64) {
+		mid := bucketMid(bucketIndex(v))
+		if math.Abs(float64(mid-v)) > maxRelErr*float64(v)+1 {
+			t.Fatalf("v=%d: bucket %d midpoint %d is off by more than %.2f%%", v, bucketIndex(v), mid, maxRelErr*100)
+		}
+	}
+	for v := range int64(4096) {
+		check(v)
+	}
+	for range 200_000 {
+		// Log-uniform over 1ns..1h.
+		check(int64(math.Exp(rng.Float64() * math.Log(float64(maxTracked)))))
+	}
+	check(maxTracked)
+	if got := bucketIndex(maxTracked); got != numBuckets-1 {
+		t.Fatalf("maxTracked bucket = %d, want last bucket %d", got, numBuckets-1)
 	}
 }
 
-func TestPercentile(t *testing.T) {
-	ms := func(v ...int) []time.Duration {
-		out := make([]time.Duration, len(v))
-		for i, x := range v {
-			out[i] = time.Duration(x) * time.Millisecond
+func TestBucketIndexIsMonotonic(t *testing.T) {
+	prev := 0
+	for v := int64(0); v < 1<<20; v++ {
+		i := bucketIndex(v)
+		if i < prev || i > prev+1 {
+			t.Fatalf("bucketIndex(%d) = %d after %d: buckets must be contiguous and increasing", v, i, prev)
 		}
-		return out
+		prev = i
 	}
-	tests := []struct {
-		name   string
-		sorted []time.Duration
-		p      int
-		want   time.Duration
-	}{
-		{"single sample p50", ms(7), 50, 7 * time.Millisecond},
-		{"single sample p99", ms(7), 99, 7 * time.Millisecond},
-		{"two samples p50", ms(1, 2), 50, 1 * time.Millisecond},
-		{"two samples p90", ms(1, 2), 90, 2 * time.Millisecond},
-		{"ten samples p95", ms(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), 95, 10 * time.Millisecond},
-		{"ten samples p90", ms(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), 90, 9 * time.Millisecond},
+}
+
+// TestPercentilesMatchExact compares histogram percentiles with exact
+// nearest-rank percentiles on a large, wide, deterministic random sample.
+func TestPercentilesMatchExact(t *testing.T) {
+	rng := rand.New(rand.NewPCG(3, 4))
+	const n = 200_000
+	samples := make([]time.Duration, n)
+	r := &Recorder{}
+	for i := range samples {
+		// Log-uniform 10µs..10s, like latencies spanning several decades.
+		d := time.Duration(math.Exp(math.Log(1e4) + rng.Float64()*(math.Log(1e10)-math.Log(1e4))))
+		samples[i] = d
+		r.Record(d, true)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := percentile(tt.sorted, nil, tt.p); got != tt.want {
-				t.Errorf("percentile(p%d) = %v, want %v", tt.p, got, tt.want)
+	slices.Sort(samples)
+	exact := func(p int) time.Duration { return samples[max((p*n+99)/100, 1)-1] }
+
+	s := Merge([]*Recorder{r})
+	for _, c := range []struct {
+		name string
+		got  time.Duration
+		p    int
+	}{{"P50", s.P50, 50}, {"P90", s.P90, 90}, {"P95", s.P95, 95}, {"P99", s.P99, 99}} {
+		assertNear(t, c.name, c.got, exact(c.p))
+	}
+	if s.Min != samples[0] || s.Max != samples[n-1] {
+		t.Errorf("Min/Max = %v/%v, want exact %v/%v", s.Min, s.Max, samples[0], samples[n-1])
+	}
+}
+
+func TestSingleSampleIsExact(t *testing.T) {
+	r := &Recorder{}
+	r.Record(12345678*time.Nanosecond, true)
+	s := Merge([]*Recorder{r})
+	// Clamping to the exact min and max makes a single sample exact.
+	if s.P50 != 12345678 || s.P99 != 12345678 || s.SuccessP99 != 12345678 {
+		t.Fatalf("P50=%v P99=%v SuccessP99=%v, want exactly 12.345678ms", s.P50, s.P99, s.SuccessP99)
+	}
+}
+
+func TestLatencyAboveTrackedRange(t *testing.T) {
+	r := &Recorder{}
+	r.Record(3*time.Hour, true)
+	s := Merge([]*Recorder{r})
+	if s.Max != 3*time.Hour || s.P99 != 3*time.Hour {
+		t.Fatalf("Max=%v P99=%v, want 3h (exact max, percentile clamped to it)", s.Max, s.P99)
+	}
+}
+
+// TestConcurrentRecording exercises shared shards from many goroutines;
+// run with -race in CI.
+func TestConcurrentRecording(t *testing.T) {
+	const vus, perVU = 64, 2000
+	recs := NewRecorders(vus)
+	var wg sync.WaitGroup
+	for i, r := range recs {
+		wg.Go(func() {
+			for j := range perVU {
+				r.Record(time.Duration(1+(i*perVU+j)%1000)*time.Microsecond, j%50 != 0)
 			}
 		})
 	}
-}
-
-// TestKthMatchesSortedUnion checks the two-slice selection against sorting
-// the concatenation, over many deterministic random cases including empty
-// slices and duplicates.
-func TestKthMatchesSortedUnion(t *testing.T) {
-	rng := rand.New(rand.NewPCG(1, 2))
-	for c := 0; c < 2000; c++ {
-		a := randomSorted(rng, rng.IntN(12))
-		b := randomSorted(rng, rng.IntN(12))
-		union := slices.Sorted(slices.Values(append(slices.Clone(a), b...)))
-		for k := range union {
-			if got := kth(a, b, k); got != union[k] {
-				t.Fatalf("kth(%v, %v, %d) = %v, want %v", a, b, k, got, union[k])
-			}
-		}
+	wg.Wait()
+	s := Merge(recs)
+	if s.Requests != vus*perVU || s.Failures != vus*perVU/50 {
+		t.Fatalf("Requests=%d Failures=%d, want %d and %d", s.Requests, s.Failures, vus*perVU, vus*perVU/50)
+	}
+	if s.Min != time.Microsecond || s.Max != 1000*time.Microsecond {
+		t.Fatalf("Min=%v Max=%v, want 1µs and 1ms", s.Min, s.Max)
 	}
 }
 
-func randomSorted(rng *rand.Rand, n int) []time.Duration {
-	s := make([]time.Duration, n)
-	for i := range s {
-		s[i] = time.Duration(rng.IntN(20)) // small range: many duplicates
+func TestNewRecordersShareAFixedNumberOfShards(t *testing.T) {
+	recs := NewRecorders(1000)
+	shards := map[*shard]bool{}
+	for _, r := range recs {
+		shards[r.shard] = true
 	}
-	slices.Sort(s)
-	return s
+	if len(shards) != numShards {
+		t.Fatalf("1,000 recorders use %d shards, want %d", len(shards), numShards)
+	}
+	if few := NewRecorders(3); few[0].shard == few[1].shard {
+		t.Fatal("fewer recorders than shards should not share a shard")
+	}
 }
 
 func TestRecordUnsentAddsNoLatency(t *testing.T) {
@@ -137,29 +213,17 @@ func TestOnlyUnsentRequests(t *testing.T) {
 // percentiles down, while success-only percentiles stay true.
 func TestSuccessPercentilesExcludeFastFailures(t *testing.T) {
 	r := &Recorder{}
-	for range 60 {
+	for range 40 {
 		r.Record(50*time.Millisecond, true)
 	}
-	for range 40 {
+	for range 60 {
 		r.Record(100*time.Microsecond, false) // connection refused
 	}
 	s := Merge([]*Recorder{r})
-	if s.P50 != 50*time.Millisecond || s.SuccessP50 != 50*time.Millisecond {
-		t.Fatalf("P50=%v SuccessP50=%v, want 50ms both", s.P50, s.SuccessP50)
-	}
+	assertNear(t, "P50 (distorted by fast failures)", s.P50, 100*time.Microsecond)
+	assertNear(t, "SuccessP50", s.SuccessP50, 50*time.Millisecond)
 	if s.Min != 100*time.Microsecond {
 		t.Errorf("Min = %v, want the fast failures included (100µs)", s.Min)
-	}
-	r2 := &Recorder{}
-	for range 40 {
-		r2.Record(50*time.Millisecond, true)
-	}
-	for range 60 {
-		r2.Record(100*time.Microsecond, false)
-	}
-	s2 := Merge([]*Recorder{r2})
-	if s2.P50 != 100*time.Microsecond || s2.SuccessP50 != 50*time.Millisecond {
-		t.Fatalf("P50=%v SuccessP50=%v, want 100µs (distorted) and 50ms (true)", s2.P50, s2.SuccessP50)
 	}
 }
 
@@ -170,6 +234,9 @@ func TestAllFailures(t *testing.T) {
 	s := Merge([]*Recorder{r})
 	if s.Requests != 2 || s.Successes != 0 || s.Failures != 2 || s.ErrorRate != 1 {
 		t.Fatalf("unexpected summary %+v", s)
+	}
+	if s.SuccessP50 != 0 {
+		t.Errorf("SuccessP50 = %v, want 0 when nothing succeeded", s.SuccessP50)
 	}
 }
 
@@ -199,23 +266,40 @@ func TestMergeScriptErrorsWithoutRequests(t *testing.T) {
 	}
 }
 
+// BenchmarkRecorderRecord must report 0 B/op: recording does not grow
+// memory, however many requests a test makes.
 func BenchmarkRecorderRecord(b *testing.B) {
-	r := &Recorder{}
+	r := NewRecorders(1)[0]
 	b.ReportAllocs()
 	for i := 0; b.Loop(); i++ {
-		r.Record(time.Duration(i), i%100 != 0)
+		r.Record(time.Duration(i%10_000_000), i%100 != 0)
 	}
+}
+
+// BenchmarkRecorderRecordParallel records from all CPUs into shared shards.
+func BenchmarkRecorderRecordParallel(b *testing.B) {
+	recs := NewRecorders(1000)
+	var next sync.Mutex
+	i := 0
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		next.Lock()
+		r := recs[i%len(recs)]
+		i++
+		next.Unlock()
+		for pb.Next() {
+			r.Record(12*time.Millisecond, true)
+		}
+	})
 }
 
 func BenchmarkMerge(b *testing.B) {
 	// 1,000 VUs x 1,000 requests each.
-	recorders := make([]*Recorder, 1000)
-	for i := range recorders {
-		r := &Recorder{}
+	recorders := NewRecorders(1000)
+	for i, r := range recorders {
 		for j := range 1000 {
 			r.Record(time.Duration((i*7919+j*104729)%1_000_000), true)
 		}
-		recorders[i] = r
 	}
 	b.ReportAllocs()
 	for b.Loop() {
