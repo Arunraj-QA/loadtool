@@ -1,0 +1,21 @@
+
+LoadTool summary
+
+  Script:      benchmarks\results\2026-10-01-phase0\raw\loadtool-vus0100-warmup1-scenario.ts
+  VUs:         100
+  Duration:    30s (elapsed 30.00s)
+  Status:      completed
+
+  Requests:    278,061 (9267.5 req/s)
+  Success:     278,061
+  Errors:      0 (0.00%)
+  Script errs: 0
+
+  Latency:
+    min      10.00ms
+    mean     10.77ms
+    p50      10.60ms
+    p90      11.39ms
+    p95      11.78ms
+    p99      13.57ms
+    max      46.37ms
