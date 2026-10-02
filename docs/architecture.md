@@ -5,6 +5,8 @@ This describes the code as it stands at the end of Phase 0 (October 2026).
   [architecture decision records](decisions/README.md).
 - **Numbers:** measured figures come from [`benchmarks/results`](../benchmarks/results/)
   and are dated, because they were taken at different commits.
+- **Workflows:** step-by-step diagrams of a test run, of development and
+  of benchmarking are in [workflows.md](workflows.md).
 
 ## 1. What LoadTool is
 

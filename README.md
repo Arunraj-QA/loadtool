@@ -142,7 +142,8 @@ docs/decisions/      Architecture decision records (ADR-NNN)
 ```
 
 See [docs/architecture.md](docs/architecture.md) for how the pieces fit
-together, and the [architecture decision records](docs/decisions/) for why.
+together, [docs/workflows.md](docs/workflows.md) for workflow diagrams, and
+the [architecture decision records](docs/decisions/) for why.
 
 ## License
 
