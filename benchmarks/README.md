@@ -45,6 +45,13 @@ In all three:
 - All VUs start at once, with no ramp-up.
 - Each VU loops with no think time.
 - Keep-alive is on and redirects are not followed.
+- At the end of the duration, running requests may finish: k6's
+  `gracefulStop` (30 s) and LoadTool's `--graceful-stop` (30 s, since
+  2026-10-02).
+  - JMeter also completes the sample in progress. Verified 2026-10-02: a
+    1 s test against a 3 s server recorded both requests at about
+    3,040 ms.
+  - Earlier LoadTool results dropped in-flight requests at the deadline.
 - Response bodies are not kept for the script: k6 uses
   `discardResponseBodies`, and JMeter stores only an MD5 hash of each
   response.

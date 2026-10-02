@@ -40,7 +40,8 @@ go build -o bin/loadtool ./cmd/loadtool
 | Flag | Default | Meaning |
 |---|---|---|
 | `-u, --vus` | `1` | Concurrent virtual users (one goroutine each) |
-| `-d, --duration` | `10s` | How long VUs keep iterating |
+| `-d, --duration` | `10s` | How long VUs keep starting new iterations |
+| `--graceful-stop` | `30s` | How long iterations still running when `--duration` ends may take to finish; `0` cancels them at once |
 
 Press Ctrl+C to stop early. A partial summary is printed and the exit code is 1.
 
@@ -91,7 +92,10 @@ How results are counted:
   recursion ends the iteration with a script error
   (`maximum call stack size of 2500 frames exceeded`); `try/catch` cannot
   catch it.
-- Requests cut off by the end of the test are not counted.
+- When `--duration` ends, no new iterations start, but running ones may
+  finish for up to `--graceful-stop`, and their requests are counted.
+  Requests still running after that, or when you press Ctrl+C, are
+  cancelled and not counted.
 - The summary shows latency twice:
   - **all requests sent**, failed ones included. This is the same
     population k6's `http_req_duration` and JMeter use.

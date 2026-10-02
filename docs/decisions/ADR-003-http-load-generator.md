@@ -30,6 +30,14 @@ separate task, so the engine must work before scripts exist.
 4. **Requests cut off by the end of the test are not recorded.** A request
    whose context was cancelled (deadline or Ctrl+C) is dropped instead of
    being counted as an error. Stopping a test must not create errors.
+   - **Amended 2026-10-02 (graceful stop).** Dropping every in-flight
+     request at the deadline biased latency percentiles low, because the
+     requests still running are mostly the slow ones.
+   - When `--duration` ends, VUs now stop *starting* iterations, and
+     running ones may finish for up to `--graceful-stop` (default 30 s,
+     like k6). Only requests still running after that are dropped.
+   - Ctrl+C still cancels everything at once. `--graceful-stop 0` gives
+     the old behaviour.
 5. **Metrics are per VU with no locks.**
    - Each VU owns a `metrics.Recorder`, so recording needs no locks or
      atomics.
