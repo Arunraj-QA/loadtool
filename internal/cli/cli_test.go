@@ -231,3 +231,32 @@ func TestRunInterruptedDuringStartup(t *testing.T) {
 		t.Fatal("run hung in script start-up after cancellation")
 	}
 }
+
+// TestRunGracefulStopCountsInFlightRequests: requests still running when
+// --duration ends are completed and counted, not silently dropped.
+func TestRunGracefulStopCountsInFlightRequests(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-time.After(300 * time.Millisecond):
+		case <-r.Context().Done():
+		}
+	}))
+	t.Cleanup(srv.Close)
+	script := getScript(t, srv.URL)
+
+	out, _, err := execute(t, "run", script, "--vus", "2", "--duration", "100ms", "--graceful-stop", "2s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Requests:    2 ") {
+		t.Errorf("want the 2 in-flight requests counted:\n%s", out)
+	}
+
+	out, _, err = execute(t, "run", script, "--vus", "2", "--duration", "100ms", "--graceful-stop", "0s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Requests:    0 ") {
+		t.Errorf("with --graceful-stop 0, in-flight requests are cancelled:\n%s", out)
+	}
+}

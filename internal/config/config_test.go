@@ -21,6 +21,8 @@ func TestValidate(t *testing.T) {
 		{"zero vus", func(c *Config) { c.VUs = 0 }, "vus must be at least 1"},
 		{"zero duration", func(c *Config) { c.Duration = 0 }, "duration must be positive"},
 		{"negative duration", func(c *Config) { c.Duration = -time.Second }, "duration must be positive"},
+		{"zero graceful stop", func(c *Config) { c.GracefulStop = 0 }, ""},
+		{"negative graceful stop", func(c *Config) { c.GracefulStop = -time.Second }, "graceful-stop must not be negative"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -14,7 +14,7 @@ import (
 )
 
 func newRunCmd() *cobra.Command {
-	cfg := config.Config{VUs: 1, Duration: 10 * time.Second}
+	cfg := config.Config{VUs: 1, Duration: 10 * time.Second, GracefulStop: 30 * time.Second}
 
 	cmd := &cobra.Command{
 		Use:     "run <script>",
@@ -33,6 +33,8 @@ func newRunCmd() *cobra.Command {
 	f := cmd.Flags()
 	f.IntVarP(&cfg.VUs, "vus", "u", cfg.VUs, "number of concurrent virtual users")
 	f.DurationVarP(&cfg.Duration, "duration", "d", cfg.Duration, "test duration, e.g. 30s or 5m")
+	f.DurationVar(&cfg.GracefulStop, "graceful-stop", cfg.GracefulStop,
+		"how long iterations still running at the end of --duration may take to finish (0 cancels them at once)")
 	return cmd
 }
 
@@ -57,7 +59,7 @@ func runTest(cmd *cobra.Command, cfg config.Config) error {
 		return vu.Iterate, nil
 	}
 
-	res, err := engine.Run(ctx, cfg.VUs, cfg.Duration, newVU)
+	res, err := engine.Run(ctx, cfg.VUs, cfg.Duration, cfg.GracefulStop, newVU)
 	if err != nil {
 		return err
 	}

@@ -32,10 +32,16 @@ type Result struct {
 }
 
 // Run initializes vus VUs with newVU, then starts one goroutine per VU that
-// calls its iteration in a loop until duration elapses or ctx is cancelled.
-// It returns only after every VU goroutine has exited. If any VU fails to
-// initialize, no load is generated and the error is returned.
-func Run(ctx context.Context, vus int, duration time.Duration, newVU NewVUFunc) (Result, error) {
+// calls its iteration in a loop. It returns only after every VU goroutine
+// has exited. If any VU fails to initialize, no load is generated and the
+// error is returned.
+//
+// When duration elapses, VUs stop starting new iterations, but iterations
+// already running may finish for up to gracefulStop; only then is their
+// context cancelled. Dropping in-flight requests at the deadline would bias
+// latency percentiles low, because the requests still running are mostly
+// the slow ones. Cancelling ctx (Ctrl+C) stops everything at once.
+func Run(ctx context.Context, vus int, duration, gracefulStop time.Duration, newVU NewVUFunc) (Result, error) {
 	iters := make([]IterationFunc, vus)
 	for i := range iters {
 		if err := ctx.Err(); err != nil {
@@ -49,16 +55,17 @@ func Run(ctx context.Context, vus int, duration time.Duration, newVU NewVUFunc) 
 	}
 
 	// The clock starts only after every VU is ready. start is taken before
-	// the deadline is set so Elapsed is never shorter than duration.
+	// the deadlines are set so Elapsed is never shorter than duration.
 	start := time.Now()
-	ctx, cancel := context.WithTimeout(ctx, duration)
+	stopStarting := start.Add(duration)
+	ctx, cancel := context.WithDeadline(ctx, stopStarting.Add(gracefulStop))
 	defer cancel()
 
 	recorders := metrics.NewRecorders(vus)
 	var wg sync.WaitGroup
 	for i, iter := range iters {
 		rec := recorders[i]
-		wg.Go(func() { runVU(ctx, rec, iter) })
+		wg.Go(func() { runVU(ctx, stopStarting, rec, iter) })
 	}
 	wg.Wait()
 	elapsed := time.Since(start)
@@ -66,8 +73,9 @@ func Run(ctx context.Context, vus int, duration time.Duration, newVU NewVUFunc) 
 	return Result{Summary: metrics.Merge(recorders), Elapsed: elapsed}, nil
 }
 
-func runVU(ctx context.Context, rec *metrics.Recorder, iter IterationFunc) {
-	for ctx.Err() == nil {
+// runVU starts iterations until stopStarting, and stops early if ctx ends.
+func runVU(ctx context.Context, stopStarting time.Time, rec *metrics.Recorder, iter IterationFunc) {
+	for ctx.Err() == nil && time.Now().Before(stopStarting) {
 		iter(ctx, rec)
 	}
 }
