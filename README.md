@@ -141,7 +141,8 @@ benchmarks/          Recorded benchmark results
 docs/decisions/      Architecture decision records (ADR-NNN)
 ```
 
-See the [architecture decision records](docs/decisions/).
+See [docs/architecture.md](docs/architecture.md) for how the pieces fit
+together, and the [architecture decision records](docs/decisions/) for why.
 
 ## License
 
