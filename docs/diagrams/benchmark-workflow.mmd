@@ -1,0 +1,34 @@
+---
+config:
+  flowchart:
+    wrappingWidth: 320
+---
+flowchart TD
+    prep(["Prepare: build bin/loadtool.exe and bin/benchserver.exe;<br/>stock JMeter 5.6.3 (no plugins, official properties)"]) --> run["./benchmarks/measure.ps1 -VUs 100,250,500,750,1000 ..."]
+    run --> fresh{"OutDir already has runs.jsonl?"}
+    fresh -->|yes| refuse["Stop: choose a new OutDir<br/>(sessions are never mixed)"]
+    fresh -->|no| env["Record environment.json (CPU, RAM, OS, power,<br/>tool versions, commit); start benchserver"]
+    env --> health{"GET /health OK?"}
+    health -->|no| abort["Stop: server not healthy"]
+    health -->|yes| level["Next VU level"]
+
+    level --> warm["Warm-up: each tool once, 30 s<br/>(recorded as kind=warmup, excluded later)"]
+    warm --> round["Measured round r of 3"]
+    round --> tool["Next tool: LoadTool → k6 → JMeter"]
+    tool --> launch["Launch the tool (JMeter: measure its java.exe child);<br/>sample private bytes + working set every 250 ms;<br/>on exit read CPU time and wall time"]
+    launch --> parse["Read the tool's own results (LoadTool summary ·<br/>k6 JSON · JMeter summary + JTL percentiles);<br/>calculate CPU %, average memory, error rate, server CPU %"]
+    parse --> append["Append one line to runs.jsonl<br/>(missing values stay empty); cool down 5 s"]
+    append --> moreTools{"More tools this round?"}
+    moreTools -->|yes| tool
+    moreTools -->|no| moreRounds{"More rounds?"}
+    moreRounds -->|yes| round
+    moreRounds -->|no| moreLevels{"More VU levels?"}
+    moreLevels -->|yes| level
+    moreLevels -->|no| stop["Stop the server"]
+
+    stop --> summarize["./benchmarks/summarize.ps1 → summary.md / .csv;<br/>check claims against raw data<br/>(error causes, overlap of ranges)"]
+    summarize --> errs{"Target errors in the runs?"}
+    errs -->|yes| caveat["Report throughput and latency as not<br/>comparable at those levels (environment-bound)"]
+    errs -->|no| report
+    caveat --> report["Write the report: environment, configuration,<br/>measured values · calculated values · observations"]
+    report --> commitRes(["Commit the report and raw data<br/>(JMeter JTLs kept outside git, SHA-256 recorded)"])

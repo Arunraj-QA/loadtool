@@ -1,0 +1,29 @@
+---
+config:
+  flowchart:
+    wrappingWidth: 320
+---
+flowchart TD
+    req(["Feature or fix request"]) --> scope{"Phase 0 scope?"}
+    scope -->|"no: later phase"| ask["Explain which phase it belongs to;<br/>ask whether Phase 0 needs it"]
+    scope -->|yes| inspect["Inspect the existing code (and Go / library<br/>source when behaviour matters);<br/>explain the proposed change briefly"]
+    inspect --> major{"Significant architecture<br/>decision or trade-off?"}
+    major -->|yes| decide["Present the trade-offs, with measurements;<br/>the user decides"]
+    decide --> adr["Write an ADR:<br/>docs/decisions/ADR-NNN-name.md"]
+    major -->|no| branch
+    adr --> branch
+    branch["Create a feature branch"] --> impl["Implement the smallest working change"]
+    impl --> tests["Add tests; for fixes, show each test<br/>fails without the fix (mutation check)"]
+    tests --> local{"gofmt, go vet,<br/>go test ./... pass?"}
+    local -->|no| impl
+    local -->|yes| perf{"Performance-sensitive?"}
+    perf -->|yes| bench["Run benchmarks and compare with the<br/>previous build (alternating A/B);<br/>record results in benchmarks/results/"]
+    perf -->|no| review
+    bench --> review["Review for goroutine leaks, races,<br/>allocations and resource cleanup"]
+    review --> commit["Update README / ADRs / architecture;<br/>small commits, one concern each,<br/>every commit builds; push the branch"]
+    commit --> ci{"CI: gofmt, vet, tests on Linux and Windows,<br/>go test -race -count=3 on Linux"}
+    ci -->|fail| impl
+    ci -->|pass| approve{"User approves merging?"}
+    approve -->|no| hold["Branch stays open"]
+    approve -->|yes| ff["Fast-forward main and push"]
+    ff --> done(["Done"])

@@ -1,0 +1,50 @@
+---
+config:
+  flowchart:
+    wrappingWidth: 320
+---
+flowchart TD
+    start(["loadtool run test.ts --vus N --duration D --graceful-stop G"]) --> args{"Exactly one script argument?"}
+    args -->|no| failArgs["Error: accepts 1 arg"]
+    args -->|yes| cfg{"config.Validate:<br/>script set, VUs ≥ 1,<br/>D > 0, G ≥ 0?"}
+    cfg -->|no| failCfg["Error: lists every invalid setting"]
+    cfg -->|yes| load["script.Load: read file"]
+    load --> build{"esbuild bundle:<br/>valid syntax, no imports,<br/>default export present?"}
+    build -->|no| failBuild["Error: load script<br/>(file:line:column)"]
+    build -->|yes| compile["goja.Compile → shared Program"]
+    compile --> client["httpclient.New:<br/>one HTTP/1.1 client,<br/>≤ 1 connection per VU"]
+
+    client --> initLoop["Start VU i (sequentially, before the clock)"]
+    initLoop --> newVU["New goja runtime, call depth ≤ 2,500,<br/>run top-level code once"]
+    newVU --> initOK{"Top-level code OK and<br/>default export is a function?"}
+    initOK -->|"no: throw, HTTP call,<br/>stack overflow"| failInit["Error: initialize VU i"]
+    initOK -->|"Ctrl+C during start-up"| failCancel["Error: context canceled"]
+    initOK -->|yes| moreVUs{"More VUs to start?"}
+    moreVUs -->|yes| initLoop
+    moreVUs -->|no| clock["Start the clock:<br/>stop starting at D,<br/>hard stop at D + G"]
+
+    clock --> vuLoop{"Each VU, in its own goroutine:<br/>before D and not cancelled?"}
+    vuLoop -->|yes| iterate["Call default()"]
+    iterate --> req["http.get / http.request → send, time, read body"]
+    req --> outcome{"Outcome"}
+    outcome -->|"2xx/3xx"| recOK["Record success + latency"]
+    outcome -->|"4xx/5xx, refused,<br/>timeout"| recFail["Record failure + latency"]
+    outcome -->|"never sent<br/>(invalid URL)"| recUnsent["Record failure, no latency"]
+    iterate -->|"script throws or<br/>stack overflow"| recScript["Count script error<br/>(keep first message)"]
+    recOK & recFail & recUnsent & recScript --> vuLoop
+
+    vuLoop -->|"D reached"| grace["Stop starting iterations;<br/>running ones may finish until D + G"]
+    grace --> hard{"Finished before D + G?"}
+    hard -->|yes| counted["Their requests are counted"]
+    hard -->|no| dropped["Cancelled at D + G:<br/>not counted"]
+    vuLoop -->|"Ctrl+C"| interrupt["Cancel everything now:<br/>requests aborted, JS interrupted"]
+
+    counted & dropped & interrupt --> wait["Wait for all VU goroutines"]
+    wait --> merge["metrics.Merge → Summary"]
+    merge --> print["Print summary: requests, errors,<br/>latency (all sent / successful only)"]
+    print --> interrupted{"Interrupted by Ctrl+C?"}
+    interrupted -->|no| exit0(["Exit 0"])
+    interrupted -->|yes| exit1(["Exit 1: partial results"])
+
+    classDef fail fill:#fde2e1,stroke:#c0392b,color:#7b241c
+    class failArgs,failCfg,failBuild,failInit,failCancel fail
