@@ -130,7 +130,8 @@ for every push, and runs vet and tests on Linux and Windows.
 
 ```text
 cmd/loadtool/        CLI entrypoint
-internal/cli/        Cobra commands and console summary
+internal/cli/        Cobra commands and wiring
+internal/report/     Result model and outputs (console summary)
 internal/config/     Run settings and validation
 internal/engine/     Goroutine-per-VU scheduler (protocol-agnostic)
 internal/script/     TypeScript/JavaScript loading and per-VU goja runtimes

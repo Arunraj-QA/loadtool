@@ -49,7 +49,9 @@ and the benchmark server is independent of LoadTool's code (§11).
 ```mermaid
 flowchart TD
     main["cmd/loadtool<br/>entry point, Ctrl+C"] --> cli
-    cli["internal/cli<br/>Cobra commands, summary"] --> config["internal/config<br/>run settings"]
+    cli["internal/cli<br/>Cobra commands, wiring"] --> config["internal/config<br/>run settings"]
+    cli --> report["internal/report<br/>result model, outputs"]
+    report --> metrics
     cli --> script["internal/script<br/>TS/JS → goja, one runtime per VU"]
     cli --> engine["internal/engine<br/>goroutine per VU, timing"]
     cli --> httpclient["internal/httpclient<br/>HTTP/1.1 execution"]
@@ -77,7 +79,8 @@ matter:
 | Package | Responsibility | Key API | Lines (code / tests) |
 |---|---|---|---|
 | `cmd/loadtool` | Process entry; maps Ctrl+C to context cancellation; exit codes | `main` | 26 / 0 |
-| `internal/cli` | Flags, validation, wiring, console summary | `NewRootCmd` | 201 / 262 |
+| `internal/cli` | Flags, validation, wiring | `NewRootCmd` | 119 / 240 |
+| `internal/report` | Result model; renders outputs (console today; JSON and HTML in Phase 1) | `Result`, `Console` | 110 / 81 |
 | `internal/config` | Run settings and validation | `Config.Validate` | 39 / 55 |
 | `internal/engine` | VU start-up, one goroutine per VU, duration and graceful stop | `Run`, `IterationFunc`, `NewVUFunc` | 81 / 258 |
 | `internal/script` | Transpile and compile scripts; per-VU goja runtime; the `http` script API | `Load`, `Compile`, `Program.NewVU`, `VU.Iterate` | 364 / 576 |
