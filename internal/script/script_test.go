@@ -107,7 +107,8 @@ func TestLoadErrors(t *testing.T) {
 		{"top-level throw", `throw new Error("init failed"); export default function () {}`, "init failed"},
 		{"request in init", `import http from "loadtool/http";
 http.get("http://127.0.0.1:1/"); export default function () {}`, "not allowed in the script's top-level code"},
-		{"import", `import { f } from "./other"; export default function () { f(); }`, `imports are not supported yet (importing "./other")`},
+		{"relative import without a file", `import { f } from "./other"; export default function () { f(); }`, `relative imports need the script to be loaded from a file (importing "./other")`},
+		{"package import", `import _ from "lodash"; export default function () { _(); }`, `cannot import "lodash"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -125,7 +126,7 @@ http.get("http://127.0.0.1:1/"); export default function () {}`, "not allowed in
 // TestTranspileHasNoInteropHelpers guards per-VU memory: esbuild's
 // CommonJS interop helpers cost about 22 KB in every VU runtime.
 func TestTranspileHasNoInteropHelpers(t *testing.T) {
-	code, err := transpile("test.ts", []byte(`
+	code, err := transpile("test.ts", "", []byte(`
 let count: number = 0;
 export default function (): void { count++; }`))
 	if err != nil {
@@ -581,11 +582,120 @@ func TestGlobalHTTPRemovedWithHint(t *testing.T) {
 }
 
 func TestBuiltinModulesAddNoInteropHelpers(t *testing.T) {
-	code, err := transpile("test.ts", []byte(`
+	code, err := transpile("test.ts", "", []byte(`
 import http, { get } from "loadtool/http";
 import lt from "loadtool";
 export const options = { vus: 1 };
 export default function () { http.get("x"); get("y"); return lt; }`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, helper := range []string{"__export", "__copyProps", "__toCommonJS", "__toESM"} {
+		if strings.Contains(code, helper) {
+			t.Errorf("output contains %s", helper)
+		}
+	}
+}
+
+// writeProject writes files (path relative to a temp dir) and returns the dir.
+func writeProject(t *testing.T, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for name, content := range files {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+func relativeImportProject(t *testing.T, base string) string {
+	return writeProject(t, map[string]string{
+		"main.ts": `import http from "loadtool/http";
+import { target, check200, boom } from "./lib/helpers.ts";
+import cfg from "./config.json";
+export const options = { vus: cfg.vus };
+let n = 0;
+export default function () {
+	n++;
+	if (n === 2) boom();
+	check200(http.get(target()));
+}
+`,
+		"lib/helpers.ts": `import { base } from "../shared";
+export function target(): string { return base + "/x"; }
+export function check200(res: { status: number }): void {
+	if (res.status !== 200) throw new Error("bad status " + res.status);
+}
+export function boom(): never {
+	throw new Error("helper boom");
+}
+`,
+		"shared.ts":   `export const base: string = "` + base + `";` + "\n",
+		"config.json": `{"vus": 3}`,
+	})
+}
+
+func TestRelativeImports(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(ok))
+	t.Cleanup(srv.Close)
+	dir := relativeImportProject(t, srv.URL)
+
+	p, err := Load(filepath.Join(dir, "main.ts"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	opts, err := p.Options(context.Background())
+	if err != nil || string(opts) != `{"vus":3}` {
+		t.Fatalf("Options = %s, %v; want {\"vus\":3} from the imported JSON", opts, err)
+	}
+
+	vu, err := p.NewVU(context.Background(), httpclient.New(1, httpclient.DefaultTimeout))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := &metrics.Recorder{}
+	vu.Iterate(context.Background(), rec) // request via helpers
+	vu.Iterate(context.Background(), rec) // boom() in helpers.ts
+	s := metrics.Merge([]*metrics.Recorder{rec})
+	if s.Successes != 1 {
+		t.Errorf("Successes = %d, want 1 request made through the helper module", s.Successes)
+	}
+	// The error must point at the imported file, at the throw on line 7.
+	if s.ScriptErrors != 1 || !strings.Contains(s.FirstScriptError, "helper boom") || !strings.Contains(s.FirstScriptError, "helpers.ts:7") {
+		t.Errorf("got %d script errors, first %q; want helper boom at helpers.ts:7", s.ScriptErrors, s.FirstScriptError)
+	}
+}
+
+func TestRelativeImportErrors(t *testing.T) {
+	dir := writeProject(t, map[string]string{
+		"missing.ts":          `import { x } from "./nope"; export default function () { x(); }`,
+		"package.ts":          `import { y } from "./lib/uses-package.ts"; export default function () { y(); }`,
+		"lib/uses-package.ts": `import left from "left-pad"; export function y() { return left; }`,
+	})
+	tests := []struct{ file, want string }{
+		{"missing.ts", `Could not resolve "./nope"`},
+		{"package.ts", `cannot import "left-pad"`}, // also enforced inside imported files
+	}
+	for _, tt := range tests {
+		_, err := Load(filepath.Join(dir, tt.file))
+		if err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("Load(%s) error = %v, want it to contain %q", tt.file, err, tt.want)
+		}
+	}
+}
+
+func TestRelativeImportsAddNoInteropHelpers(t *testing.T) {
+	dir := relativeImportProject(t, "http://unused")
+	src, err := os.ReadFile(filepath.Join(dir, "main.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := transpile("main.ts", dir, src)
 	if err != nil {
 		t.Fatal(err)
 	}

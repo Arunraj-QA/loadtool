@@ -33,13 +33,18 @@ type Program struct {
 	prog *goja.Program
 }
 
-// Load reads and compiles the script at path.
+// Load reads and compiles the script at path. Relative imports
+// (./helpers.ts) are resolved from the script's directory.
 func Load(path string) (*Program, error) {
 	src, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return Compile(filepath.Base(path), src)
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	return compileIn(filepath.Base(path), filepath.Dir(abs), src)
 }
 
 const (
@@ -70,10 +75,17 @@ var errNoDefaultExport = errors.New("script must export a default function: `exp
 
 // Compile transpiles src to JavaScript (stripping TypeScript types and
 // resolving the default export) and compiles it for goja. Files ending in
-// .ts are treated as TypeScript, everything else as JavaScript. Imports are
-// not supported.
+// .ts are treated as TypeScript, everything else as JavaScript. The script
+// may import built-in modules; relative imports need Load, which knows the
+// script's directory.
 func Compile(filename string, src []byte) (*Program, error) {
-	code, err := transpile(filename, src)
+	return compileIn(filename, "", src)
+}
+
+// compileIn is Compile with the directory relative imports resolve from;
+// dir must be absolute, or empty to reject relative imports.
+func compileIn(filename, dir string, src []byte) (*Program, error) {
+	code, err := transpile(filename, dir, src)
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +96,9 @@ func Compile(filename string, src []byte) (*Program, error) {
 	return &Program{prog: prog}, nil
 }
 
-// transpile turns the script into plain JavaScript that stores its default
-// export in defaultExportGlobal.
-func transpile(filename string, src []byte) (string, error) {
+// transpile turns the script, and the files it imports, into one plain
+// JavaScript program that stores its default export in defaultExportGlobal.
+func transpile(filename, dir string, src []byte) (string, error) {
 	loader := api.LoaderJS
 	if strings.EqualFold(filepath.Ext(filename), ".ts") {
 		loader = api.LoaderTS
@@ -97,7 +109,10 @@ func transpile(filename string, src []byte) (string, error) {
 		Format:   api.FormatESModule,
 		Platform: api.PlatformNeutral,
 		Target:   api.ES2017,
-		Plugins:  []api.Plugin{scriptPlugin(filename, string(src), loader)},
+		Plugins:  []api.Plugin{scriptPlugin(filename, dir, string(src), loader)},
+		// Paths in errors and the source map are relative to the script's
+		// directory, so they read "helpers.ts", not a full path.
+		AbsWorkingDir: dir,
 		// The source map lets goja report errors at .ts line numbers. It is
 		// produced separately so its file names can be cleaned up.
 		Sourcemap: api.SourceMapExternal,
@@ -157,7 +172,7 @@ func withInlineSourceMap(files []api.OutputFile) (string, error) {
 
 // scriptPlugin serves the script's source from memory for the entry's
 // import and rejects every other import.
-func scriptPlugin(filename, src string, loader api.Loader) api.Plugin {
+func scriptPlugin(filename, dir, src string, loader api.Loader) api.Plugin {
 	return api.Plugin{
 		Name: "loadtool-script",
 		Setup: func(b api.PluginBuild) {
@@ -167,11 +182,18 @@ func scriptPlugin(filename, src string, loader api.Loader) api.Plugin {
 					return api.OnResolveResult{Path: filename, Namespace: scriptNamespace}, nil
 				case isBuiltinModule(args.Path):
 					return api.OnResolveResult{Path: args.Path, Namespace: builtinNamespace}, nil
+				case isRelativeImport(args.Path):
+					if dir == "" {
+						return api.OnResolveResult{}, fmt.Errorf("relative imports need the script to be loaded from a file (importing %q)", args.Path)
+					}
+					// Let esbuild resolve it from the importing file's directory.
+					return api.OnResolveResult{}, nil
 				}
-				return api.OnResolveResult{}, fmt.Errorf("imports are not supported yet (importing %q)", args.Path)
+				return api.OnResolveResult{}, fmt.Errorf(
+					"cannot import %q: only built-in modules (\"loadtool\", \"loadtool/http\") and relative paths such as \"./helpers.ts\" can be imported", args.Path)
 			})
 			b.OnLoad(api.OnLoadOptions{Filter: ".*", Namespace: scriptNamespace}, func(api.OnLoadArgs) (api.OnLoadResult, error) {
-				return api.OnLoadResult{Contents: &src, Loader: loader}, nil
+				return api.OnLoadResult{Contents: &src, Loader: loader, ResolveDir: dir}, nil
 			})
 			b.OnLoad(api.OnLoadOptions{Filter: ".*", Namespace: builtinNamespace}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
 				mod, err := builtinModuleSource(args.Path)
@@ -314,4 +336,9 @@ func (vu *VU) Iterate(ctx context.Context, rec *metrics.Recorder) {
 	if err != nil && ctx.Err() == nil {
 		rec.RecordScriptError(scriptErrorMessage(err))
 	}
+}
+
+// isRelativeImport reports whether path is relative to the importing file.
+func isRelativeImport(path string) bool {
+	return strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../")
 }
