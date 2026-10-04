@@ -105,7 +105,8 @@ func TestLoadErrors(t *testing.T) {
 		{"default not a function", `export default 42;`, "must export a default function"},
 		{"commonjs without default", `module.exports = undefined;`, "must export a default function"},
 		{"top-level throw", `throw new Error("init failed"); export default function () {}`, "init failed"},
-		{"request in init", `http.get("http://127.0.0.1:1/"); export default function () {}`, "not allowed in the script's top-level code"},
+		{"request in init", `import http from "loadtool/http";
+http.get("http://127.0.0.1:1/"); export default function () {}`, "not allowed in the script's top-level code"},
 		{"import", `import { f } from "./other"; export default function () { f(); }`, `imports are not supported yet (importing "./other")`},
 	}
 	for _, tt := range tests {
@@ -148,7 +149,8 @@ func TestHTTPGetReturnsStatusAndTimings(t *testing.T) {
 	src, _ := server(t, func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(20 * time.Millisecond)
 		w.WriteHeader(http.StatusTeapot)
-	}, `
+	}, `import http from "loadtool/http";
+
 export default function () {
 	const res = http.get("BASE_URL");
 	if (res.status !== 418) throw new Error("status " + res.status);
@@ -172,7 +174,8 @@ func TestHTTPRequestSendsMethodBodyAndHeaders(t *testing.T) {
 		b, _ := io.ReadAll(r.Body)
 		got <- seen{r.Method, string(b), r.Header.Get("Content-Type")}
 		w.WriteHeader(http.StatusCreated)
-	}, `
+	}, `import http from "loadtool/http";
+
 export default function () {
 	const res = http.request("post", "BASE_URL", JSON.stringify({ a: 1 }), {
 		headers: { "Content-Type": "application/json" },
@@ -194,7 +197,8 @@ func TestHTTPTransportErrorDoesNotThrow(t *testing.T) {
 	url := srv.URL
 	srv.Close()
 
-	src := strings.ReplaceAll(`
+	src := strings.ReplaceAll(`import http from "loadtool/http";
+
 export default function () {
 	const res = http.get("BASE_URL");
 	if (res.status !== 0) throw new Error("status " + res.status);
@@ -234,9 +238,12 @@ func TestHTTPArgumentErrors(t *testing.T) {
 	tests := []struct {
 		name, src, wantErr string
 	}{
-		{"get without url", `export default function () { http.get(); }`, "url is required"},
-		{"request without method", `export default function () { http.request(); }`, "method is required"},
-		{"request without url", `export default function () { http.request("GET"); }`, "url is required"},
+		{"get without url", `import http from "loadtool/http";
+export default function () { http.get(); }`, "url is required"},
+		{"request without method", `import http from "loadtool/http";
+export default function () { http.request(); }`, "method is required"},
+		{"request without url", `import http from "loadtool/http";
+export default function () { http.request("GET"); }`, "url is required"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -268,7 +275,8 @@ export default function () { count++; }`)
 }
 
 func TestConcurrentVUs(t *testing.T) {
-	src, _ := server(t, ok, `
+	src, _ := server(t, ok, `import http from "loadtool/http";
+
 let n = 0;
 export default function () {
 	n++;
@@ -337,7 +345,8 @@ func TestIterateWithDoneContextDoesNothing(t *testing.T) {
 }
 
 func BenchmarkNewVU(b *testing.B) {
-	p, err := Compile("test.ts", []byte(`export default function () { http.get("http://localhost/"); }`))
+	p, err := Compile("test.ts", []byte(`import http from "loadtool/http";
+export default function () { http.get("http://localhost/"); }`))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -370,7 +379,8 @@ func BenchmarkIterateEmpty(b *testing.B) {
 func BenchmarkIterateHTTPGet(b *testing.B) {
 	srv := httptest.NewServer(http.HandlerFunc(ok))
 	defer srv.Close()
-	src := strings.ReplaceAll(`export default function () { http.get("BASE_URL"); }`, "BASE_URL", srv.URL)
+	src := strings.ReplaceAll(`import http from "loadtool/http";
+export default function () { http.get("BASE_URL"); }`, "BASE_URL", srv.URL)
 	p, err := Compile("test.ts", []byte(src))
 	if err != nil {
 		b.Fatal(err)
@@ -537,5 +547,51 @@ func TestOptionsErrors(t *testing.T) {
 				t.Fatalf("error = %v, want it to contain %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuiltinHTTPModuleImports(t *testing.T) {
+	src, _ := server(t, ok, `
+import http, { get, request } from "loadtool/http";
+export default function () {
+	if (http.get("BASE_URL").status !== 200) throw new Error("default import");
+	if (get("BASE_URL").status !== 200) throw new Error("named get");
+	if (request("GET", "BASE_URL").status !== 200) throw new Error("named request");
+}`)
+	s := iterate(newVU(t, compile(t, "test.ts", src)))
+	if s.ScriptErrors != 0 || s.Successes != 3 {
+		t.Fatalf("got %d script errors (%s), %d successes; want 0 and 3", s.ScriptErrors, s.FirstScriptError, s.Successes)
+	}
+}
+
+func TestUnknownBuiltinModule(t *testing.T) {
+	_, err := Compile("test.ts", []byte(`import x from "loadtool/ws"; export default function () { x(); }`))
+	if err == nil || !strings.Contains(err.Error(), `unknown module "loadtool/ws"`) || !strings.Contains(err.Error(), `"loadtool/http"`) {
+		t.Fatalf("error = %v, want an unknown-module error listing the built-in modules", err)
+	}
+}
+
+// TestGlobalHTTPRemovedWithHint covers the ADR-005 breaking change: Phase 0
+// scripts used a global http object; they now get a hint to import it.
+func TestGlobalHTTPRemovedWithHint(t *testing.T) {
+	s := iterate(newVU(t, compile(t, "test.js", `export default function () { http.get("http://127.0.0.1:1/"); }`)))
+	if s.ScriptErrors != 1 || !strings.Contains(s.FirstScriptError, `import http from "loadtool/http"`) {
+		t.Fatalf("got %d script errors, first %q; want one with the import hint", s.ScriptErrors, s.FirstScriptError)
+	}
+}
+
+func TestBuiltinModulesAddNoInteropHelpers(t *testing.T) {
+	code, err := transpile("test.ts", []byte(`
+import http, { get } from "loadtool/http";
+import lt from "loadtool";
+export const options = { vus: 1 };
+export default function () { http.get("x"); get("y"); return lt; }`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, helper := range []string{"__export", "__copyProps", "__toCommonJS", "__toESM"} {
+		if strings.Contains(code, helper) {
+			t.Errorf("output contains %s", helper)
+		}
 	}
 }

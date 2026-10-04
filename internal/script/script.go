@@ -162,13 +162,23 @@ func scriptPlugin(filename, src string, loader api.Loader) api.Plugin {
 		Name: "loadtool-script",
 		Setup: func(b api.PluginBuild) {
 			b.OnResolve(api.OnResolveOptions{Filter: ".*"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
-				if args.Importer == "<stdin>" && args.Path == scriptImport {
+				switch {
+				case args.Importer == "<stdin>" && args.Path == scriptImport:
 					return api.OnResolveResult{Path: filename, Namespace: scriptNamespace}, nil
+				case isBuiltinModule(args.Path):
+					return api.OnResolveResult{Path: args.Path, Namespace: builtinNamespace}, nil
 				}
 				return api.OnResolveResult{}, fmt.Errorf("imports are not supported yet (importing %q)", args.Path)
 			})
 			b.OnLoad(api.OnLoadOptions{Filter: ".*", Namespace: scriptNamespace}, func(api.OnLoadArgs) (api.OnLoadResult, error) {
 				return api.OnLoadResult{Contents: &src, Loader: loader}, nil
+			})
+			b.OnLoad(api.OnLoadOptions{Filter: ".*", Namespace: builtinNamespace}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+				mod, err := builtinModuleSource(args.Path)
+				if err != nil {
+					return api.OnLoadResult{}, err
+				}
+				return api.OnLoadResult{Contents: &mod, Loader: api.LoaderJS}, nil
 			})
 		},
 	}
@@ -210,7 +220,12 @@ func scriptErrorMessage(err error) string {
 	if errors.As(err, &so) {
 		return fmt.Sprintf("maximum call stack size of %d frames exceeded%s", maxCallStackSize, err.Error())
 	}
-	return err.Error()
+	msg := err.Error()
+	if strings.Contains(msg, "ReferenceError: http is not defined") {
+		// Phase 0 scripts used a global http object (ADR-005 replaced it).
+		msg += ` (http is a module now: add import http from "loadtool/http")`
+	}
+	return msg
 }
 
 // VU is one virtual user's JavaScript runtime. It must only be used by a
@@ -235,7 +250,12 @@ func (p *Program) NewVU(ctx context.Context, client *http.Client) (*VU, error) {
 	rt.SetMaxCallStackSize(maxCallStackSize)
 	vu := &VU{rt: rt, client: client}
 
-	if err := rt.Set("http", vu.newHTTPModule()); err != nil {
+	builtins := rt.NewObject()
+	if err := errors.Join(
+		builtins.Set("http", vu.newHTTPModule()),
+		builtins.Set("core", rt.NewObject()),
+		rt.Set(builtinGlobal, builtins),
+	); err != nil {
 		return nil, err
 	}
 	stop := context.AfterFunc(ctx, func() { rt.Interrupt(errStopped) })

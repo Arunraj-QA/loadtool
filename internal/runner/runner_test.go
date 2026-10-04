@@ -32,7 +32,8 @@ func okServer(t *testing.T) *httptest.Server {
 
 func getScript(t *testing.T, url, extra string) string {
 	t.Helper()
-	return scriptFile(t, extra+`export default function (): void { http.get("`+url+`"); }`)
+	return scriptFile(t, extra+`import http from "loadtool/http";
+export default function (): void { http.get("`+url+`"); }`)
 }
 
 func intp(n int) *int                     { return &n }

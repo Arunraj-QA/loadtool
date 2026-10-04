@@ -1,4 +1,6 @@
-/// <reference path="./loadtool.d.ts" />
+/// <reference path="../types/loadtool.d.ts" />
+
+import http from "loadtool/http";
 
 // The same test as basic-http.ts, written in plain JavaScript.
 //

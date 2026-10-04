@@ -75,6 +75,8 @@ calls it repeatedly until the duration ends. See
 JavaScript.
 
 ```typescript
+import http from "loadtool/http";
+
 export default function () {
   const res = http.get("http://localhost:8080/");
   if (res.status !== 200) {
@@ -83,19 +85,25 @@ export default function () {
 }
 ```
 
-The Phase 0 script API is intentionally small. It is a single `http` global:
+The script API follows the shape of k6's
+([ADR-005](docs/decisions/ADR-005-k6-shaped-script-api.md)). It is being
+built out in Phase 1. The `loadtool/http` module provides:
 
 | Call | Returns |
 |---|---|
 | `http.get(url, params?)` | response |
 | `http.request(method, url, body?, params?)` | response |
 
+`get` and `request` can also be imported by name:
+`import { get } from "loadtool/http"`. Phase 0 scripts that used a global
+`http` need the import line added; the error message says so.
+
 - `params` is `{ headers: { name: value } }`.
 - A response is `{ status, error, timings: { duration } }`, with the
   duration in milliseconds.
 - Response bodies are not exposed to scripts yet.
 - Type declarations for editors are in
-  [`examples/loadtool.d.ts`](examples/loadtool.d.ts).
+  [`types/loadtool.d.ts`](types/loadtool.d.ts).
 
 How results are counted:
 - A request succeeds when it gets a 2xx or 3xx response. Redirects are not

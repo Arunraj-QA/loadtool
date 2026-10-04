@@ -1,4 +1,6 @@
-/// <reference path="./loadtool.d.ts" />
+/// <reference path="../types/loadtool.d.ts" />
+
+import http from "loadtool/http";
 
 // Run with:
 //   loadtool run examples/basic-http.ts --vus 10 --duration 10s

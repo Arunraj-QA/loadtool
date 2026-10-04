@@ -40,7 +40,8 @@ func scriptFile(t *testing.T, src string) string {
 // getScript returns a script whose iteration sends one GET to url.
 func getScript(t *testing.T, url string) string {
 	t.Helper()
-	return scriptFile(t, `export default function (): void { http.get("`+url+`"); }`)
+	return scriptFile(t, `import http from "loadtool/http";
+export default function (): void { http.get("`+url+`"); }`)
 }
 
 func statusServer(t *testing.T, status int) *httptest.Server {
@@ -243,7 +244,8 @@ func TestRunGracefulStopCountsInFlightRequests(t *testing.T) {
 // script options < LOADTOOL_* environment variables < typed CLI flags.
 func TestRunUsesScriptOptions(t *testing.T) {
 	srv := statusServer(t, http.StatusOK)
-	path := scriptFile(t, `export const options = { vus: 3, duration: "150ms", thresholds: {} };
+	path := scriptFile(t, `import http from "loadtool/http";
+export const options = { vus: 3, duration: "150ms", thresholds: {} };
 export default function (): void { http.get("`+srv.URL+`"); }`)
 
 	out, stderr, err := execute(t, "run", path)
