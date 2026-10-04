@@ -326,3 +326,68 @@ func TestDoSendsNoImplicitAcceptEncoding(t *testing.T) {
 		t.Errorf("explicit Accept-Encoding = %q, want %q", ae, "br")
 	}
 }
+
+func TestDoKeepsBodyAndHeader(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Reply", "yes")
+		switch r.URL.Path {
+		case "/sized":
+			w.Header().Set("Content-Length", "5")
+			w.Write([]byte("sized"))
+		case "/chunked":
+			// Flushing before the end forces chunked encoding: no
+			// Content-Length, so the body is read until EOF.
+			w.Write([]byte("chun"))
+			w.(http.Flusher).Flush()
+			w.Write([]byte("ked"))
+		case "/empty":
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	client := New(1, DefaultTimeout)
+
+	for _, tt := range []struct{ path, want string }{
+		{"/sized", "sized"}, {"/chunked", "chunked"}, {"/empty", ""},
+	} {
+		t.Run(tt.path, func(t *testing.T) {
+			res := Do(context.Background(), client,
+				Request{Method: http.MethodGet, URL: srv.URL + tt.path, KeepBody: true}, &metrics.Recorder{})
+			if res.Err != nil {
+				t.Fatal(res.Err)
+			}
+			if res.Body == nil || string(res.Body) != tt.want {
+				t.Errorf("Body = %q (nil: %v), want %q", res.Body, res.Body == nil, tt.want)
+			}
+			if got := res.Header.Get("X-Reply"); got != "yes" {
+				t.Errorf("Header X-Reply = %q, want yes", got)
+			}
+		})
+	}
+}
+
+func TestDoDiscardsBodyByDefault(t *testing.T) {
+	srv := statusServer(t, http.StatusOK)
+	res := Do(context.Background(), New(1, DefaultTimeout), get(srv.URL), &metrics.Recorder{})
+	if res.Body != nil {
+		t.Errorf("Body = %q, want nil when KeepBody is not set", res.Body)
+	}
+}
+
+func BenchmarkDoKeepBody(b *testing.B) {
+	payload := []byte(`{"id":1,"name":"product","price":9.99,"tags":["a","b","c"]}`)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(payload)
+	}))
+	defer srv.Close()
+	client := New(1, DefaultTimeout)
+	defer client.CloseIdleConnections()
+	rec := &metrics.Recorder{}
+	ctx := context.Background()
+	req := Request{Method: http.MethodGet, URL: srv.URL, KeepBody: true}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		Do(ctx, client, req, rec)
+	}
+}

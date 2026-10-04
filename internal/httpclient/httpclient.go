@@ -59,6 +59,9 @@ type Request struct {
 	Body string
 	// Header may be nil.
 	Header http.Header
+	// KeepBody keeps the response body in Result.Body. Otherwise it is
+	// read and discarded, which allocates nothing per request.
+	KeepBody bool
 }
 
 // Result is the outcome of one request.
@@ -68,6 +71,12 @@ type Result struct {
 	// Duration covers sending the request and reading the whole body.
 	Duration time.Duration
 	Err      error
+	// Header is the response's header, nil if no response was received.
+	Header http.Header
+	// Body is the response body when Request.KeepBody is set. It is
+	// non-nil (possibly empty) whenever a body was kept, so callers can
+	// tell an empty body from a discarded one.
+	Body []byte
 }
 
 // OK reports whether the request completed with a 2xx or 3xx status.
@@ -98,8 +107,14 @@ func Do(ctx context.Context, client *http.Client, r Request, rec *metrics.Record
 	resp, err := client.Do(req)
 	if err == nil {
 		res.Status = resp.StatusCode
-		// Drain the body so the connection returns to the pool.
-		_, err = io.Copy(io.Discard, resp.Body)
+		res.Header = resp.Header
+		// Read the body to the end either way, so the connection returns
+		// to the pool and Duration includes the transfer.
+		if r.KeepBody {
+			res.Body, err = readBody(resp)
+		} else {
+			_, err = io.Copy(io.Discard, resp.Body)
+		}
 		resp.Body.Close()
 	}
 	res.Duration = time.Since(start)
@@ -110,3 +125,26 @@ func Do(ctx context.Context, client *http.Client, r Request, rec *metrics.Record
 	}
 	return res
 }
+
+// readBody reads the whole body, in one allocation when the server sends
+// Content-Length.
+func readBody(resp *http.Response) ([]byte, error) {
+	// net/http never returns more than Content-Length bytes, so reading
+	// exactly that many reaches the end of the body.
+	if n := resp.ContentLength; n >= 0 && n <= maxPresize {
+		b := make([]byte, n)
+		if _, err := io.ReadFull(resp.Body, b); err != nil {
+			return nil, err
+		}
+		return b, nil
+	}
+	b, err := io.ReadAll(resp.Body)
+	if b == nil && err == nil {
+		b = []byte{}
+	}
+	return b, err
+}
+
+// maxPresize bounds the buffer allocated up front from Content-Length, so a
+// wrong header cannot make one request allocate a huge buffer.
+const maxPresize = 16 << 20
