@@ -107,6 +107,8 @@ sequenceDiagram
 
     M->>C: ExecuteContext(ctx)  [Ctrl+C cancels ctx]
     C->>S: Load(test.ts): esbuild bundle → goja.Compile (once)
+    C->>S: Options(): run top-level code once, read `options`
+    Note over C: resolve settings: CLI flag > LOADTOOL_* env > script options > default
     C->>H: New(VUs, 30s): one shared http.Client
     C->>E: Run(ctx, vus, duration, gracefulStop, newVU)
     loop for each VU, sequentially, before the clock starts

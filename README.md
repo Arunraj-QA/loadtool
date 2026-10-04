@@ -45,6 +45,27 @@ go build -o bin/loadtool ./cmd/loadtool
 
 Press Ctrl+C to stop early. A partial summary is printed and the exit code is 1.
 
+### Options in the script
+
+A script can declare its own settings:
+
+```typescript
+export const options = { vus: 10, duration: "30s" };
+```
+
+Each setting is taken from the first source that sets it
+([ADR-006](docs/decisions/ADR-006-options-and-precedence.md)):
+
+1. a CLI flag you typed (`--vus`, `--duration`)
+2. an environment variable (`LOADTOOL_VUS`, `LOADTOOL_DURATION`)
+3. the script's `options`
+4. the default (1 VU, 10 s)
+
+Notes:
+- `duration` accepts `"30s"` / `"1m30s"`, or a number of milliseconds.
+- Options LoadTool does not support yet produce a warning and are
+  ignored, so scripts written for k6 still run.
+
 ## Writing a test
 
 A test is a `.ts` or `.js` file that exports a default function. Every VU
