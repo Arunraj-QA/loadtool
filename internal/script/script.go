@@ -301,7 +301,7 @@ func (p *Program) NewVU(ctx context.Context, id int, client *http.Client) (*VU, 
 	builtins := rt.NewObject()
 	if err := errors.Join(
 		builtins.Set("http", vu.newHTTPModule()),
-		builtins.Set("core", rt.NewObject()),
+		builtins.Set("core", vu.newCoreModule()),
 		rt.Set(builtinGlobal, builtins),
 		rt.Set("__ENV", rt.NewDynamicObject(&envObject{rt: rt, base: p.env})),
 		rt.Set("__VU", id),

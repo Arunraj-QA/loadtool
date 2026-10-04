@@ -25,7 +25,16 @@ export const get = m.get;
 export const request = m.request;
 `,
 	"loadtool": `const m = globalThis.` + builtinGlobal + `.core;
-export default m;
+export const sleep = m.sleep;
+// group runs fn and returns its result. Tagging metrics with the group
+// name comes with the metrics registry.
+export function group(name, fn) {
+	if (typeof fn !== "function") {
+		throw new TypeError("group: the second argument must be a function");
+	}
+	return fn();
+}
+export default { sleep, group };
 `,
 }
 

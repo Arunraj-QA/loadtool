@@ -32,6 +32,27 @@ declare module "loadtool/http" {
 }
 
 declare module "loadtool" {
-  const loadtool: Record<string, never>;
+  /**
+   * Pause this VU for the given number of seconds (fractions allowed).
+   * Returns early when the run ends. Not allowed in top-level code.
+   */
+  export function sleep(seconds: number): void;
+  /** Run fn and return its result. */
+  export function group<T>(name: string, fn: () => T): T;
+
+  const loadtool: {
+    sleep: typeof sleep;
+    group: typeof group;
+  };
   export default loadtool;
 }
+
+/**
+ * The process environment plus --env KEY=VALUE flags. Writes and deletes
+ * affect only the current VU.
+ */
+declare var __ENV: Record<string, string | undefined>;
+/** The VU number: 1..N, or 0 while LoadTool reads the script's options. */
+declare const __VU: number;
+/** This VU's iteration number, starting at 0. */
+declare const __ITER: number;

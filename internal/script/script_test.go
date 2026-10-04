@@ -853,3 +853,64 @@ export default function () { for (let i = 0; i < 50; i++) console.log(msg); }`).
 		}
 	}
 }
+
+func TestSleep(t *testing.T) {
+	vu := newVU(t, compile(t, "test.ts", `import { sleep } from "loadtool"; export default function () { sleep(0.05); }`))
+	start := time.Now()
+	if s := iterate(vu); s.ScriptErrors != 0 {
+		t.Fatal(s.FirstScriptError)
+	}
+	// Allow for coarse clocks (Windows ticks every ~0.5ms).
+	if took := time.Since(start); took < 45*time.Millisecond || took > 2*time.Second {
+		t.Errorf("sleep(0.05) took %v, want about 50ms", took)
+	}
+}
+
+func TestSleepStopsWhenRunEnds(t *testing.T) {
+	vu := newVU(t, compile(t, "test.ts", `import lt from "loadtool"; export default function () { lt.sleep(3600); }`))
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	rec := &metrics.Recorder{}
+	start := time.Now()
+	vu.Iterate(ctx, rec)
+	if took := time.Since(start); took > 5*time.Second {
+		t.Fatalf("sleep(3600) delayed the end of the run by %v", took)
+	}
+	if s := metrics.Merge([]*metrics.Recorder{rec}); s.ScriptErrors != 0 {
+		t.Errorf("stopping a sleeping VU must not be a script error: %s", s.FirstScriptError)
+	}
+}
+
+func TestSleepErrors(t *testing.T) {
+	_, err := compile(t, "test.ts", `import { sleep } from "loadtool"; sleep(1); export default function () {}`).NewVU(context.Background(), 1, http.DefaultClient)
+	if err == nil || !strings.Contains(err.Error(), "sleep is not allowed in the script's top-level code") {
+		t.Errorf("sleep in top-level code: error = %v", err)
+	}
+	for _, arg := range []string{"-1", `"soon"`, "NaN", "Infinity", ""} {
+		s := iterate(newVU(t, compile(t, "test.ts", `import { sleep } from "loadtool"; export default function () { sleep(`+arg+`); }`)))
+		if s.ScriptErrors != 1 || !strings.Contains(s.FirstScriptError, "sleep: seconds must be a non-negative number") {
+			t.Errorf("sleep(%s): got %d errors, first %q", arg, s.ScriptErrors, s.FirstScriptError)
+		}
+	}
+}
+
+func TestGroup(t *testing.T) {
+	s := iterate(newVU(t, compile(t, "test.ts", `
+import lt, { group } from "loadtool";
+export default function () {
+	const v = group("outer", () => lt.group("inner", () => 41) + 1);
+	if (v !== 42) throw new Error("group returned " + v);
+	group("failing", () => {
+		throw new Error("inside group");
+	});
+}`)))
+	// The first group returns its value; the exception from the second keeps
+	// its original location (line 7).
+	if s.ScriptErrors != 1 || !strings.Contains(s.FirstScriptError, "inside group") || !strings.Contains(s.FirstScriptError, "test.ts:7") {
+		t.Fatalf("got %d errors, first %q; want the inner exception at test.ts:7", s.ScriptErrors, s.FirstScriptError)
+	}
+	s = iterate(newVU(t, compile(t, "test.js", `import { group } from "loadtool"; export default function () { group("no fn"); }`)))
+	if s.ScriptErrors != 1 || !strings.Contains(s.FirstScriptError, "second argument must be a function") {
+		t.Fatalf("group without a function: got %q", s.FirstScriptError)
+	}
+}
