@@ -53,7 +53,7 @@ Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd)
 | Component | Package | Status |
 |---|---|---|
 | CLI | `cmd/loadtool`, `internal/cli` | Done |
-| Runner | `runTest` inside `internal/cli/run.go` | Done, but **not yet a component of its own**. The orchestration (load script, resolve options, start VUs, run, report) lives in the CLI package. Phase 1 extracts it into `internal/runner`, so the CLI only parses flags. Scenarios, setup/teardown and thresholds then extend the Runner, not the CLI. |
+| Runner | `internal/runner` | Done. Orchestrates a run: load the script, resolve options, start VUs, run the engine, return the `report.Result`. Extracted from the CLI in Phase 1 step 3, so the CLI only parses flags and prints. Scenarios, setup/teardown and thresholds extend the Runner. |
 | VU | `internal/engine` | Done: goroutine per VU, started before the clock, graceful stop |
 | goja | `internal/script` | Done: one runtime per VU, call-depth limit, interrupts |
 | HTTP | `internal/httpclient` | Done: HTTP/1.1, at most one connection per VU, keep-alive |
@@ -86,8 +86,8 @@ Each step is one branch merged into `phase-1-mvp` after CI passes.
 |---|---|---|---|
 | 1 | Result model; console output moved to `internal/report` | Console | Done |
 | 2 | `export const options`, with precedence (ADR-006) | DSL / Runner | Done |
-| 3 | Extract the Runner from the CLI into `internal/runner` (no behaviour change) | Runner | Next |
-| 4 | Built-in modules, local imports, `sleep`/`group`, `__ENV`/`__VU`/`__ITER`, published types | DSL | Planned |
+| 3 | Extract the Runner from the CLI into `internal/runner` (no behaviour change) | Runner | Done |
+| 4 | Built-in modules, local imports, `sleep`/`group`, `__ENV`/`__VU`/`__ITER`, published types | DSL | Next |
 | 5 | `check()` and the `checks` metric | Checks | Planned |
 | 6 | Threshold expressions and exit code | Thresholds | Planned |
 | 7 | Executors, multiple scenarios, setup/teardown run order | Scenario Engine | Planned |
@@ -142,12 +142,15 @@ and the benchmark server is independent of LoadTool's code (§11).
 ```mermaid
 flowchart TD
     main["cmd/loadtool<br/>entry point, Ctrl+C"] --> cli
-    cli["internal/cli<br/>Cobra commands, wiring"] --> config["internal/config<br/>run settings"]
+    cli["internal/cli<br/>Cobra flags, prints the report"] --> runner["internal/runner<br/>orchestrates a run"]
+    cli --> config["internal/config<br/>run settings, options"]
     cli --> report["internal/report<br/>result model, outputs"]
+    runner --> config
+    runner --> report
     report --> metrics
-    cli --> script["internal/script<br/>TS/JS → goja, one runtime per VU"]
-    cli --> engine["internal/engine<br/>goroutine per VU, timing"]
-    cli --> httpclient["internal/httpclient<br/>HTTP/1.1 execution"]
+    runner --> script["internal/script<br/>TS/JS → goja, one runtime per VU"]
+    runner --> engine["internal/engine<br/>goroutine per VU, timing"]
+    runner --> httpclient["internal/httpclient<br/>HTTP/1.1 execution"]
     script --> httpclient
     script --> metrics["internal/metrics<br/>histograms, summary"]
     httpclient --> metrics
@@ -159,7 +162,8 @@ matter:
 - **`engine` imports neither `script` nor `httpclient`.** It schedules
   opaque iterations (`IterationFunc`) and knows nothing about JavaScript
   or HTTP. New protocols or script runtimes plug in without changing it.
-- **`cli` is the only place that wires components together.** No package
+- **`runner` is the only place that wires the engine components
+  together;** `cli` only parses flags and prints. No package
   reaches across to another's internals, and there is no global mutable
   state.
   - The package-level variables that exist are never modified after
@@ -172,7 +176,8 @@ matter:
 | Package | Responsibility | Key API | Lines (code / tests) |
 |---|---|---|---|
 | `cmd/loadtool` | Process entry; maps Ctrl+C to context cancellation; exit codes | `main` | 26 / 0 |
-| `internal/cli` | Flags, validation, wiring | `NewRootCmd` | 119 / 240 |
+| `internal/cli` | Flags; prints the report; exit codes | `NewRootCmd` | 111 / 284 |
+| `internal/runner` | Orchestrates a run: script, options, VUs, engine, result | `Run`, `Params` | 94 / 148 |
 | `internal/report` | Result model; renders outputs (console today; JSON and HTML in Phase 1) | `Result`, `Console` | 110 / 81 |
 | `internal/config` | Run settings and validation | `Config.Validate` | 39 / 55 |
 | `internal/engine` | VU start-up, one goroutine per VU, duration and graceful stop | `Run`, `IterationFunc`, `NewVUFunc` | 81 / 258 |
@@ -191,14 +196,14 @@ standard library.
 sequenceDiagram
     autonumber
     participant M as main
-    participant C as cli.runTest
+    participant C as runner.Run
     participant S as script
     participant E as engine.Run
     participant V as VU goroutines
     participant H as httpclient
     participant X as metrics
 
-    M->>C: ExecuteContext(ctx)  [Ctrl+C cancels ctx]
+    M->>C: cli parses flags, calls runner.Run(ctx)  [Ctrl+C cancels ctx]
     C->>S: Load(test.ts): esbuild bundle → goja.Compile (once)
     C->>S: Options(): run top-level code once, read `options`
     Note over C: resolve settings: CLI flag > LOADTOOL_* env > script options > default
@@ -220,7 +225,7 @@ sequenceDiagram
     E->>E: wait for all VUs (in-flight iterations may finish until the hard deadline)
     E->>X: Merge(recorders) → Summary
     E-->>C: Result{Summary, Elapsed}
-    C-->>M: print summary; exit 1 if interrupted
+    C-->>M: report.Result → cli prints it; exit 1 if interrupted
 ```
 
 **Phases of a run:**

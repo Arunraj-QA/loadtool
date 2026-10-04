@@ -151,7 +151,8 @@ for every push, and runs vet and tests on Linux and Windows.
 
 ```text
 cmd/loadtool/        CLI entrypoint
-internal/cli/        Cobra commands and wiring
+internal/cli/        Cobra commands: flags, printing, exit codes
+internal/runner/     Orchestrates a run: script, options, VUs, engine, result
 internal/report/     Result model and outputs (console summary)
 internal/config/     Run settings and validation
 internal/engine/     Goroutine-per-VU scheduler (protocol-agnostic)
