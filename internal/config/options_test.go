@@ -60,6 +60,7 @@ func TestParseOptionsErrors(t *testing.T) {
 		{`{"vus": "ten"}`, "options.vus must be a whole number"},
 		{`{"vus": 2.5}`, "options.vus must be a whole number"},
 		{`{"duration": "soon"}`, "options.duration"},
+		{`{"discardResponseBodies": "yes"}`, "options.discardResponseBodies must be true or false"},
 	}
 	for _, tt := range tests {
 		if _, _, err := ParseOptions([]byte(tt.raw)); err == nil || !strings.Contains(err.Error(), tt.want) {
@@ -130,5 +131,28 @@ func TestResolveErrorsNameSource(t *testing.T) {
 				t.Fatalf("error = %v, want it to contain %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestDiscardResponseBodies(t *testing.T) {
+	for _, tt := range []struct {
+		raw  string
+		want bool
+	}{
+		{`{}`, false},
+		{`{"discardResponseBodies": false}`, false},
+		{`{"discardResponseBodies": true}`, true},
+	} {
+		opts, unknown, err := ParseOptions([]byte(tt.raw))
+		if err != nil || len(unknown) != 0 {
+			t.Fatalf("ParseOptions(%s) = %v, %v", tt.raw, unknown, err)
+		}
+		var c Config
+		if err := c.Resolve(Overrides{}, nil, opts); err != nil {
+			t.Fatal(err)
+		}
+		if c.DiscardResponseBodies != tt.want {
+			t.Errorf("%s: DiscardResponseBodies = %v, want %v", tt.raw, c.DiscardResponseBodies, tt.want)
+		}
 	}
 }

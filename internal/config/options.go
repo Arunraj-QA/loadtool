@@ -14,12 +14,15 @@ import (
 // `export const options = {...}`. A nil field was not set.
 // Keys and value forms follow k6 (ADR-005, ADR-006).
 type Options struct {
-	VUs      *int      `json:"vus"`
-	Duration *Duration `json:"duration"`
+	VUs      *int
+	Duration *Duration
+	// DiscardResponseBodies drops response bodies instead of handing them
+	// to the script (ADR-008).
+	DiscardResponseBodies *bool
 }
 
 // knownOptions lists the keys Options understands.
-var knownOptions = []string{"duration", "vus"}
+var knownOptions = []string{"discardResponseBodies", "duration", "vus"}
 
 // Duration accepts a duration string ("30s", "1m30s") or a number of
 // milliseconds, as k6 options do.
@@ -83,6 +86,13 @@ func ParseOptions(raw []byte) (Options, []string, error) {
 			return opts, nil, fmt.Errorf("options.duration: %w", err)
 		}
 		opts.Duration = &d
+	}
+	if v, ok := fields["discardResponseBodies"]; ok {
+		var b bool
+		if err := json.Unmarshal(v, &b); err != nil {
+			return opts, nil, fmt.Errorf("options.discardResponseBodies must be true or false, got %s", v)
+		}
+		opts.DiscardResponseBodies = &b
 	}
 	return opts, unknown, nil
 }
@@ -148,6 +158,8 @@ func (c *Config) Resolve(cli Overrides, getenv func(string) (string, bool), scri
 	}
 
 	c.VUs, c.Duration = vus, dur
+	// Only the script sets this; there is no flag or variable for it.
+	c.DiscardResponseBodies = script.DiscardResponseBodies != nil && *script.DiscardResponseBodies
 	return nil
 }
 

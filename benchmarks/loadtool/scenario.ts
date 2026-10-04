@@ -10,6 +10,9 @@ import http from "loadtool/http";
 
 const TARGET = __ENV.TARGET || "http://127.0.0.1:8080/api/test";
 
+// Bodies are not used, and the k6 scenario discards them too.
+export const options = { discardResponseBodies: true };
+
 export default function (): void {
   const res = http.get(TARGET);
   if (res.status !== 200) {

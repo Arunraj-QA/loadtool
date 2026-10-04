@@ -147,3 +147,40 @@ func TestRunStartErrors(t *testing.T) {
 		})
 	}
 }
+
+// options.discardResponseBodies reaches the VUs, and warnings raised while
+// the test runs reach Params.Warn.
+func TestRunAppliesHTTPOptionsAndWarnings(t *testing.T) {
+	srv := okServer(t)
+	for _, tt := range []struct {
+		discard  string
+		wantBody string
+	}{
+		{"false", "string"},
+		{"true", "object"}, // typeof null
+	} {
+		t.Run("discard="+tt.discard, func(t *testing.T) {
+			path := scriptFile(t, `import http from "loadtool/http";
+export const options = { discardResponseBodies: `+tt.discard+` };
+export default function (): void {
+	const res = http.get("`+srv.URL+`", { timeout: "1s" });
+	if (typeof res.body !== "`+tt.wantBody+`") throw new Error("typeof body is " + typeof res.body);
+}`)
+			var warnings []string
+			res, err := Run(context.Background(), Params{
+				Config:    config.Config{Script: path, GracefulStop: time.Second},
+				Overrides: config.Overrides{VUs: intp(2), Duration: durp(50 * time.Millisecond)},
+				Warn:      func(msg string) { warnings = append(warnings, msg) },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Summary.ScriptErrors != 0 {
+				t.Fatalf("script error: %s", res.Summary.FirstScriptError)
+			}
+			if len(warnings) != 1 || !strings.Contains(warnings[0], `"timeout" is not supported`) {
+				t.Errorf("warnings = %q, want one about timeout", warnings)
+			}
+		})
+	}
+}

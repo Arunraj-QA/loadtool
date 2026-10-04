@@ -37,6 +37,27 @@ type Program struct {
 	env map[string]string
 	// console receives console output from all VUs; nil discards it.
 	console *lockedWriter
+	// discardBodies drops response bodies (options.discardResponseBodies).
+	discardBodies bool
+	// warn reports non-fatal problems found while the script runs.
+	warn *warner
+}
+
+// WithDiscardResponseBodies returns a copy of p whose VUs drop response
+// bodies instead of handing them to the script.
+func (p *Program) WithDiscardResponseBodies(discard bool) *Program {
+	c := *p
+	c.discardBodies = discard
+	return &c
+}
+
+// WithWarn returns a copy of p whose VUs report non-fatal problems, such
+// as unsupported request parameters, to warn. Each message is reported
+// once per run, however many VUs hit it; nil discards them.
+func (p *Program) WithWarn(warn func(msg string)) *Program {
+	c := *p
+	c.warn = newWarner(warn)
+	return &c
 }
 
 // WithEnv returns a copy of p whose VUs see env as __ENV. env must not be
@@ -283,6 +304,9 @@ type VU struct {
 	id int64
 	// console receives console output; nil discards it.
 	console io.Writer
+	// discardBodies and warn come from the Program.
+	discardBodies bool
+	warn          *warner
 }
 
 // NewVU creates a runtime for VU number id, runs the script's top-level
@@ -294,7 +318,7 @@ type VU struct {
 func (p *Program) NewVU(ctx context.Context, id int, client *http.Client) (*VU, error) {
 	rt := goja.New()
 	rt.SetMaxCallStackSize(maxCallStackSize)
-	vu := &VU{rt: rt, client: client, id: int64(id)}
+	vu := &VU{rt: rt, client: client, id: int64(id), discardBodies: p.discardBodies, warn: p.warn}
 	// A nil *lockedWriter must become a nil io.Writer, not a non-nil
 	// interface holding a nil pointer.
 	if p.console != nil {

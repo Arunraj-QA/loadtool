@@ -18,6 +18,9 @@ type Config struct {
 	// GracefulStop is how long iterations still running when Duration ends
 	// may take to finish before they are cancelled.
 	GracefulStop time.Duration
+	// DiscardResponseBodies drops response bodies instead of handing them
+	// to the script.
+	DiscardResponseBodies bool
 }
 
 // Validate reports every invalid field in c.

@@ -51,7 +51,7 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		return report.Result{}, fmt.Errorf("load script: %w", err)
 	}
 	// Before reading options, so options can use __ENV too.
-	prog = prog.WithEnv(p.Env).WithConsole(p.Console)
+	prog = prog.WithEnv(p.Env).WithConsole(p.Console).WithWarn(p.Warn)
 
 	raw, err := prog.Options(ctx)
 	if err != nil {
@@ -72,6 +72,7 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	if err := cfg.Validate(); err != nil {
 		return report.Result{}, err
 	}
+	prog = prog.WithDiscardResponseBodies(cfg.DiscardResponseBodies)
 
 	// One client for all VUs: http.Client is safe for concurrent use and a
 	// shared transport lets each VU keep its own pooled connection.

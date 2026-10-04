@@ -93,23 +93,41 @@ export default function () {
 
 The script API follows the shape of k6's
 ([ADR-005](docs/decisions/ADR-005-k6-shaped-script-api.md)). It is being
-built out in Phase 1. The `loadtool/http` module provides:
+built out in Phase 1 ([ADR-008](docs/decisions/ADR-008-test-dsl.md)). The
+`loadtool/http` module provides:
 
 | Call | Returns |
 |---|---|
 | `http.get(url, params?)` | response |
+| `http.post(url, body?, params?)`; also `put`, `patch`, `del` | response |
 | `http.request(method, url, body?, params?)` | response |
 
-`get` and `request` can also be imported by name:
-`import { get } from "loadtool/http"`. Phase 0 scripts that used a global
-`http` need the import line added; the error message says so.
+Every function can also be imported by name:
+`import { get, post } from "loadtool/http"`. Phase 0 scripts that used a
+global `http` need the import line added; the error message says so.
 
-- `params` is `{ headers: { name: value } }`.
-- A response is `{ status, error, timings: { duration } }`, with the
-  duration in milliseconds.
-- Response bodies are not exposed to scripts yet.
+- `body` is a string. Send JSON with `JSON.stringify(...)` and a
+  `Content-Type` header; an object body is an error, not form data.
+- `params` is `{ headers: { name: value } }`. Other keys produce a
+  warning (once per run) and are ignored.
 - Type declarations for editors are in
   [`types/loadtool.d.ts`](types/loadtool.d.ts).
+
+A response has:
+
+| Field | Value |
+|---|---|
+| `status` | HTTP status, or `0` if no response was received |
+| `error` | `""`, or the transport error |
+| `headers` | `{ "Content-Type": "..." }`; repeated headers are joined with `", "` |
+| `body` | The body as a string; `null` if bodies are discarded or nothing arrived |
+| `json()` | The body parsed as JSON; throws `SyntaxError` on invalid JSON |
+| `timings.duration` | Milliseconds, including reading the body |
+| `url` | The request URL |
+
+Bodies are read and kept by default. Set
+`export const options = { discardResponseBodies: true }` when a test does
+not use them; this saves an allocation per request.
 
 ### More of the script API
 

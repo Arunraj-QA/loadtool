@@ -140,7 +140,7 @@ the methods its script uses.
 | Exported functions (`default`, `setup`, `teardown`, `exec` targets) | `goja.Callable` per VU | esbuild metadata lists the script's exports. The generated entry binds only the ones used, as direct references, so there are still no interop helpers. A missing `exec` target is an error before the test starts. |
 | `setup()` return value | `[]byte` (JSON) | Stringified once, then parsed once per VU at VU start. Every iteration of that VU gets the same object. Functions and `undefined` are dropped, as in `JSON.stringify`. |
 | Request `params` | `httpclient.Request` | Read property by property; no reflection. |
-| Response | `goja.Object` | Built per request with a per-VU prototype that holds `json()`, so no function object is created per response. The body is kept as `[]byte` and becomes a JS string only when `body` or `json()` is used. |
+| Response | goja dynamic object over the Go result | `headers`, `body`, `timings` and `json` are built on first access, so a script that only reads `status` builds none of them. The body is kept as `[]byte` and becomes a JS string only when `body` or `json()` is used. Measured in step 5a: 80 allocations per HTTP iteration, down from 88 with the eager Phase 0 object, even though bodies are now kept. |
 | `check(value, sets)` | Native function | Calls each condition through `goja.AssertFunction`. The result is `ToBoolean()`. |
 | Check names | Index into a per-run name table | Interned on first use. Per-VU counters are plain integers, merged at the end like the existing recorders. |
 
@@ -308,8 +308,8 @@ Mutations to `data` stay inside that VU.
   `discardResponseBodies: true` restores Phase 0 behaviour and is used by
   the benchmark scenario.
 - **Retained memory per VU** must stay near the ADR-007 figures.
-  `check`, `post` and the rest are lazy, and the response prototype is one
-  object per VU. Setup data is copied into every VU, so large setup data
+  `check`, `post` and the rest are lazy, and responses build their fields
+  only when read. Setup data is copied into every VU, so large setup data
   costs size × VUs; this is documented.
 - **The engine gains executors.** The constant-VU path must keep its
   Phase 0 performance; this is measured A/B against the step 4 binary.

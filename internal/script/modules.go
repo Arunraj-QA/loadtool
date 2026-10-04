@@ -28,10 +28,16 @@ var builtinProps = []lazyProp{
 // provides, so esbuild binds the imports directly and adds no interop
 // helpers.
 var builtinModules = map[string]string{
+	// Named exports are pure calls, so esbuild drops the ones a script does
+	// not import and their methods are never built (see lazyObject).
 	"loadtool/http": `const m = globalThis.` + builtinGlobal + `.http;
 export default m;
-export const get = m.get;
-export const request = m.request;
+export const get = /* @__PURE__ */ (() => m.get)();
+export const post = /* @__PURE__ */ (() => m.post)();
+export const put = /* @__PURE__ */ (() => m.put)();
+export const patch = /* @__PURE__ */ (() => m.patch)();
+export const del = /* @__PURE__ */ (() => m.del)();
+export const request = /* @__PURE__ */ (() => m.request)();
 `,
 	"loadtool": `const m = globalThis.` + builtinGlobal + `.core;
 export const sleep = m.sleep;

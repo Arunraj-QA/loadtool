@@ -1,4 +1,4 @@
-// Type declarations for the LoadTool script API (Phase 1, ADR-005).
+// Type declarations for the LoadTool script API (Phase 1, ADR-005, ADR-008).
 // Editor support only: LoadTool strips types and does not type-check.
 //
 // Reference this file from a script to get completion and type errors in
@@ -11,21 +11,40 @@ declare module "loadtool/http" {
     status: number;
     /** Transport error message; empty string when the request completed. */
     error: string;
+    /** Response headers by canonical name; repeated headers are joined with ", ". */
+    headers: Record<string, string>;
+    /** The body, or null when bodies are discarded or no response arrived. */
+    body: string | null;
+    /** Parse the body as JSON. Throws SyntaxError on invalid JSON. */
+    json(): any;
     timings: {
       /** Time from sending the request to reading the whole body, in milliseconds. */
       duration: number;
     };
+    /** The request URL. */
+    url: string;
   }
 
   export interface Params {
     headers?: Record<string, string>;
   }
 
+  /** Request body: a string. Use JSON.stringify(...) to send JSON. */
+  export type Body = string | null;
+
   export function get(url: string, params?: Params): Response;
-  export function request(method: string, url: string, body?: string | null, params?: Params): Response;
+  export function post(url: string, body?: Body, params?: Params): Response;
+  export function put(url: string, body?: Body, params?: Params): Response;
+  export function patch(url: string, body?: Body, params?: Params): Response;
+  export function del(url: string, body?: Body, params?: Params): Response;
+  export function request(method: string, url: string, body?: Body, params?: Params): Response;
 
   const http: {
     get: typeof get;
+    post: typeof post;
+    put: typeof put;
+    patch: typeof patch;
+    del: typeof del;
     request: typeof request;
   };
   export default http;
