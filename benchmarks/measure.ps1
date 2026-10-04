@@ -142,12 +142,10 @@ function Get-Environment {
 function Get-Command-For([string] $tool, [int] $vus, [int] $seconds, [string] $id) {
   switch ($tool) {
     'loadtool' {
-      # Same scenario with TARGET substituted, so all tools hit $target.
-      $scenario = Join-Path $OutDir "$id-scenario.ts"
-      (Get-Content -Raw -Encoding UTF8 'benchmarks/loadtool/scenario.ts') -replace
-        'const TARGET = "[^"]*";', "const TARGET = `"$target`";" |
-        Set-Content -Encoding UTF8 $scenario
-      return @{ Exe = $LoadTool; Args = "run $scenario --vus $vus --duration ${seconds}s" }
+      return @{
+        Exe  = $LoadTool
+        Args = "run --vus $vus --duration ${seconds}s -e TARGET=$target benchmarks/loadtool/scenario.ts"
+      }
     }
     'k6' {
       $json = Join-Path $OutDir "$id-k6-summary.json"

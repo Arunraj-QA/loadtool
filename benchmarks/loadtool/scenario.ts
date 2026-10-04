@@ -6,11 +6,9 @@ import http from "loadtool/http";
 // ../jmeter/scenario.jmx so all tools do identical work.
 //
 //   loadtool run benchmarks/loadtool/scenario.ts --vus 1000 --duration 60s
-//
-// LoadTool has no environment variables in scripts yet, so change
-// TARGET here when the server runs on another machine.
+//   loadtool run -e TARGET=http://10.0.0.5:8080/api/test --vus 1000 --duration 60s benchmarks/loadtool/scenario.ts
 
-const TARGET = "http://127.0.0.1:8080/api/test";
+const TARGET = __ENV.TARGET || "http://127.0.0.1:8080/api/test";
 
 export default function (): void {
   const res = http.get(TARGET);

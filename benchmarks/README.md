@@ -39,7 +39,7 @@ together:
 | Success | status 200, else a script error | `check` status 200 | response assertion 200 |
 | VUs / threads | `--vus` | `--vus` | `-Jvus` |
 | Duration | `--duration` | `--duration` | `-Jduration` (seconds) |
-| Target host | edit `TARGET` in the file | `-e TARGET=…` | `-Jhost=…` `-Jport=…` |
+| Target host | `-e TARGET=…` | `-e TARGET=…` | `-Jhost=…` `-Jport=…` |
 
 In all three:
 - All VUs start at once, with no ramp-up.
@@ -105,7 +105,7 @@ Commands, with the server at `<host>`:
 
 ```bash
 go build -o bin/loadtool ./cmd/loadtool
-./bin/loadtool run benchmarks/loadtool/scenario.ts --vus 1000 --duration 60s
+./bin/loadtool run -e TARGET=http://<host>:8080/api/test --vus 1000 --duration 60s benchmarks/loadtool/scenario.ts
 
 k6 run -e TARGET=http://<host>:8080/api/test --vus 1000 --duration 60s benchmarks/k6/scenario.js
 
@@ -160,7 +160,7 @@ while LoadTool and k6 report fractions of a millisecond.
 
 ### How each tool is launched
 
-- **LoadTool:** `bin/loadtool.exe run <copy of scenario.ts with TARGET set>`.
+- **LoadTool:** `bin/loadtool.exe` with `-e TARGET=…` (runs before 2026-10-04 used a copy of `scenario.ts` with `TARGET` edited in).
 - **k6:** the real `k6.exe`, not a Chocolatey launcher, with
   `-e TARGET=…`.
 - **JMeter:** `bin\jmeter.bat -n`, so JMeter's default JVM settings
@@ -193,7 +193,5 @@ Then generate the median (min–max) tables:
 - JMeter must be stock 5.6.3 with no third-party plugins in `lib/ext`.
   Plugins add start-up memory and CPU (see
   [results/2026-10-01-phase0-all-tools](results/2026-10-01-phase0-all-tools/README.md)).
-- LoadTool scripts cannot read environment variables yet, so the LoadTool
-  target is edited in the scenario file.
 - Latency timing on Windows has about 0.5 ms resolution (see
   [results/2026-09-24-microbenchmarks.md](results/2026-09-24-microbenchmarks.md)).
