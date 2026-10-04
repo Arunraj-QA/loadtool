@@ -40,7 +40,8 @@ export const del = /* @__PURE__ */ (() => m.del)();
 export const request = /* @__PURE__ */ (() => m.request)();
 `,
 	"loadtool": `const m = globalThis.` + builtinGlobal + `.core;
-export const sleep = m.sleep;
+export const sleep = /* @__PURE__ */ (() => m.sleep)();
+export const check = /* @__PURE__ */ (() => m.check)();
 // group runs fn and returns its result. Tagging metrics with the group
 // name comes with the metrics registry.
 export function group(name, fn) {
@@ -49,7 +50,7 @@ export function group(name, fn) {
 	}
 	return fn();
 }
-export default { sleep, group };
+export default { sleep, check, group };
 `,
 }
 

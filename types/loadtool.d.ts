@@ -58,10 +58,17 @@ declare module "loadtool" {
   export function sleep(seconds: number): void;
   /** Run fn and return its result. */
   export function group<T>(name: string, fn: () => T): T;
+  /**
+   * Run each condition on value and count a pass or fail per name.
+   * Returns true if every condition passed. A condition that throws counts
+   * as failed; it does not end the iteration.
+   */
+  export function check<T>(value: T, conditions: Record<string, (value: T) => unknown>): boolean;
 
   const loadtool: {
     sleep: typeof sleep;
     group: typeof group;
+    check: typeof check;
   };
   export default loadtool;
 }

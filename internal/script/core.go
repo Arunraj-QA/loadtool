@@ -10,11 +10,16 @@ import (
 
 var errInitSleep = errors.New("sleep is not allowed in the script's top-level code; call it inside the default function")
 
+// coreProps are the Go functions of the "loadtool" module, built on first
+// use (see lazyObject).
+var coreProps = []lazyProp{
+	{"sleep", func(vu *VU) goja.Value { return vu.rt.ToValue(vu.sleep) }},
+	{"check", func(vu *VU) goja.Value { return vu.rt.ToValue(vu.check) }},
+}
+
 // newCoreModule builds the Go side of the "loadtool" module.
-func (vu *VU) newCoreModule() *goja.Object {
-	o := vu.rt.NewObject()
-	_ = o.Set("sleep", vu.sleep)
-	return o
+func (vu *VU) newCoreModule() goja.Value {
+	return vu.newLazyObject(coreProps)
 }
 
 // sleep(seconds) pauses this VU. It returns early when the run ends or is

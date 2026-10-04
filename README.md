@@ -135,16 +135,23 @@ The `loadtool` module ([ADR-007](docs/decisions/ADR-007-script-modules-and-globa
 
 ```typescript
 import http from "loadtool/http";
-import { sleep, group } from "loadtool";
+import { check, sleep, group } from "loadtool";
 
 export default function () {
   group("home page", () => {
-    http.get("http://localhost:8080/");
+    const res = http.get("http://localhost:8080/");
+    check(res, { "status is 200": (r) => r.status === 200 });
   });
   sleep(1); // seconds; fractions allowed
 }
 ```
 
+- `check(value, { name: condition })` runs each condition on `value` and
+  counts a pass or fail per name; it returns `true` if all passed. A
+  condition that throws (for example `r.json()` on an HTML error page)
+  counts as failed. Failed checks do not stop the iteration or count as
+  request errors; the summary lists each check's pass rate. See
+  [`examples/checks.ts`](examples/checks.ts).
 - `sleep(seconds)` pauses the VU. It ends early when the test ends, and is
   not allowed in top-level code.
 - `group(name, fn)` runs `fn` and returns its result. Results are not
