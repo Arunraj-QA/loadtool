@@ -20,9 +20,39 @@ The long-term goal is to build a differentiated performance-testing platform wit
 
 We are currently implementing:
 
-**Phase 0 — Foundations**
+**Phase 1 — MVP Core Engine**
 
-Phase 0 must remain intentionally small.
+Phase 1 extends the Phase 0 engine. Do not rewrite or redesign it: keep
+the Phase 0 components that work and extend them (see `docs/architecture.md`).
+
+### Phase 1 Goals
+
+1. Full TypeScript test-as-code DSL
+2. setup/teardown hooks
+3. checks/assertions
+4. thresholds
+5. scenarios:
+
+   * ramping
+   * constant-VU
+   * constant-arrival-rate
+6. HTTP/2
+7. connection reuse
+8. cookie/session handling
+9. JSON output
+10. self-contained HTML report
+11. GitHub Action
+12. generic CI recipe
+13. documentation
+14. 5–10 example scripts
+15. preparation for external users
+
+### Phase 1 Exit Criteria
+
+To be agreed before the Phase 1 benchmark run. Until then, do not claim
+Phase 1 is complete.
+
+## Phase 0 — Foundations (complete)
 
 ### Phase 0 Goals
 
@@ -57,6 +87,12 @@ Phase 0 must remain intentionally small.
 
 Do not claim the exit criteria is met until the benchmark is actually executed and the measurements are recorded.
 
+Status: measured on 2026-10-01 in
+`benchmarks/results/2026-10-01-phase0-all-tools/`. At 1,000 VUs LoadTool's
+peak private bytes (190–210 MB) and working set were below JMeter's
+(1,366–1,371 MB) on every run. Caveats: one laptop with the server on the
+same machine, and JMeter with its default JVM settings.
+
 ## Technology Decisions
 
 Language:
@@ -71,13 +107,15 @@ JavaScript/TypeScript runtime:
 
 * goja
 
-Initial protocol:
+Protocols:
 
-* HTTP/1.1
+* HTTP/1.1 (Phase 0)
+* HTTP/2 (Phase 1)
 
 Load model:
 
 * goroutine per VU
+* scenarios run by executors: constant-VUs, ramping, constant-arrival-rate (Phase 1)
 
 Testing:
 
@@ -93,7 +131,7 @@ License:
 
 ## Important Architecture Principles
 
-1. Keep Phase 0 simple.
+1. Keep each phase minimal. Phase 1 extends the Phase 0 engine; do not rewrite it.
 2. Do not implement distributed execution yet.
 3. Do not implement Kubernetes yet.
 4. Do not implement ClickHouse yet.
@@ -169,9 +207,9 @@ Do not combine unrelated changes into one commit.
 
 ## Phase Boundary
 
-If a requested feature belongs primarily to Phase 1 or later, do not implement it automatically.
+If a requested feature belongs primarily to Phase 2 or later, do not implement it automatically.
 
-Explain why it belongs to a later phase and ask whether it is required for Phase 0.
+Explain why it belongs to a later phase and ask whether it is required for Phase 1.
 
 ## Benchmark Discipline
 
