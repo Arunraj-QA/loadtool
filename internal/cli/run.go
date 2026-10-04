@@ -10,6 +10,7 @@ import (
 	"github.com/Arunraj-QA/loadtool/internal/config"
 	"github.com/Arunraj-QA/loadtool/internal/engine"
 	"github.com/Arunraj-QA/loadtool/internal/httpclient"
+	"github.com/Arunraj-QA/loadtool/internal/report"
 	"github.com/Arunraj-QA/loadtool/internal/script"
 )
 
@@ -64,7 +65,15 @@ func runTest(cmd *cobra.Command, cfg config.Config) error {
 		return err
 	}
 	interrupted := ctx.Err() != nil
-	printSummary(cmd.OutOrStdout(), cfg, res, interrupted)
+	report.Console(cmd.OutOrStdout(), report.Result{
+		Script:       cfg.Script,
+		VUs:          cfg.VUs,
+		Duration:     cfg.Duration,
+		GracefulStop: cfg.GracefulStop,
+		Elapsed:      res.Elapsed,
+		Interrupted:  interrupted,
+		Summary:      res.Summary,
+	})
 	if interrupted {
 		// Partial results were printed; still fail so automation notices.
 		return fmt.Errorf("test interrupted: %w", context.Cause(ctx))

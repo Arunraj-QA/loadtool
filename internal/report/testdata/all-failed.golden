@@ -1,0 +1,22 @@
+
+LoadTool summary
+
+  Script:      examples/basic-http.ts
+  VUs:         100
+  Duration:    30s (elapsed 5.00s)
+  Status:      completed
+
+  Requests:    10 (2.0 req/s)
+  Success:     0
+  Errors:      10 (100.00%)
+  Script errs: 0
+
+  Latency (all requests sent, failed included):
+    min     300.00µs
+    mean    450.00µs
+    p50     400.00µs
+    p90     800.00µs
+    p95     850.00µs
+    p99     900.00µs
+    max     900.00µs
+  Latency (successful requests): none succeeded

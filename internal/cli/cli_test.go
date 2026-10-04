@@ -188,28 +188,6 @@ func TestUnknownCommand(t *testing.T) {
 	}
 }
 
-func TestFormatCount(t *testing.T) {
-	tests := map[int]string{0: "0", 999: "999", 1000: "1,000", 125430: "125,430", 1234567: "1,234,567"}
-	for n, want := range tests {
-		if got := formatCount(n); got != want {
-			t.Errorf("formatCount(%d) = %q, want %q", n, got, want)
-		}
-	}
-}
-
-func TestFormatDuration(t *testing.T) {
-	tests := map[time.Duration]string{
-		450 * time.Microsecond:   "450.00µs",
-		42500 * time.Microsecond: "42.50ms",
-		1500 * time.Millisecond:  "1.50s",
-	}
-	for d, want := range tests {
-		if got := formatDuration(d); got != want {
-			t.Errorf("formatDuration(%v) = %q, want %q", d, got, want)
-		}
-	}
-}
-
 // TestRunInterruptedDuringStartup covers Ctrl+C while VUs start: top-level
 // script code that never finishes must not hang the command.
 func TestRunInterruptedDuringStartup(t *testing.T) {

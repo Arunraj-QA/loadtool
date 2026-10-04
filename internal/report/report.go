@@ -1,4 +1,6 @@
-package cli
+// Package report renders the result of a test run. Every output format
+// renders from the same Result, so they always agree.
+package report
 
 import (
 	"fmt"
@@ -6,25 +8,42 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Arunraj-QA/loadtool/internal/config"
-	"github.com/Arunraj-QA/loadtool/internal/engine"
+	"github.com/Arunraj-QA/loadtool/internal/metrics"
 )
 
-func printSummary(w io.Writer, cfg config.Config, res engine.Result, interrupted bool) {
-	s := res.Summary
+// Result is everything known about a finished run that outputs need.
+type Result struct {
+	// Script is the path of the test script as given on the command line.
+	Script string
+	// VUs, Duration and GracefulStop are the run settings.
+	VUs          int
+	Duration     time.Duration
+	GracefulStop time.Duration
+	// Elapsed is the wall-clock time from the start of the test clock until
+	// the last VU stopped.
+	Elapsed time.Duration
+	// Interrupted reports whether the run was stopped early (Ctrl+C), so
+	// the results are partial.
+	Interrupted bool
+	Summary     metrics.Summary
+}
+
+// Console writes the human-readable summary to w.
+func Console(w io.Writer, r Result) {
+	s := r.Summary
 	status := "completed"
-	if interrupted {
+	if r.Interrupted {
 		status = "interrupted (partial results)"
 	}
 	var rps float64
-	if secs := res.Elapsed.Seconds(); secs > 0 {
+	if secs := r.Elapsed.Seconds(); secs > 0 {
 		rps = float64(s.Requests) / secs
 	}
 
 	fmt.Fprintf(w, "\nLoadTool summary\n\n")
-	fmt.Fprintf(w, "  Script:      %s\n", cfg.Script)
-	fmt.Fprintf(w, "  VUs:         %d\n", cfg.VUs)
-	fmt.Fprintf(w, "  Duration:    %s (elapsed %s)\n", cfg.Duration, formatDuration(res.Elapsed))
+	fmt.Fprintf(w, "  Script:      %s\n", r.Script)
+	fmt.Fprintf(w, "  VUs:         %d\n", r.VUs)
+	fmt.Fprintf(w, "  Duration:    %s (elapsed %s)\n", r.Duration, formatDuration(r.Elapsed))
 	fmt.Fprintf(w, "  Status:      %s\n\n", status)
 
 	fmt.Fprintf(w, "  Requests:    %s (%.1f req/s)\n", formatCount(s.Requests), rps)

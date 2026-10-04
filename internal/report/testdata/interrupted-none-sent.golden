@@ -1,0 +1,15 @@
+
+LoadTool summary
+
+  Script:      examples/basic-http.ts
+  VUs:         100
+  Duration:    30s (elapsed 2.00s)
+  Status:      interrupted (partial results)
+
+  Requests:    2 (1.0 req/s)
+  Success:     0
+  Errors:      2 (100.00%)
+  Script errs: 1
+    first:     TypeError: x
+
+  Latency:     no requests were sent
