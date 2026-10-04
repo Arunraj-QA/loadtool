@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -34,6 +35,8 @@ type Program struct {
 	// env backs every VU's __ENV. It is never written after WithEnv, so
 	// VUs on different goroutines read it safely.
 	env map[string]string
+	// console receives console output from all VUs; nil discards it.
+	console *lockedWriter
 }
 
 // WithEnv returns a copy of p whose VUs see env as __ENV. env must not be
@@ -274,6 +277,8 @@ type VU struct {
 	rec *metrics.Recorder
 	// iter is the number of the next iteration, exposed as __ITER.
 	iter int64
+	// id is the VU number, exposed as __VU.
+	id int64
 }
 
 // NewVU creates a runtime for VU number id, runs the script's top-level
@@ -285,7 +290,13 @@ type VU struct {
 func (p *Program) NewVU(ctx context.Context, id int, client *http.Client) (*VU, error) {
 	rt := goja.New()
 	rt.SetMaxCallStackSize(maxCallStackSize)
-	vu := &VU{rt: rt, client: client}
+	vu := &VU{rt: rt, client: client, id: int64(id)}
+	// A nil *lockedWriter must become a nil io.Writer, not a non-nil
+	// interface holding a nil pointer.
+	var console io.Writer
+	if p.console != nil {
+		console = p.console
+	}
 
 	builtins := rt.NewObject()
 	if err := errors.Join(
@@ -295,6 +306,7 @@ func (p *Program) NewVU(ctx context.Context, id int, client *http.Client) (*VU, 
 		rt.Set("__ENV", rt.NewDynamicObject(&envObject{rt: rt, base: p.env})),
 		rt.Set("__VU", id),
 		rt.Set("__ITER", 0),
+		rt.Set("console", vu.newConsole(console)),
 	); err != nil {
 		return nil, err
 	}

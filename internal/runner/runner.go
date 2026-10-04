@@ -7,6 +7,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/Arunraj-QA/loadtool/internal/config"
 	"github.com/Arunraj-QA/loadtool/internal/engine"
@@ -28,6 +29,8 @@ type Params struct {
 	// Env is what scripts see as __ENV. It must not be modified during
 	// the run; nil means an empty __ENV.
 	Env map[string]string
+	// Console receives the scripts' console output; nil discards it.
+	Console io.Writer
 	// Warn receives non-fatal problems, such as unsupported script options.
 	// nil discards them.
 	Warn func(msg string)
@@ -48,7 +51,7 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		return report.Result{}, fmt.Errorf("load script: %w", err)
 	}
 	// Before reading options, so options can use __ENV too.
-	prog = prog.WithEnv(p.Env)
+	prog = prog.WithEnv(p.Env).WithConsole(p.Console)
 
 	raw, err := prog.Options(ctx)
 	if err != nil {

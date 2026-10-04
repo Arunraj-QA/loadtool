@@ -321,3 +321,20 @@ export default function () {
 		t.Errorf("error = %v, want a KEY=VALUE error for a malformed --env", err)
 	}
 }
+
+func TestRunConsoleGoesToStderr(t *testing.T) {
+	path := scriptFile(t, `console.log("init");
+export default function () { if (__ITER === 0 && __VU === 1) console.warn("first iteration"); }`)
+	out, stderr, err := execute(t, "run", path, "--duration", "50ms")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"INFO  [VU 0] init", "INFO  [VU 1] init", "WARN  [VU 1] first iteration"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr missing %q:\n%s", want, stderr)
+		}
+	}
+	if strings.Contains(out, "first iteration") {
+		t.Errorf("console output must not go to stdout:\n%s", out)
+	}
+}

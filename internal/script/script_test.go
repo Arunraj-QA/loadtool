@@ -1,6 +1,7 @@
 package script
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -785,5 +786,70 @@ export default function () {}`).WithEnv(map[string]string{"VUS": "5"})
 	got, err := p.Options(context.Background())
 	if err != nil || string(got) != `{"vus":5}` {
 		t.Fatalf("Options() = %s, %v; want {\"vus\":5} (__VU is 0 and __ENV is set while reading options)", got, err)
+	}
+}
+
+func TestConsoleOutput(t *testing.T) {
+	var buf bytes.Buffer
+	p := compile(t, "test.ts", `
+export default function () {
+	console.log("hello", 42, true, undefined, null, { a: 1 }, [1, "x"]);
+	console.info("i");
+	console.warn("w");
+	console.error("e");
+	console.debug("d");
+	const loop: any = {}; loop.self = loop;
+	console.log(loop);
+}`).WithConsole(&buf)
+	vu, err := p.NewVU(context.Background(), 3, http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := iterate(vu); s.ScriptErrors != 0 {
+		t.Fatal(s.FirstScriptError)
+	}
+	want := `INFO  [VU 3] hello 42 true undefined null {"a":1} [1,"x"]
+INFO  [VU 3] i
+WARN  [VU 3] w
+ERROR [VU 3] e
+DEBUG [VU 3] d
+INFO  [VU 3] [object Object]
+`
+	if buf.String() != want {
+		t.Errorf("console output:\n%s\nwant:\n%s", buf.String(), want)
+	}
+}
+
+func TestConsoleDiscardedWithoutWriter(t *testing.T) {
+	// No WithConsole: console calls must work and write nowhere.
+	s := iterate(newVU(t, compile(t, "test.js", `export default function () { console.log("x"); console.error("y"); }`)))
+	if s.ScriptErrors != 0 {
+		t.Fatal(s.FirstScriptError)
+	}
+}
+
+func TestConsoleLinesNotInterleaved(t *testing.T) {
+	var buf bytes.Buffer
+	p := compile(t, "test.js", `
+const msg = "x".repeat(200);
+export default function () { for (let i = 0; i < 50; i++) console.log(msg); }`).WithConsole(&buf)
+	const vus = 8
+	var wg sync.WaitGroup
+	for i := range vus {
+		vu, err := p.NewVU(context.Background(), i+1, http.DefaultClient)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wg.Go(func() { iterate(vu) })
+	}
+	wg.Wait()
+	lines := strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n")
+	if len(lines) != vus*50 {
+		t.Fatalf("got %d lines, want %d", len(lines), vus*50)
+	}
+	for _, l := range lines {
+		if !strings.HasPrefix(l, "INFO  [VU ") || !strings.HasSuffix(l, "] "+strings.Repeat("x", 200)) {
+			t.Fatalf("corrupted line: %q", l)
+		}
 	}
 }

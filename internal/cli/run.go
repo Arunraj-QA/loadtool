@@ -86,6 +86,7 @@ func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env ma
 		Overrides: cli,
 		Getenv:    os.LookupEnv,
 		Env:       env,
+		Console:   cmd.ErrOrStderr(),
 		Warn: func(msg string) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", msg)
 		},
