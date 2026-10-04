@@ -1,0 +1,134 @@
+package config
+
+import (
+	"slices"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestDurationUnmarshal(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    time.Duration
+		wantErr bool
+	}{
+		{`"30s"`, 30 * time.Second, false},
+		{`"1m30s"`, 90 * time.Second, false},
+		{`1500`, 1500 * time.Millisecond, false}, // numbers are milliseconds, as in k6
+		{`2.5`, 2500 * time.Microsecond, false},
+		{`"abc"`, 0, true},
+		{`"30"`, 0, true}, // a unitless string is ambiguous
+		{`true`, 0, true},
+	}
+	for _, tt := range tests {
+		var d Duration
+		err := d.UnmarshalJSON([]byte(tt.in))
+		if (err != nil) != tt.wantErr {
+			t.Errorf("UnmarshalJSON(%s) error = %v, wantErr %v", tt.in, err, tt.wantErr)
+			continue
+		}
+		if !tt.wantErr && time.Duration(d) != tt.want {
+			t.Errorf("UnmarshalJSON(%s) = %v, want %v", tt.in, time.Duration(d), tt.want)
+		}
+	}
+}
+
+func TestParseOptions(t *testing.T) {
+	for _, raw := range []string{"", "null", "  "} {
+		opts, unknown, err := ParseOptions([]byte(raw))
+		if err != nil || opts.VUs != nil || opts.Duration != nil || unknown != nil {
+			t.Errorf("ParseOptions(%q) = %+v, %v, %v; want empty", raw, opts, unknown, err)
+		}
+	}
+
+	opts, unknown, err := ParseOptions([]byte(`{"vus": 25, "duration": "45s", "thresholds": {}, "insecureSkipTLSVerify": true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.VUs == nil || *opts.VUs != 25 || opts.Duration == nil || time.Duration(*opts.Duration) != 45*time.Second {
+		t.Fatalf("got VUs=%v Duration=%v, want 25 and 45s", opts.VUs, opts.Duration)
+	}
+	if want := []string{"insecureSkipTLSVerify", "thresholds"}; !slices.Equal(unknown, want) {
+		t.Errorf("unknown = %v, want %v (sorted)", unknown, want)
+	}
+}
+
+func TestParseOptionsErrors(t *testing.T) {
+	tests := []struct{ raw, want string }{
+		{`[1, 2]`, "must be an object"},
+		{`{"vus": "ten"}`, "options.vus must be a whole number"},
+		{`{"vus": 2.5}`, "options.vus must be a whole number"},
+		{`{"duration": "soon"}`, "options.duration"},
+	}
+	for _, tt := range tests {
+		if _, _, err := ParseOptions([]byte(tt.raw)); err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("ParseOptions(%s) error = %v, want it to contain %q", tt.raw, err, tt.want)
+		}
+	}
+}
+
+func intp(n int) *int                     { return &n }
+func durp(d time.Duration) *time.Duration { return &d }
+func optDur(d time.Duration) *Duration    { v := Duration(d); return &v }
+func env(m map[string]string) func(string) (string, bool) {
+	return func(k string) (string, bool) { v, ok := m[k]; return v, ok }
+}
+
+func TestResolvePrecedence(t *testing.T) {
+	script := Options{VUs: intp(10), Duration: optDur(20 * time.Second)}
+	envBoth := env(map[string]string{EnvVUs: "20", EnvDuration: "30s"})
+	tests := []struct {
+		name    string
+		cli     Overrides
+		getenv  func(string) (string, bool)
+		script  Options
+		wantVUs int
+		wantDur time.Duration
+	}{
+		{"defaults", Overrides{}, nil, Options{}, DefaultVUs, DefaultDuration},
+		{"script", Overrides{}, nil, script, 10, 20 * time.Second},
+		{"env beats script", Overrides{}, envBoth, script, 20, 30 * time.Second},
+		{"cli beats env and script", Overrides{VUs: intp(30), Duration: durp(40 * time.Second)}, envBoth, script, 30, 40 * time.Second},
+		{"sources mix per setting", Overrides{VUs: intp(30)}, env(map[string]string{EnvDuration: "30s"}), script, 30, 30 * time.Second},
+		{"blank env is ignored", Overrides{}, env(map[string]string{EnvVUs: "  "}), script, 10, 20 * time.Second},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var c Config
+			if err := c.Resolve(tt.cli, tt.getenv, tt.script); err != nil {
+				t.Fatal(err)
+			}
+			if c.VUs != tt.wantVUs || c.Duration != tt.wantDur {
+				t.Errorf("got VUs=%d Duration=%v, want %d and %v", c.VUs, c.Duration, tt.wantVUs, tt.wantDur)
+			}
+		})
+	}
+}
+
+func TestResolveErrorsNameSource(t *testing.T) {
+	tests := []struct {
+		name   string
+		cli    Overrides
+		getenv func(string) (string, bool)
+		script Options
+		want   string
+	}{
+		{"cli vus", Overrides{VUs: intp(0)}, nil, Options{}, "vus must be at least 1, got 0 (from --vus)"},
+		{"env vus", Overrides{}, env(map[string]string{EnvVUs: "0"}), Options{}, "(from LOADTOOL_VUS)"},
+		{"env vus not a number", Overrides{}, env(map[string]string{EnvVUs: "many"}), Options{}, "LOADTOOL_VUS must be a whole number"},
+		{"script vus", Overrides{}, nil, Options{VUs: intp(-1)}, "(from script options)"},
+		{"cli duration", Overrides{Duration: durp(0)}, nil, Options{}, "duration must be positive, got 0s (from --duration)"},
+		{"env duration", Overrides{}, env(map[string]string{EnvDuration: "later"}), Options{}, "LOADTOOL_DURATION must be a duration"},
+		{"script duration", Overrides{}, nil, Options{Duration: optDur(0)}, "(from script options)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var c Config
+			err := c.Resolve(tt.cli, tt.getenv, tt.script)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want it to contain %q", err, tt.want)
+			}
+		})
+	}
+}

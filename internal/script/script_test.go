@@ -502,3 +502,40 @@ func TestNewVUInterruptsTopLevelCode(t *testing.T) {
 		t.Fatal("top-level code was not interrupted by ctx")
 	}
 }
+
+func TestOptions(t *testing.T) {
+	tests := []struct {
+		name, src, want string
+	}{
+		{"with options", `export const options = { vus: 3, duration: "200ms" }; export default function () {}`, `{"vus":3,"duration":"200ms"}`},
+		{"functions are dropped", `export const options = { vus: 2, f() {} }; export default function () {}`, `{"vus":2}`},
+		{"computed from top-level code", `const n = 2 * 4; export const options = { vus: n }; export default function () {}`, `{"vus":8}`},
+		{"no options", `export default function () {}`, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := compile(t, "test.ts", tt.src).Options(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("Options() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOptionsErrors(t *testing.T) {
+	tests := []struct{ name, src, want string }{
+		{"top-level throw", `throw new Error("bad init"); export const options = {}; export default function () {}`, "bad init"},
+		{"not serializable", `const o: any = {}; o.self = o; export const options = o; export default function () {}`, "options:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := compile(t, "test.ts", tt.src).Options(context.Background())
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want it to contain %q", err, tt.want)
+			}
+		})
+	}
+}

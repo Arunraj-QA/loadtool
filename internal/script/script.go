@@ -50,16 +50,21 @@ const (
 	scriptNamespace = "loadtool"
 	// defaultExportGlobal is where the entry stores the default export.
 	defaultExportGlobal = "__loadtool_default"
+	// optionsGlobal is where the entry stores `export const options`.
+	optionsGlobal = "__loadtool_options"
 	// outfile names the in-memory build output; nothing is written to disk.
 	outfile = "script.js"
 )
 
-// entrySource imports the script's default export and stores it in a
-// global. Bundling this entry lets esbuild bind the default export
-// directly, so the output needs no CommonJS interop helpers. Every VU runs
-// the output, and those helpers made up about 75% of per-VU memory (see
-// benchmarks/results/2026-09-24-vu-memory.md).
-var entrySource = fmt.Sprintf("import fn from %q;\nglobalThis.%s = fn;\n", scriptImport, defaultExportGlobal)
+// entrySource stores the script's default export and its options in
+// globals. Bundling this entry lets esbuild bind the exports directly
+// (property reads on a namespace import become plain references), so the
+// output needs no CommonJS interop helpers. Every VU runs the output, and
+// those helpers made up about 75% of per-VU memory (see
+// benchmarks/results/2026-09-24-vu-memory.md). A missing export becomes
+// undefined, not a build error.
+var entrySource = fmt.Sprintf("import * as mod from %q;\nglobalThis.%s = mod.default;\nglobalThis.%s = mod.options;\n",
+	scriptImport, defaultExportGlobal, optionsGlobal)
 
 var errNoDefaultExport = errors.New("script must export a default function: `export default function () { ... }`")
 
@@ -174,9 +179,6 @@ func buildError(filename string, msgs []api.Message) error {
 	for _, m := range msgs {
 		l := m.Location
 		switch {
-		case l != nil && l.File == "<stdin>" && strings.Contains(m.Text, `for import "default"`):
-			// The generated entry could not find a default export.
-			errs = append(errs, fmt.Errorf("%s: %w", filename, errNoDefaultExport))
 		case l != nil:
 			file := strings.TrimPrefix(l.File, scriptNamespace+":")
 			errs = append(errs, fmt.Errorf("%s:%d:%d: %s", file, l.Line, l.Column+1, m.Text))
@@ -252,6 +254,25 @@ func (p *Program) NewVU(ctx context.Context, client *http.Client) (*VU, error) {
 	}
 	vu.fn = fn
 	return vu, nil
+}
+
+// Options runs the script's top-level code once in a runtime of its own and
+// returns its `export const options` as JSON, or nil if the script has no
+// options. Values JSON cannot represent, such as functions, are dropped.
+func (p *Program) Options(ctx context.Context) ([]byte, error) {
+	// No client: HTTP calls are not allowed in top-level code anyway.
+	vu, err := p.NewVU(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	if !isSet(vu.rt.Get(optionsGlobal)) {
+		return nil, nil
+	}
+	v, err := vu.rt.RunString("JSON.stringify(globalThis." + optionsGlobal + ")")
+	if err != nil {
+		return nil, fmt.Errorf("options: %s", scriptErrorMessage(err))
+	}
+	return []byte(v.String()), nil
 }
 
 // Iterate calls the script's default function once. HTTP requests made by

@@ -238,3 +238,47 @@ func TestRunGracefulStopCountsInFlightRequests(t *testing.T) {
 		t.Errorf("with --graceful-stop 0, in-flight requests are cancelled:\n%s", out)
 	}
 }
+
+// TestRunUsesScriptOptions checks precedence end to end (ADR-006):
+// script options < LOADTOOL_* environment variables < typed CLI flags.
+func TestRunUsesScriptOptions(t *testing.T) {
+	srv := statusServer(t, http.StatusOK)
+	path := scriptFile(t, `export const options = { vus: 3, duration: "150ms", thresholds: {} };
+export default function (): void { http.get("`+srv.URL+`"); }`)
+
+	out, stderr, err := execute(t, "run", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "VUs:         3") || !strings.Contains(out, "Duration:    150ms") {
+		t.Errorf("script options not applied:\n%s", out)
+	}
+	if !strings.Contains(stderr, `script option "thresholds" is not supported yet`) {
+		t.Errorf("want a warning for the unsupported option, stderr: %q", stderr)
+	}
+
+	t.Setenv("LOADTOOL_VUS", "2")
+	out, _, err = execute(t, "run", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "VUs:         2") {
+		t.Errorf("LOADTOOL_VUS should override the script:\n%s", out)
+	}
+
+	out, _, err = execute(t, "run", path, "--vus", "4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "VUs:         4") || !strings.Contains(out, "Duration:    150ms") {
+		t.Errorf("--vus should override env and script, duration still from the script:\n%s", out)
+	}
+}
+
+func TestRunRejectsInvalidScriptOptions(t *testing.T) {
+	path := scriptFile(t, `export const options = { vus: 0 }; export default function () {}`)
+	_, _, err := execute(t, "run", path)
+	if err == nil || !strings.Contains(err.Error(), "(from script options)") {
+		t.Fatalf("error = %v, want it to name the script options as the source", err)
+	}
+}
