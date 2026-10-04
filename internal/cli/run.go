@@ -9,10 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Arunraj-QA/loadtool/internal/config"
-	"github.com/Arunraj-QA/loadtool/internal/engine"
-	"github.com/Arunraj-QA/loadtool/internal/httpclient"
 	"github.com/Arunraj-QA/loadtool/internal/report"
-	"github.com/Arunraj-QA/loadtool/internal/script"
+	"github.com/Arunraj-QA/loadtool/internal/runner"
 )
 
 func newRunCmd() *cobra.Command {
@@ -52,63 +50,23 @@ func newRunCmd() *cobra.Command {
 	return cmd
 }
 
+// runTest runs the test through the runner, prints the console report and
+// turns an interrupted run into an error (exit code 1).
 func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides) error {
-	if cfg.Script == "" {
-		return cfg.Validate()
-	}
-	prog, err := script.Load(cfg.Script)
-	if err != nil {
-		return fmt.Errorf("load script: %w", err)
-	}
-
 	ctx := cmd.Context()
-	raw, err := prog.Options(ctx)
-	if err != nil {
-		return err
-	}
-	opts, unknown, err := config.ParseOptions(raw)
-	if err != nil {
-		return err
-	}
-	for _, k := range unknown {
-		fmt.Fprintf(cmd.ErrOrStderr(), "warning: script option %q is not supported yet and was ignored\n", k)
-	}
-	if err := cfg.Resolve(cli, os.LookupEnv, opts); err != nil {
-		return err
-	}
-	if err := cfg.Validate(); err != nil {
-		return err
-	}
-
-	// One client for all VUs: http.Client is safe for concurrent use and a
-	// shared transport lets each VU keep its own pooled connection.
-	client := httpclient.New(cfg.VUs, httpclient.DefaultTimeout)
-	defer client.CloseIdleConnections()
-
-	newVU := func(int) (engine.IterationFunc, error) {
-		// ctx lets Ctrl+C interrupt a script's top-level code.
-		vu, err := prog.NewVU(ctx, client)
-		if err != nil {
-			return nil, err
-		}
-		return vu.Iterate, nil
-	}
-
-	res, err := engine.Run(ctx, cfg.VUs, cfg.Duration, cfg.GracefulStop, newVU)
-	if err != nil {
-		return err
-	}
-	interrupted := ctx.Err() != nil
-	report.Console(cmd.OutOrStdout(), report.Result{
-		Script:       cfg.Script,
-		VUs:          cfg.VUs,
-		Duration:     cfg.Duration,
-		GracefulStop: cfg.GracefulStop,
-		Elapsed:      res.Elapsed,
-		Interrupted:  interrupted,
-		Summary:      res.Summary,
+	res, err := runner.Run(ctx, runner.Params{
+		Config:    cfg,
+		Overrides: cli,
+		Getenv:    os.LookupEnv,
+		Warn: func(msg string) {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", msg)
+		},
 	})
-	if interrupted {
+	if err != nil {
+		return err
+	}
+	report.Console(cmd.OutOrStdout(), res)
+	if res.Interrupted {
 		// Partial results were printed; still fail so automation notices.
 		return fmt.Errorf("test interrupted: %w", context.Cause(ctx))
 	}
