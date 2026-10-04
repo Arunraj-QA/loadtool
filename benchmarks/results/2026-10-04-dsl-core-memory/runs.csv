@@ -1,0 +1,13 @@
+script,variant,round,peakWorkingSetMB,peakPrivateMB,requests,reqPerSec,errors,exit
+http,before,1,149.2,198.3,621840,31073.4,9354,0
+http,after,1,147.2,193.7,563349,28149.7,9095,0
+http,after,2,140.9,188.7,808572,40403.8,1813,0
+http,before,2,134.2,177.7,737025,36816.2,1884,0
+http,before,3,148.1,197.6,665153,33231.7,3403,0
+http,after,3,144.1,190.8,699500,34948.8,4218,0
+cpu,before,1,143.4,178.2,0,0.0,0,0
+cpu,after,1,93.9,129.6,0,0.0,0,0
+cpu,after,2,111.2,146.1,0,0.0,0,0
+cpu,before,2,159.6,142.7,0,0.0,0,0
+cpu,before,3,159.1,142.5,0,0.0,0,0
+cpu,after,3,156.4,139.7,0,0.0,0,0
