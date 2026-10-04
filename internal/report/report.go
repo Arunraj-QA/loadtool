@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
 )
@@ -54,6 +56,7 @@ func Console(w io.Writer, r Result) {
 		fmt.Fprintf(w, "    first:     %s\n", s.FirstScriptError)
 	}
 	fmt.Fprintln(w)
+	printChecks(w, s.Checks)
 
 	if s.Sent == 0 {
 		fmt.Fprintf(w, "  Latency:     no requests were sent\n")
@@ -75,6 +78,42 @@ func Console(w io.Writer, r Result) {
 	printLatencies(w, []latencyRow{
 		{"p50", s.SuccessP50}, {"p90", s.SuccessP90}, {"p95", s.SuccessP95}, {"p99", s.SuccessP99},
 	})
+}
+
+// printChecks lists each check with its pass rate, ✓ when it never
+// failed, and the first error a failing condition threw.
+func printChecks(w io.Writer, checks []metrics.CheckResult) {
+	if len(checks) == 0 {
+		return
+	}
+	var passes, total, width int
+	for _, c := range checks {
+		passes += c.Passes
+		total += c.Passes + c.Fails
+		width = max(width, utf8.RuneCountInString(c.Name))
+	}
+	fmt.Fprintf(w, "  Checks:      %s / %s passed (%s)\n", formatCount(passes), formatCount(total), percent(passes, total))
+	for _, c := range checks {
+		mark := "✓"
+		if c.Fails > 0 {
+			mark = "✗"
+		}
+		pad := strings.Repeat(" ", width-utf8.RuneCountInString(c.Name))
+		n := c.Passes + c.Fails
+		fmt.Fprintf(w, "    %s %s%s  %s / %s  %s\n", mark, c.Name, pad, formatCount(c.Passes), formatCount(n), percent(c.Passes, n))
+		if c.FirstError != "" {
+			fmt.Fprintf(w, "        first error: %s\n", c.FirstError)
+		}
+	}
+	fmt.Fprintln(w)
+}
+
+// percent formats part/whole with two decimals; 0/0 is shown as "-".
+func percent(part, whole int) string {
+	if whole == 0 {
+		return "-"
+	}
+	return fmt.Sprintf("%.2f%%", float64(part)*100/float64(whole))
 }
 
 type latencyRow struct {

@@ -31,6 +31,12 @@ type Recorder struct {
 
 	scriptErrors     int
 	firstScriptError string
+
+	// checkNames is shared by a run's recorders; checkIndex caches its
+	// indexes for this recorder, and checks is indexed by them.
+	checkNames *checkNames
+	checkIndex map[string]int
+	checks     []checkCount
 }
 
 // NewRecorders returns n Recorders spread over a fixed set of shared
@@ -40,9 +46,10 @@ func NewRecorders(n int) []*Recorder {
 	for i := range shards {
 		shards[i] = newShard()
 	}
+	names := newCheckNames()
 	recs := make([]*Recorder, n)
 	for i := range recs {
-		recs[i] = &Recorder{shard: shards[i%len(shards)]}
+		recs[i] = &Recorder{shard: shards[i%len(shards)], checkNames: names}
 	}
 	return recs
 }
@@ -100,6 +107,9 @@ type Summary struct {
 	ScriptErrors int
 	// FirstScriptError is one example message, empty if there were none.
 	FirstScriptError string
+
+	// Checks are the check() results in the order they were first run.
+	Checks []CheckResult
 }
 
 // Merge aggregates recorders into a Summary. The recorders must no longer
@@ -120,6 +130,8 @@ func Merge(recorders []*Recorder) Summary {
 			failedHists = append(failedHists, r.shard.failed)
 		}
 	}
+
+	s.Checks = mergeChecks(recorders)
 
 	ok := combine(okHists)
 	all := combine(append(okHists, failedHists...))

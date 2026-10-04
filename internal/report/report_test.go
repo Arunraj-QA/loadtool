@@ -33,6 +33,21 @@ var goldenCases = map[string]Result{
 			P50: 400 * time.Microsecond, P90: 800 * time.Microsecond, P95: 850 * time.Microsecond, P99: 900 * time.Microsecond,
 		},
 	},
+	"checks": {
+		Script: "examples/checks.ts", VUs: 10, Duration: 30 * time.Second, GracefulStop: 30 * time.Second,
+		Elapsed: 30 * time.Second,
+		Summary: metrics.Summary{
+			Requests: 3000, Successes: 3000, Sent: 3000,
+			Min: 9 * time.Millisecond, Mean: 11 * time.Millisecond, Max: 30 * time.Millisecond,
+			P50: 11 * time.Millisecond, P90: 12 * time.Millisecond, P95: 13 * time.Millisecond, P99: 20 * time.Millisecond,
+			SuccessP50: 11 * time.Millisecond, SuccessP90: 12 * time.Millisecond, SuccessP95: 13 * time.Millisecond, SuccessP99: 20 * time.Millisecond,
+			Checks: []metrics.CheckResult{
+				{Name: "status is 200", Passes: 3000},
+				{Name: "has products", Passes: 2994, Fails: 6, FirstError: "SyntaxError: Unexpected token <"},
+				{Name: "ünïcode name", Passes: 3000},
+			},
+		},
+	},
 	"interrupted-none-sent": {
 		Script: "examples/basic-http.ts", VUs: 100, Duration: 30 * time.Second, GracefulStop: 30 * time.Second,
 		Elapsed: 2 * time.Second, Interrupted: true,

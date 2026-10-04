@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -141,7 +142,7 @@ func TestRunStartErrors(t *testing.T) {
 			if !strings.Contains(err.Error(), tt.want) {
 				t.Errorf("error = %v, want it to contain %q", err, tt.want)
 			}
-			if res != (report.Result{}) {
+			if !reflect.DeepEqual(res, report.Result{}) {
 				t.Errorf("want no result on a start-up error, got %+v", res)
 			}
 		})

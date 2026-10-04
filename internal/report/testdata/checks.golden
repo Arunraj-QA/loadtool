@@ -1,0 +1,32 @@
+
+LoadTool summary
+
+  Script:      examples/checks.ts
+  VUs:         10
+  Duration:    30s (elapsed 30.00s)
+  Status:      completed
+
+  Requests:    3,000 (100.0 req/s)
+  Success:     3,000
+  Errors:      0 (0.00%)
+  Script errs: 0
+
+  Checks:      8,994 / 9,000 passed (99.93%)
+    ✓ status is 200  3,000 / 3,000  100.00%
+    ✗ has products   2,994 / 3,000  99.80%
+        first error: SyntaxError: Unexpected token <
+    ✓ ünïcode name   3,000 / 3,000  100.00%
+
+  Latency (all requests sent, failed included):
+    min       9.00ms
+    mean     11.00ms
+    p50      11.00ms
+    p90      12.00ms
+    p95      13.00ms
+    p99      20.00ms
+    max      30.00ms
+  Latency (successful requests):
+    p50      11.00ms
+    p90      12.00ms
+    p95      13.00ms
+    p99      20.00ms

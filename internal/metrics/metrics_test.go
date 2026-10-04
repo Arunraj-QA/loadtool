@@ -3,6 +3,7 @@ package metrics
 import (
 	"math"
 	"math/rand/v2"
+	"reflect"
 	"slices"
 	"sync"
 	"testing"
@@ -26,13 +27,13 @@ func assertNear(t *testing.T, name string, got, want time.Duration) {
 }
 
 func TestMergeEmpty(t *testing.T) {
-	if got := Merge(nil); got != (Summary{}) {
+	if got := Merge(nil); !reflect.DeepEqual(got, Summary{}) {
 		t.Fatalf("Merge(nil) = %+v, want zero Summary", got)
 	}
-	if got := Merge([]*Recorder{{}, {}}); got != (Summary{}) {
+	if got := Merge([]*Recorder{{}, {}}); !reflect.DeepEqual(got, Summary{}) {
 		t.Fatalf("Merge(empty recorders) = %+v, want zero Summary", got)
 	}
-	if got := Merge(NewRecorders(4)); got != (Summary{}) {
+	if got := Merge(NewRecorders(4)); !reflect.DeepEqual(got, Summary{}) {
 		t.Fatalf("Merge(unused shared recorders) = %+v, want zero Summary", got)
 	}
 }
