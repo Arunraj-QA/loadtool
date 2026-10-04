@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -20,6 +21,7 @@ func newRunCmd() *cobra.Command {
 	var (
 		vus      int
 		duration time.Duration
+		envFlags []string
 	)
 
 	cmd := &cobra.Command{
@@ -36,7 +38,11 @@ func newRunCmd() *cobra.Command {
 			if cmd.Flags().Changed("duration") {
 				cli.Duration = &duration
 			}
-			return runTest(cmd, cfg, cli)
+			env, err := scriptEnv(os.Environ(), envFlags)
+			if err != nil {
+				return err
+			}
+			return runTest(cmd, cfg, cli, env)
 		},
 	}
 
@@ -47,17 +53,39 @@ func newRunCmd() *cobra.Command {
 		"test duration, e.g. 30s or 5m (overrides "+config.EnvDuration+" and options.duration)")
 	f.DurationVar(&cfg.GracefulStop, "graceful-stop", cfg.GracefulStop,
 		"how long iterations still running at the end of --duration may take to finish (0 cancels them at once)")
+	f.StringArrayVarP(&envFlags, "env", "e", nil,
+		"set a variable for the script's __ENV, as KEY=VALUE (repeatable; overrides the process environment)")
 	return cmd
+}
+
+// scriptEnv builds the script's __ENV: the process environment (environ,
+// as from os.Environ) with --env KEY=VALUE flags applied on top.
+func scriptEnv(environ, flags []string) (map[string]string, error) {
+	env := make(map[string]string, len(environ)+len(flags))
+	for _, kv := range environ {
+		if k, v, ok := strings.Cut(kv, "="); ok && k != "" {
+			env[k] = v
+		}
+	}
+	for _, kv := range flags {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok || k == "" {
+			return nil, fmt.Errorf("--env %q must have the form KEY=VALUE", kv)
+		}
+		env[k] = v
+	}
+	return env, nil
 }
 
 // runTest runs the test through the runner, prints the console report and
 // turns an interrupted run into an error (exit code 1).
-func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides) error {
+func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env map[string]string) error {
 	ctx := cmd.Context()
 	res, err := runner.Run(ctx, runner.Params{
 		Config:    cfg,
 		Overrides: cli,
 		Getenv:    os.LookupEnv,
+		Env:       env,
 		Warn: func(msg string) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", msg)
 		},

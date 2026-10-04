@@ -31,6 +31,17 @@ import (
 // Program is a compiled test script, safe to share between VUs.
 type Program struct {
 	prog *goja.Program
+	// env backs every VU's __ENV. It is never written after WithEnv, so
+	// VUs on different goroutines read it safely.
+	env map[string]string
+}
+
+// WithEnv returns a copy of p whose VUs see env as __ENV. env must not be
+// modified afterwards.
+func (p *Program) WithEnv(env map[string]string) *Program {
+	c := *p
+	c.env = env
+	return &c
 }
 
 // Load reads and compiles the script at path. Relative imports
@@ -261,13 +272,17 @@ type VU struct {
 	// the script run on the VU's goroutine, so they read them without locks.
 	ctx context.Context
 	rec *metrics.Recorder
+	// iter is the number of the next iteration, exposed as __ITER.
+	iter int64
 }
 
-// NewVU creates a runtime, runs the script's top-level (init) code once, and
-// resolves its default export. client is shared between VUs; http.Client is
-// safe for concurrent use. If ctx ends while the top-level code runs (for
-// example on Ctrl+C), the code is interrupted and ctx's error is returned.
-func (p *Program) NewVU(ctx context.Context, client *http.Client) (*VU, error) {
+// NewVU creates a runtime for VU number id, runs the script's top-level
+// (init) code once, and resolves its default export. id is exposed as __VU:
+// 1..N for VUs, 0 for the runtime that only reads options. client is shared
+// between VUs; http.Client is safe for concurrent use. If ctx ends while
+// the top-level code runs (for example on Ctrl+C), the code is interrupted
+// and ctx's error is returned.
+func (p *Program) NewVU(ctx context.Context, id int, client *http.Client) (*VU, error) {
 	rt := goja.New()
 	rt.SetMaxCallStackSize(maxCallStackSize)
 	vu := &VU{rt: rt, client: client}
@@ -277,6 +292,9 @@ func (p *Program) NewVU(ctx context.Context, client *http.Client) (*VU, error) {
 		builtins.Set("http", vu.newHTTPModule()),
 		builtins.Set("core", rt.NewObject()),
 		rt.Set(builtinGlobal, builtins),
+		rt.Set("__ENV", rt.NewDynamicObject(&envObject{rt: rt, base: p.env})),
+		rt.Set("__VU", id),
+		rt.Set("__ITER", 0),
 	); err != nil {
 		return nil, err
 	}
@@ -303,7 +321,7 @@ func (p *Program) NewVU(ctx context.Context, client *http.Client) (*VU, error) {
 // options. Values JSON cannot represent, such as functions, are dropped.
 func (p *Program) Options(ctx context.Context) ([]byte, error) {
 	// No client: HTTP calls are not allowed in top-level code anyway.
-	vu, err := p.NewVU(ctx, nil)
+	vu, err := p.NewVU(ctx, 0, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -328,6 +346,8 @@ func (vu *VU) Iterate(ctx context.Context, rec *metrics.Recorder) {
 		return
 	}
 	vu.ctx, vu.rec = ctx, rec
+	_ = vu.rt.Set("__ITER", vu.iter)
+	vu.iter++
 	stop := context.AfterFunc(ctx, func() { vu.rt.Interrupt(errStopped) })
 	_, err := vu.fn(goja.Undefined())
 	stop()

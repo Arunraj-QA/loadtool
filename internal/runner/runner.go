@@ -22,8 +22,12 @@ type Params struct {
 	Config config.Config
 	// Overrides are the settings typed on the command line.
 	Overrides config.Overrides
-	// Getenv looks up environment variables; nil means none are set.
+	// Getenv looks up environment variables for LoadTool's own settings
+	// (LOADTOOL_VUS, ...); nil means none are set.
 	Getenv func(string) (string, bool)
+	// Env is what scripts see as __ENV. It must not be modified during
+	// the run; nil means an empty __ENV.
+	Env map[string]string
 	// Warn receives non-fatal problems, such as unsupported script options.
 	// nil discards them.
 	Warn func(msg string)
@@ -43,6 +47,8 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	if err != nil {
 		return report.Result{}, fmt.Errorf("load script: %w", err)
 	}
+	// Before reading options, so options can use __ENV too.
+	prog = prog.WithEnv(p.Env)
 
 	raw, err := prog.Options(ctx)
 	if err != nil {
@@ -69,9 +75,10 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	client := httpclient.New(cfg.VUs, httpclient.DefaultTimeout)
 	defer client.CloseIdleConnections()
 
-	newVU := func(int) (engine.IterationFunc, error) {
-		// ctx lets Ctrl+C interrupt a script's top-level code.
-		vu, err := prog.NewVU(ctx, client)
+	newVU := func(i int) (engine.IterationFunc, error) {
+		// ctx lets Ctrl+C interrupt a script's top-level code. VUs are
+		// numbered from 1 in __VU, as in k6.
+		vu, err := prog.NewVU(ctx, i+1, client)
 		if err != nil {
 			return nil, err
 		}

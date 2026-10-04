@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -282,5 +283,41 @@ func TestRunRejectsInvalidScriptOptions(t *testing.T) {
 	_, _, err := execute(t, "run", path)
 	if err == nil || !strings.Contains(err.Error(), "(from script options)") {
 		t.Fatalf("error = %v, want it to name the script options as the source", err)
+	}
+}
+
+func TestScriptEnv(t *testing.T) {
+	environ := []string{"PATH=/bin", `=C:=C:\work`, "EMPTY=", "TARGET=http://old"}
+	env, err := scriptEnv(environ, []string{"TARGET=http://new", "EXTRA=a=b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"PATH": "/bin", "EMPTY": "", "TARGET": "http://new", "EXTRA": "a=b"}
+	if fmt.Sprint(env) != fmt.Sprint(want) {
+		t.Errorf("scriptEnv = %v, want %v (Windows' hidden =C: entries are skipped, --env wins)", env, want)
+	}
+	for _, bad := range []string{"NOVALUE", "=value"} {
+		if _, err := scriptEnv(nil, []string{bad}); err == nil || !strings.Contains(err.Error(), "KEY=VALUE") {
+			t.Errorf("scriptEnv(--env %q) error = %v, want a KEY=VALUE error", bad, err)
+		}
+	}
+}
+
+func TestRunEnvFlag(t *testing.T) {
+	srv := statusServer(t, http.StatusOK)
+	path := scriptFile(t, `import http from "loadtool/http";
+export default function () {
+	if (!__ENV.TARGET) throw new Error("TARGET not set");
+	http.get(__ENV.TARGET);
+}`)
+	out, _, err := execute(t, "run", path, "--duration", "100ms", "-e", "TARGET="+srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Script errs: 0") || strings.Contains(out, "Requests:    0 ") {
+		t.Errorf("want requests to __ENV.TARGET and no script errors:\n%s", out)
+	}
+	if _, _, err := execute(t, "run", path, "-e", "BROKEN"); err == nil || !strings.Contains(err.Error(), "KEY=VALUE") {
+		t.Errorf("error = %v, want a KEY=VALUE error for a malformed --env", err)
 	}
 }

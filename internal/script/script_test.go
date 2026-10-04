@@ -3,6 +3,7 @@ package script
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -28,7 +29,7 @@ func compile(t *testing.T, filename, src string) *Program {
 
 func newVU(t *testing.T, p *Program) *VU {
 	t.Helper()
-	vu, err := p.NewVU(context.Background(), httpclient.New(1, httpclient.DefaultTimeout))
+	vu, err := p.NewVU(context.Background(), 1, httpclient.New(1, httpclient.DefaultTimeout))
 	if err != nil {
 		t.Fatalf("NewVU: %v", err)
 	}
@@ -114,7 +115,7 @@ http.get("http://127.0.0.1:1/"); export default function () {}`, "not allowed in
 		t.Run(tt.name, func(t *testing.T) {
 			p, err := Compile("test.ts", []byte(tt.src))
 			if err == nil {
-				_, err = p.NewVU(context.Background(), http.DefaultClient)
+				_, err = p.NewVU(context.Background(), 1, http.DefaultClient)
 			}
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("error = %v, want it to contain %q", err, tt.wantErr)
@@ -291,7 +292,7 @@ export default function () {
 	recs := make([]*metrics.Recorder, vus)
 	var wg sync.WaitGroup
 	for i := range vus {
-		vu, err := p.NewVU(context.Background(), client)
+		vu, err := p.NewVU(context.Background(), 1, client)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -354,7 +355,7 @@ export default function () { http.get("http://localhost/"); }`))
 	client := httpclient.New(1, httpclient.DefaultTimeout)
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := p.NewVU(context.Background(), client); err != nil {
+		if _, err := p.NewVU(context.Background(), 1, client); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -365,7 +366,7 @@ func BenchmarkIterateEmpty(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	vu, err := p.NewVU(context.Background(), http.DefaultClient)
+	vu, err := p.NewVU(context.Background(), 1, http.DefaultClient)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -388,7 +389,7 @@ export default function () { http.get("BASE_URL"); }`, "BASE_URL", srv.URL)
 	}
 	client := httpclient.New(1, httpclient.DefaultTimeout)
 	defer client.CloseIdleConnections()
-	vu, err := p.NewVU(context.Background(), client)
+	vu, err := p.NewVU(context.Background(), 1, client)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -421,7 +422,7 @@ func TestExamplesLoad(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Load: %v", err)
 			}
-			if _, err := p.NewVU(context.Background(), http.DefaultClient); err != nil {
+			if _, err := p.NewVU(context.Background(), 1, http.DefaultClient); err != nil {
 				t.Fatalf("NewVU: %v", err)
 			}
 		})
@@ -475,7 +476,7 @@ func TestRecursionInInitFailsLoad(t *testing.T) {
 	_, err := compile(t, "test.ts", `
 function f(): number { return f() + 1; }
 f();
-export default function () {}`).NewVU(context.Background(), http.DefaultClient)
+export default function () {}`).NewVU(context.Background(), 1, http.DefaultClient)
 	if err == nil || !strings.Contains(err.Error(), "maximum call stack size of 2500 frames exceeded") {
 		t.Fatalf("error = %v, want a call stack size error", err)
 	}
@@ -501,7 +502,7 @@ func TestNewVUInterruptsTopLevelCode(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		_, err := p.NewVU(ctx, http.DefaultClient)
+		_, err := p.NewVU(ctx, 1, http.DefaultClient)
 		done <- err
 	}()
 	select {
@@ -654,7 +655,7 @@ func TestRelativeImports(t *testing.T) {
 		t.Fatalf("Options = %s, %v; want {\"vus\":3} from the imported JSON", opts, err)
 	}
 
-	vu, err := p.NewVU(context.Background(), httpclient.New(1, httpclient.DefaultTimeout))
+	vu, err := p.NewVU(context.Background(), 1, httpclient.New(1, httpclient.DefaultTimeout))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -703,5 +704,86 @@ func TestRelativeImportsAddNoInteropHelpers(t *testing.T) {
 		if strings.Contains(code, helper) {
 			t.Errorf("output contains %s", helper)
 		}
+	}
+}
+
+func TestEnvObject(t *testing.T) {
+	p := compile(t, "test.ts", `
+export default function () {
+	const want = (cond: boolean, what: string) => { if (!cond) throw new Error(what); };
+	want(__ENV.A === "1", "read A");
+	want("B" in __ENV, "B in __ENV");
+	want(__ENV.C === undefined, "missing key is undefined");
+	want(Object.keys(__ENV).join(",") === "A,B", "keys " + Object.keys(__ENV).join(","));
+	want(JSON.stringify(__ENV) === '{"A":"1","B":"2"}', "json " + JSON.stringify(__ENV));
+	__ENV.X = "9";
+	delete __ENV.A;
+	want(Object.keys(__ENV).join(",") === "B,X", "after write and delete: " + Object.keys(__ENV).join(","));
+	want(__ENV.A === undefined && __ENV.X === "9", "values after write and delete");
+}`).WithEnv(map[string]string{"A": "1", "B": "2"})
+	if s := iterate(newVU(t, p)); s.ScriptErrors != 0 {
+		t.Fatal(s.FirstScriptError)
+	}
+}
+
+func TestEnvIsolatedBetweenVUs(t *testing.T) {
+	base := map[string]string{"A": "1"}
+	p := compile(t, "test.ts", `
+let writes = 0;
+export default function () {
+	if (writes++ === 0 && __VU === 1) { __ENV.A = "changed"; return; }
+	if (__VU === 2 && __ENV.A !== "1") throw new Error("VU 2 saw " + __ENV.A);
+}`).WithEnv(base)
+	a, err := p.NewVU(context.Background(), 1, http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := p.NewVU(context.Background(), 2, http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iterate(a)
+	if s := iterate(b); s.ScriptErrors != 0 {
+		t.Fatal(s.FirstScriptError)
+	}
+	if base["A"] != "1" {
+		t.Fatalf("the shared map was modified: A=%q", base["A"])
+	}
+}
+
+func TestVUAndIter(t *testing.T) {
+	p := compile(t, "test.ts", `
+export const initVU = __VU;
+const seen: number[] = [];
+(globalThis as any).seen = seen;
+(globalThis as any).initVU = __VU;
+export default function () {
+	if (__VU !== 7) throw new Error("__VU " + __VU);
+	seen.push(__ITER);
+}`)
+	vu, err := p.NewVU(context.Background(), 7, http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 3 {
+		if s := iterate(vu); s.ScriptErrors != 0 {
+			t.Fatal(s.FirstScriptError)
+		}
+	}
+	if got := vu.rt.Get("initVU").ToInteger(); got != 7 {
+		t.Errorf("__VU in top-level code = %d, want 7", got)
+	}
+	if got := vu.rt.Get("seen").Export(); fmt.Sprint(got) != "[0 1 2]" {
+		t.Errorf("__ITER values = %v, want [0 1 2]", got)
+	}
+}
+
+func TestOptionsSeeVUZeroAndEnv(t *testing.T) {
+	p := compile(t, "test.ts", `
+export const options = { vus: __VU === 0 ? Number(__ENV.VUS) : 99 };
+export default function () {}`).WithEnv(map[string]string{"VUS": "5"})
+	got, err := p.Options(context.Background())
+	if err != nil || string(got) != `{"vus":5}` {
+		t.Fatalf("Options() = %s, %v; want {\"vus\":5} (__VU is 0 and __ENV is set while reading options)", got, err)
 	}
 }
