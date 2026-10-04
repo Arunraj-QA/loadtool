@@ -1,12 +1,105 @@
-# LoadTool architecture (Phase 0)
+# LoadTool architecture
 
-This describes the code as it stands at the end of Phase 0 (October 2026).
+The first section shows the target architecture by phase. Sections 1–14
+describe the code in detail as it stands at the end of Phase 0 (October
+2026); Phase 1 changes are noted where they have been made.
 - **Decisions:** the *why* behind individual choices is in the
   [architecture decision records](decisions/README.md).
 - **Numbers:** measured figures come from [`benchmarks/results`](../benchmarks/results/)
   and are dated, because they were taken at different commits.
 - **Workflows:** step-by-step diagrams of a test run, of development and
   of benchmarking are in [workflows.md](workflows.md).
+
+## Architecture by phase
+
+```text
+Phase 0
+    │
+    ├── CLI
+    ├── Runner
+    ├── VU
+    ├── goja
+    ├── HTTP
+    ├── Metrics
+    └── Console
+             │
+             ▼
+Phase 1
+    │
+    ├── DSL
+    ├── Scenario Engine
+    ├── Checks
+    ├── Thresholds
+    ├── HTTP/2
+    ├── Sessions
+    ├── JSON Reporter
+    ├── HTML Reporter
+    └── CI
+```
+
+Phase 1 extends the Phase 0 components; it does not replace them. Every
+Phase 1 component builds on a Phase 0 component. Each column below is one
+Phase 0 component (top) and the Phase 1 components that extend it; the
+secondary relations (for example Thresholds setting the Runner's exit
+code) are in the Phase 1 table.
+
+![Architecture by phase: each Phase 0 component with the Phase 1 components that extend it](diagrams/architecture-by-phase.svg)
+
+Blue: Phase 0 (done). Green: Phase 1 (extends the component above it).
+Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd).
+
+### Phase 0 components
+
+| Component | Package | Status |
+|---|---|---|
+| CLI | `cmd/loadtool`, `internal/cli` | Done |
+| Runner | `runTest` inside `internal/cli/run.go` | Done, but **not yet a component of its own**. The orchestration (load script, resolve options, start VUs, run, report) lives in the CLI package. Phase 1 extracts it into `internal/runner`, so the CLI only parses flags. Scenarios, setup/teardown and thresholds then extend the Runner, not the CLI. |
+| VU | `internal/engine` | Done: goroutine per VU, started before the clock, graceful stop |
+| goja | `internal/script` | Done: one runtime per VU, call-depth limit, interrupts |
+| HTTP | `internal/httpclient` | Done: HTTP/1.1, at most one connection per VU, keep-alive |
+| Metrics | `internal/metrics` | Done: fixed-size sharded histograms (ADR-004) |
+| Console | `internal/report` (`Console`) | Done: renders from `report.Result` |
+
+### Phase 1 components
+
+| Component | Extends | Package | Covers roadmap items | Status |
+|---|---|---|---|---|
+| DSL | goja | `internal/script` (built-in modules `loadtool`, `loadtool/http`; lifecycle exports; `__ENV`, `__VU`, `__ITER`), published `types/loadtool.d.ts` | 1 TypeScript DSL, 2 setup/teardown (script side) | `options` export done (ADR-006); rest planned. k6-shaped (ADR-005) |
+| Scenario Engine | VU, Runner | `internal/engine` (executors: constant-vus, ramping-vus, constant-arrival-rate; scenarios) | 5 scenarios, 2 setup/teardown (run order) | Planned |
+| Checks | DSL, Metrics | `check()` in `internal/script`; `checks` metric in `internal/metrics` | 3 checks/assertions | Planned |
+| Thresholds | Metrics, Runner | new `internal/thresholds` | 4 thresholds; exit code | Planned |
+| HTTP/2 | HTTP | `internal/httpclient` | 6 HTTP/2 | Planned |
+| Sessions | HTTP | `internal/httpclient` (per-VU client and cookie jar; reuse options) | 7 connection reuse, 8 cookies/sessions | Planned |
+| JSON Reporter | Console (`report.Result`) | `internal/report` | 9 JSON output | Planned |
+| HTML Reporter | Console (`report.Result`) | `internal/report` | 10 self-contained HTML report | Planned |
+| CI | CLI | `action.yml`, `.github/workflows/release.yml`, `docs/ci/` | 11 GitHub Action, 12 generic CI recipe | Planned |
+
+Roadmap items 13–15 (documentation, 5–10 examples, preparation for
+external users) are deliverables around these components (`docs/`,
+`examples/`, releases), not runtime components.
+
+### Phase 1 build order
+
+Each step is one branch merged into `phase-1-mvp` after CI passes.
+
+| # | Step | Component | Status |
+|---|---|---|---|
+| 1 | Result model; console output moved to `internal/report` | Console | Done |
+| 2 | `export const options`, with precedence (ADR-006) | DSL / Runner | Done |
+| 3 | Extract the Runner from the CLI into `internal/runner` (no behaviour change) | Runner | Next |
+| 4 | Built-in modules, local imports, `sleep`/`group`, `__ENV`/`__VU`/`__ITER`, published types | DSL | Planned |
+| 5 | `check()` and the `checks` metric | Checks | Planned |
+| 6 | Threshold expressions and exit code | Thresholds | Planned |
+| 7 | Executors, multiple scenarios, setup/teardown run order | Scenario Engine | Planned |
+| 8 | Per-VU client and cookie jar, connection-reuse options | Sessions | Planned |
+| 9 | HTTP/2 and h2c | HTTP/2 | Planned |
+| 10 | Versioned JSON output | JSON Reporter | Planned |
+| 11 | Self-contained HTML report with time series | HTML Reporter | Planned |
+| 12 | Release builds, GitHub Action, generic CI recipe | CI | Planned |
+| 13 | Documentation, 5–10 examples, preparation for external users | — | Planned |
+| 14 | Re-run the benchmark; agree and check the Phase 1 exit criteria | — | Planned |
+
+A memory benchmark runs after steps 4, 7 and 8, which add per-VU state.
 
 ## 1. What LoadTool is
 

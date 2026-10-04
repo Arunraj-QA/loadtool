@@ -1,0 +1,38 @@
+---
+config:
+  flowchart:
+    wrappingWidth: 320
+---
+flowchart TB
+    subgraph c7 [" "]
+        direction TB
+        console[Console]:::p0 --> json[JSON Reporter]:::p1
+        console --> html[HTML Reporter]:::p1
+    end
+    subgraph c6 [" "]
+        direction TB
+        metrics[Metrics]:::p0 --> thr[Thresholds]:::p1
+    end
+    subgraph c5 [" "]
+        direction TB
+        http[HTTP]:::p0 --> h2[HTTP/2]:::p1
+        http --> sess[Sessions]:::p1
+    end
+    subgraph c4 [" "]
+        direction TB
+        goja[goja]:::p0 --> dsl[DSL]:::p1 --> checks[Checks]:::p1
+    end
+    subgraph c3 [" "]
+        direction TB
+        vu[VU]:::p0 --> scen[Scenario Engine]:::p1
+    end
+    subgraph c2 [" "]
+        direction TB
+        runner[Runner]:::p0
+    end
+    subgraph c1 [" "]
+        direction TB
+        cli[CLI]:::p0 --> ci[CI]:::p1
+    end
+    classDef p0 fill:#e8eefc,stroke:#3b5bdb,color:#1c2a5e
+    classDef p1 fill:#e6f7ee,stroke:#2b8a3e,color:#14401f
