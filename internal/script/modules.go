@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/dop251/goja"
 )
 
 const (
@@ -13,6 +15,13 @@ const (
 	// builtinNamespace is the esbuild namespace of built-in modules.
 	builtinNamespace = "loadtool-builtin"
 )
+
+// builtinProps are the Go-backed module objects in builtinGlobal. Each is
+// built when a script that imports the module first runs.
+var builtinProps = []lazyProp{
+	{"http", func(vu *VU) goja.Value { return vu.newHTTPModule() }},
+	{"core", func(vu *VU) goja.Value { return vu.newCoreModule() }},
+}
 
 // builtinModules are the modules scripts import by name (ADR-005, ADR-007).
 // Each is a small ES module that re-exports objects the VU's runtime

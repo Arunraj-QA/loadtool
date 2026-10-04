@@ -33,34 +33,41 @@ func (p *Program) WithConsole(w io.Writer) *Program {
 	return &c
 }
 
-// newConsole builds the VU's console object. Each call writes one line:
+// consoleProps are the console methods. Each writes one line:
 //
 //	INFO  [VU 3] message
-func (vu *VU) newConsole(out io.Writer) *goja.Object {
-	o := vu.rt.NewObject()
-	for _, m := range []struct{ name, level string }{
-		{"log", "INFO "}, {"info", "INFO "}, {"warn", "WARN "}, {"error", "ERROR"}, {"debug", "DEBUG"},
-	} {
-		level := m.level
-		_ = o.Set(m.name, func(call goja.FunctionCall) goja.Value {
-			if out == nil {
-				return goja.Undefined()
-			}
-			var b strings.Builder
-			b.WriteString(level)
-			b.WriteString(" [VU ")
-			b.WriteString(strconv.FormatInt(vu.id, 10))
-			b.WriteString("]")
-			for _, arg := range call.Arguments {
-				b.WriteByte(' ')
-				b.WriteString(vu.formatConsoleArg(arg))
-			}
-			b.WriteByte('\n')
-			_, _ = io.WriteString(out, b.String())
+var consoleProps = []lazyProp{
+	{"log", consoleMethod("INFO ")},
+	{"info", consoleMethod("INFO ")},
+	{"warn", consoleMethod("WARN ")},
+	{"error", consoleMethod("ERROR")},
+	{"debug", consoleMethod("DEBUG")},
+}
+
+func consoleMethod(level string) func(vu *VU) goja.Value {
+	return func(vu *VU) goja.Value {
+		return vu.rt.ToValue(func(call goja.FunctionCall) goja.Value {
+			vu.consoleWrite(level, call.Arguments)
 			return goja.Undefined()
 		})
 	}
-	return o
+}
+
+func (vu *VU) consoleWrite(level string, args []goja.Value) {
+	if vu.console == nil {
+		return
+	}
+	var b strings.Builder
+	b.WriteString(level)
+	b.WriteString(" [VU ")
+	b.WriteString(strconv.FormatInt(vu.id, 10))
+	b.WriteString("]")
+	for _, arg := range args {
+		b.WriteByte(' ')
+		b.WriteString(vu.formatConsoleArg(arg))
+	}
+	b.WriteByte('\n')
+	_, _ = io.WriteString(vu.console, b.String())
 }
 
 // formatConsoleArg renders strings as they are, objects and arrays as JSON

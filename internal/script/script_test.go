@@ -262,7 +262,7 @@ export default function () { http.request("GET"); }`, "url is required"},
 func TestVUsHaveIsolatedState(t *testing.T) {
 	p := compile(t, "test.ts", `
 let count = 0;
-export default function () { count++; }`)
+export default function () { count++; (globalThis as any).count = count; }`)
 	a, b := newVU(t, p), newVU(t, p)
 	for range 3 {
 		iterate(a)
@@ -274,6 +274,28 @@ export default function () { count++; }`)
 	}
 	if got := b.rt.Get("count").ToInteger(); got != 1 {
 		t.Errorf("VU b count = %d, want 1 (state leaked between VUs)", got)
+	}
+}
+
+// Top-level declarations are module-scoped, as in an ES module: they do
+// not become properties of globalThis. Besides matching ES module rules,
+// this keeps them out of the global object, which costs memory in every VU.
+func TestTopLevelDeclarationsAreModuleScoped(t *testing.T) {
+	p := compile(t, "test.ts", `
+import http from "loadtool/http";
+var v = 1;
+let l = 2;
+function f() {}
+export default function () {
+	for (const name of ["v", "l", "f", "http", "m", "get", "request"]) {
+		if (name in globalThis) throw new Error(name + " leaked to globalThis");
+	}
+	if (v + l !== 3 || typeof f !== "function" || typeof http.get !== "function") {
+		throw new Error("top-level bindings are not visible to the script");
+	}
+}`)
+	if s := iterate(newVU(t, p)); s.ScriptErrors != 0 {
+		t.Fatal(s.FirstScriptError)
 	}
 }
 

@@ -118,9 +118,11 @@ func transpile(filename, dir string, src []byte) (string, error) {
 		loader = api.LoaderTS
 	}
 	out := api.Build(api.BuildOptions{
-		Stdin:    &api.StdinOptions{Contents: entrySource},
-		Bundle:   true,
-		Format:   api.FormatESModule,
+		Stdin:  &api.StdinOptions{Contents: entrySource},
+		Bundle: true,
+		// IIFE keeps top-level declarations module-scoped, as in an ES
+		// module. As globals they would cost every VU about 2 KB more.
+		Format:   api.FormatIIFE,
 		Platform: api.PlatformNeutral,
 		Target:   api.ES2017,
 		Plugins:  []api.Plugin{scriptPlugin(filename, dir, string(src), loader)},
@@ -279,6 +281,8 @@ type VU struct {
 	iter int64
 	// id is the VU number, exposed as __VU.
 	id int64
+	// console receives console output; nil discards it.
+	console io.Writer
 }
 
 // NewVU creates a runtime for VU number id, runs the script's top-level
@@ -293,20 +297,18 @@ func (p *Program) NewVU(ctx context.Context, id int, client *http.Client) (*VU, 
 	vu := &VU{rt: rt, client: client, id: int64(id)}
 	// A nil *lockedWriter must become a nil io.Writer, not a non-nil
 	// interface holding a nil pointer.
-	var console io.Writer
 	if p.console != nil {
-		console = p.console
+		vu.console = p.console
 	}
 
-	builtins := rt.NewObject()
+	// Built-in modules and console methods are built on first use, so a
+	// VU only pays memory for what its script uses (see lazyObject).
 	if err := errors.Join(
-		builtins.Set("http", vu.newHTTPModule()),
-		builtins.Set("core", vu.newCoreModule()),
-		rt.Set(builtinGlobal, builtins),
+		rt.Set(builtinGlobal, vu.newLazyObject(builtinProps)),
 		rt.Set("__ENV", rt.NewDynamicObject(&envObject{rt: rt, base: p.env})),
 		rt.Set("__VU", id),
 		rt.Set("__ITER", 0),
-		rt.Set("console", vu.newConsole(console)),
+		rt.Set("console", vu.newLazyObject(consoleProps)),
 	); err != nil {
 		return nil, err
 	}
