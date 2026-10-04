@@ -11,6 +11,7 @@ Significant architecture decisions are recorded here as
 | [ADR-004](ADR-004-latency-histogram.md) | Fixed-size latency histogram | Accepted |
 | [ADR-005](ADR-005-k6-shaped-script-api.md) | k6-shaped script API (Phase 1 DSL) | Accepted |
 | [ADR-006](ADR-006-options-and-precedence.md) | Run options and their precedence | Accepted |
+| [ADR-007](ADR-007-script-modules-and-globals.md) | Script modules and globals: built-ins, imports, `__ENV`, console, sleep | Accepted |
 
 The numbering was reorganized on 2026-09-24 when the records moved from
 `docs/adr/`. Each record lists its previous path.

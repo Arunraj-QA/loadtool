@@ -64,7 +64,7 @@ Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd)
 
 | Component | Extends | Package | Covers roadmap items | Status |
 |---|---|---|---|---|
-| DSL | goja | `internal/script` (built-in modules `loadtool`, `loadtool/http`; lifecycle exports; `__ENV`, `__VU`, `__ITER`), published `types/loadtool.d.ts` | 1 TypeScript DSL, 2 setup/teardown (script side) | `options` export done (ADR-006); rest planned. k6-shaped (ADR-005) |
+| DSL | goja | `internal/script` (built-in modules `loadtool`, `loadtool/http`; lifecycle exports; `__ENV`, `__VU`, `__ITER`), published `types/loadtool.d.ts` | 1 TypeScript DSL, 2 setup/teardown (script side) | Core done: `options` (ADR-006); built-in modules, relative imports, `__ENV`/`__VU`/`__ITER`, `console`, `sleep`, `group` (ADR-007). Lifecycle exports come with the Scenario Engine. k6-shaped (ADR-005) |
 | Scenario Engine | VU, Runner | `internal/engine` (executors: constant-vus, ramping-vus, constant-arrival-rate; scenarios) | 5 scenarios, 2 setup/teardown (run order) | Planned |
 | Checks | DSL, Metrics | `check()` in `internal/script`; `checks` metric in `internal/metrics` | 3 checks/assertions | Planned |
 | Thresholds | Metrics, Runner | new `internal/thresholds` | 4 thresholds; exit code | Planned |
@@ -87,8 +87,8 @@ Each step is one branch merged into `phase-1-mvp` after CI passes.
 | 1 | Result model; console output moved to `internal/report` | Console | Done |
 | 2 | `export const options`, with precedence (ADR-006) | DSL / Runner | Done |
 | 3 | Extract the Runner from the CLI into `internal/runner` (no behaviour change) | Runner | Done |
-| 4 | Built-in modules, local imports, `sleep`/`group`, `__ENV`/`__VU`/`__ITER`, published types | DSL | Next |
-| 5 | `check()` and the `checks` metric | Checks | Planned |
+| 4 | Built-in modules, local imports, `sleep`/`group`, `__ENV`/`__VU`/`__ITER`, `console`, published types (ADR-007) | DSL | Done |
+| 5 | `check()` and the `checks` metric | Checks | Next |
 | 6 | Threshold expressions and exit code | Thresholds | Planned |
 | 7 | Executors, multiple scenarios, setup/teardown run order | Scenario Engine | Planned |
 | 8 | Per-VU client and cookie jar, connection-reuse options | Sessions | Planned |
@@ -100,6 +100,7 @@ Each step is one branch merged into `phase-1-mvp` after CI passes.
 | 14 | Re-run the benchmark; agree and check the Phase 1 exit criteria | — | Planned |
 
 A memory benchmark runs after steps 4, 7 and 8, which add per-VU state.
+Step 4: [`benchmarks/results/2026-10-04-dsl-core-memory.md`](../benchmarks/results/2026-10-04-dsl-core-memory.md).
 
 ## 1. What LoadTool is
 

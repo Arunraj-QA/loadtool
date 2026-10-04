@@ -4,9 +4,11 @@ LoadTool is an open-source API performance and load-testing engine written
 in Go. Test scenarios are written in TypeScript and run by a Go engine that
 uses one goroutine per virtual user (VU).
 
-> **Status: early development (Phase 0).** `loadtool run` executes a
-> TypeScript or JavaScript test script with goja, generates HTTP/1.1 load
-> from one goroutine per VU, and prints a summary.
+> **Status: early development (Phase 1 in progress).** `loadtool run`
+> executes a TypeScript or JavaScript test script with goja, generates
+> HTTP/1.1 load from one goroutine per VU, and prints a summary. The
+> k6-shaped script API is being built out; see
+> [docs/architecture.md](docs/architecture.md) for the plan.
 
 ## Phase 0 goal
 
@@ -21,9 +23,12 @@ Phase 0 builds the smallest useful engine:
 - Unit tests and Go benchmarks
 
 **Exit criterion:** `loadtool run` executes a scripted HTTP test at 1,000 VUs
-from a laptop, using less memory than JMeter at the same VU count. This has
-**not** been measured yet. Results will be recorded in
-[`benchmarks/`](benchmarks/).
+from a laptop, using less memory than JMeter at the same VU count. Measured
+on 2026-10-01: at 1,000 VUs LoadTool's peak private bytes (190–210 MB) and
+working set were below JMeter's (1,366–1,371 MB) on every run. Caveats: one
+laptop with the server on the same machine, and JMeter with its default JVM
+settings. Details are in
+[`benchmarks/results/2026-10-01-phase0-all-tools/`](benchmarks/results/2026-10-01-phase0-all-tools/).
 
 Distributed execution, dashboards, storage, browser testing and AI analysis
 are planned for later phases and are out of scope for Phase 0.
@@ -42,6 +47,7 @@ go build -o bin/loadtool ./cmd/loadtool
 | `-u, --vus` | `1` | Concurrent virtual users (one goroutine each) |
 | `-d, --duration` | `10s` | How long VUs keep starting new iterations |
 | `--graceful-stop` | `30s` | How long iterations still running when `--duration` ends may take to finish; `0` cancels them at once |
+| `-e, --env` | | Set `KEY=VALUE` in the script's `__ENV` (repeatable; overrides the process environment) |
 
 Press Ctrl+C to stop early. A partial summary is printed and the exit code is 1.
 
@@ -105,6 +111,44 @@ built out in Phase 1. The `loadtool/http` module provides:
 - Type declarations for editors are in
   [`types/loadtool.d.ts`](types/loadtool.d.ts).
 
+### More of the script API
+
+The `loadtool` module ([ADR-007](docs/decisions/ADR-007-script-modules-and-globals.md)):
+
+```typescript
+import http from "loadtool/http";
+import { sleep, group } from "loadtool";
+
+export default function () {
+  group("home page", () => {
+    http.get("http://localhost:8080/");
+  });
+  sleep(1); // seconds; fractions allowed
+}
+```
+
+- `sleep(seconds)` pauses the VU. It ends early when the test ends, and is
+  not allowed in top-level code.
+- `group(name, fn)` runs `fn` and returns its result. Results are not
+  broken down by group yet.
+
+Globals:
+
+| Name | Value |
+|---|---|
+| `__ENV` | Environment variables, plus `--env KEY=VALUE` flags (which win). Changes a VU makes stay in that VU. |
+| `__VU` | The VU number, from 1. It is 0 while `options` are read. |
+| `__ITER` | The VU's iteration number, from 0 |
+| `console` | `log`, `info`, `warn`, `error`, `debug`. Writes to stderr as `INFO  [VU 3] message`; objects are printed as JSON. |
+
+Imports:
+- Scripts can import other files by relative path:
+  `import { login } from "./helpers.ts"`. They are bundled into the test.
+- Only `loadtool`, `loadtool/http` and relative paths can be imported.
+  npm packages are not supported.
+- Top-level variables belong to the script, as in an ES module. They are
+  not properties of `globalThis`.
+
 How results are counted:
 - A request succeeds when it gets a 2xx or 3xx response. Redirects are not
   followed.
@@ -116,7 +160,6 @@ How results are counted:
   shown in the summary.
 - Top-level code runs once per VU before the test starts. HTTP requests are
   not allowed there.
-- A script is a single file: `import` statements are not supported yet.
 - JavaScript call depth is limited to 2,500 nested calls per VU. Deeper
   recursion ends the iteration with a script error
   (`maximum call stack size of 2500 frames exceeded`); `try/catch` cannot
