@@ -1,0 +1,6 @@
+[
+  { "id": 1, "name": "keyboard" },
+  { "id": 2, "name": "mouse" },
+  { "id": 3, "name": "monitor" },
+  { "id": 4, "name": "headset" }
+]

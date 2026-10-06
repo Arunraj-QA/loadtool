@@ -80,6 +80,11 @@ jobs:
           bin/benchserver &
           for _ in $(seq 50); do curl -sf http://127.0.0.1:8080/health && break; sleep 0.1; done
 
+      - name: Examples
+        run: |
+          go build -o bin/loadtool ./cmd/loadtool
+          scripts/smoke-examples.sh bin/loadtool
+
       - name: Action, passing test
         id: pass
         uses: ./
