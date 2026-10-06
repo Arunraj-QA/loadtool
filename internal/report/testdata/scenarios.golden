@@ -1,0 +1,29 @@
+
+LoadTool summary
+
+  Script:      examples/scenarios.ts
+  VUs:         81
+  Duration:    1m10s (elapsed 71.00s)
+  Scenarios:   browse: ramping-vus, up to 50 VUs over 30s
+               orders: constant-arrival-rate, 20 iterations per 1s for 1m0s, 30 VUs, starting at 10s, exec placeOrder
+  Status:      completed
+
+  Requests:    5,000 (70.4 req/s)
+  Success:     5,000
+  Errors:      0 (0.00%)
+  Script errs: 0
+  Dropped:     1,234 iterations (no free VU; raise preAllocatedVUs)
+
+  Latency (all requests sent, failed included):
+    min       9.00ms
+    mean     11.00ms
+    p50      11.00ms
+    p90      12.00ms
+    p95      13.00ms
+    p99      20.00ms
+    max      30.00ms
+  Latency (successful requests):
+    p50      11.00ms
+    p90      12.00ms
+    p95      13.00ms
+    p99      20.00ms

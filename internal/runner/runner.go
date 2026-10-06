@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/Arunraj-QA/loadtool/internal/config"
 	"github.com/Arunraj-QA/loadtool/internal/engine"
@@ -104,6 +105,12 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		return report.Result{}, err
 	}
 	prog = prog.WithDiscardResponseBodies(cfg.DiscardResponseBodies)
+	if prog, err = prepareExecs(prog, lc, cfg.Scenarios); err != nil {
+		return report.Result{}, err
+	}
+	if cfg.ScenariosReplaced && p.Warn != nil {
+		p.Warn("--vus/--duration (or LOADTOOL_VUS/LOADTOOL_DURATION) replace the script's scenarios or stages with one constant-vus scenario")
+	}
 
 	// One client for all VUs: http.Client is safe for concurrent use and a
 	// shared transport lets each VU keep its own pooled connection.
@@ -116,17 +123,7 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	}
 	prog = prog.WithSetupData(data)
 
-	newVU := func(i int) (engine.IterationFunc, error) {
-		// ctx lets Ctrl+C interrupt a script's top-level code. VUs are
-		// numbered from 1 in __VU, as in k6.
-		vu, err := prog.NewVU(ctx, i+1, client)
-		if err != nil {
-			return nil, err
-		}
-		return vu.Iterate, nil
-	}
-
-	res, runErr := engine.Run(ctx, cfg.VUs, cfg.Duration, cfg.GracefulStop, newVU)
+	res, runErr := engine.RunScenarios(ctx, engineScenarios(ctx, prog, client, cfg.Scenarios))
 	// Read before teardown: a Ctrl+C during teardown does not make the
 	// load phase interrupted.
 	interrupted := ctx.Err() != nil
@@ -145,6 +142,12 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		Summary:      res.Summary,
 		Thresholds:   thresholds.Evaluate(ths, res.Summary, res.Elapsed),
 	}
+	// The plain vus/duration shorthand needs no scenario list.
+	if len(cfg.Scenarios) > 1 || cfg.Scenarios[0].Executor != config.ConstantVUs {
+		for _, s := range cfg.Scenarios {
+			result.Scenarios = append(result.Scenarios, s.Describe())
+		}
+	}
 	if teardownErr != nil {
 		result.TeardownError = teardownErr.Error()
 	}
@@ -161,4 +164,62 @@ func teardownContext(ctx context.Context) context.Context {
 		return context.WithoutCancel(ctx)
 	}
 	return ctx
+}
+
+// prepareExecs makes sure every function the scenarios run exists, before
+// setup or any load: the default export through the lifecycle runtime,
+// named exec functions through WithExecs.
+func prepareExecs(prog *script.Program, lc *script.Lifecycle, scenarios []config.Scenario) (*script.Program, error) {
+	var named []string
+	for _, s := range scenarios {
+		if s.Exec == "default" {
+			if !lc.HasDefault() {
+				return nil, fmt.Errorf("scenario %q runs the default function: %w", s.Name, script.ErrNoDefaultExport)
+			}
+			continue
+		}
+		named = append(named, s.Exec)
+	}
+	return prog.WithExecs(named)
+}
+
+// engineScenarios turns the resolved scenarios into engine scenarios. VUs
+// are numbered from 1 across all scenarios, in order, as __VU.
+func engineScenarios(ctx context.Context, prog *script.Program, client *http.Client, scenarios []config.Scenario) []engine.Scenario {
+	out := make([]engine.Scenario, len(scenarios))
+	firstVU := 1
+	for i, s := range scenarios {
+		base, exec := firstVU, s.Exec
+		firstVU += s.MaxVUs()
+		out[i] = engine.Scenario{
+			Name:         s.Name,
+			Executor:     executor(s),
+			StartTime:    s.StartTime,
+			GracefulStop: s.GracefulStop,
+			NewVU: func(id int) (engine.IterationFunc, error) {
+				// ctx lets Ctrl+C interrupt a script's top-level code.
+				vu, err := prog.NewVUExec(ctx, base+id, exec, client)
+				if err != nil {
+					return nil, err
+				}
+				return vu.Iterate, nil
+			},
+		}
+	}
+	return out
+}
+
+func executor(s config.Scenario) engine.Executor {
+	switch s.Executor {
+	case config.RampingVUs:
+		stages := make([]engine.Stage, len(s.Stages))
+		for i, st := range s.Stages {
+			stages[i] = engine.Stage{Duration: st.Duration, Target: st.Target}
+		}
+		return engine.RampingVUs{StartVUs: s.StartVUs, Stages: stages, GracefulRampDown: s.GracefulRampDown}
+	case config.ConstantArrivalRate:
+		return engine.ConstantArrivalRate{Rate: s.Rate, TimeUnit: s.TimeUnit, Duration: s.Duration, PreAllocatedVUs: s.PreAllocatedVUs}
+	default:
+		return engine.ConstantVUs{VUs: s.VUs, Duration: s.Duration}
+	}
 }

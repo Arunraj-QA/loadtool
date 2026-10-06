@@ -35,6 +35,9 @@ type Result struct {
 	// Thresholds are the evaluated threshold expressions, in the order
 	// the summary lists them.
 	Thresholds []thresholds.Result
+	// Scenarios describes the scenarios, one line each; empty for the
+	// plain vus/duration shorthand.
+	Scenarios []string
 }
 
 // Console writes the human-readable summary to w.
@@ -53,6 +56,13 @@ func Console(w io.Writer, r Result) {
 	fmt.Fprintf(w, "  Script:      %s\n", r.Script)
 	fmt.Fprintf(w, "  VUs:         %d\n", r.VUs)
 	fmt.Fprintf(w, "  Duration:    %s (elapsed %s)\n", r.Duration, formatDuration(r.Elapsed))
+	for i, sc := range r.Scenarios {
+		label := ""
+		if i == 0 {
+			label = "Scenarios:"
+		}
+		fmt.Fprintf(w, "  %-12s %s\n", label, sc)
+	}
 	fmt.Fprintf(w, "  Status:      %s\n", status)
 	if r.TeardownError != "" {
 		fmt.Fprintf(w, "  Teardown:    failed (%s)\n", r.TeardownError)
@@ -65,6 +75,11 @@ func Console(w io.Writer, r Result) {
 	fmt.Fprintf(w, "  Script errs: %s\n", formatCount(s.ScriptErrors))
 	if s.FirstScriptError != "" {
 		fmt.Fprintf(w, "    first:     %s\n", s.FirstScriptError)
+	}
+	if s.DroppedIterations > 0 {
+		// Arrival-rate starts that found no free VU: the target rate was
+		// not reached, so the results describe a lighter load.
+		fmt.Fprintf(w, "  Dropped:     %s iterations (no free VU; raise preAllocatedVUs)\n", formatCount(s.DroppedIterations))
 	}
 	fmt.Fprintln(w)
 	printChecks(w, s.Checks)

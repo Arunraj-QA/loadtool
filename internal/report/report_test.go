@@ -67,6 +67,20 @@ var goldenCases = map[string]Result{
 			{Threshold: thresholds.Threshold{Metric: "checks", Expr: "rate>0.99"}, NoData: true, Unit: thresholds.Fraction},
 		},
 	},
+	"scenarios": {
+		Script: "examples/scenarios.ts", VUs: 81, Duration: 70 * time.Second, GracefulStop: 30 * time.Second,
+		Elapsed: 71 * time.Second,
+		Scenarios: []string{
+			"browse: ramping-vus, up to 50 VUs over 30s",
+			"orders: constant-arrival-rate, 20 iterations per 1s for 1m0s, 30 VUs, starting at 10s, exec placeOrder",
+		},
+		Summary: metrics.Summary{
+			Requests: 5000, Successes: 5000, Sent: 5000, Iterations: 4900, DroppedIterations: 1234,
+			Min: 9 * time.Millisecond, Mean: 11 * time.Millisecond, Max: 30 * time.Millisecond,
+			P50: 11 * time.Millisecond, P90: 12 * time.Millisecond, P95: 13 * time.Millisecond, P99: 20 * time.Millisecond,
+			SuccessP50: 11 * time.Millisecond, SuccessP90: 12 * time.Millisecond, SuccessP95: 13 * time.Millisecond, SuccessP99: 20 * time.Millisecond,
+		},
+	},
 	"interrupted-none-sent": {
 		Script: "examples/basic-http.ts", VUs: 100, Duration: 30 * time.Second, GracefulStop: 30 * time.Second,
 		Elapsed: 2 * time.Second, Interrupted: true,
