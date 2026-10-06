@@ -88,8 +88,8 @@ var known = map[string]metric{
 		},
 		unit: func(string) Unit { return Fraction },
 	},
-	"http_reqs":  counter(func(s metrics.Summary) int { return s.Requests }),
-	"iterations": counter(func(s metrics.Summary) int { return s.Iterations }),
+	"http_reqs":          counter(func(s metrics.Summary) int { return s.Requests }),
+	"iterations":         counter(func(s metrics.Summary) int { return s.Iterations }),
 	"dropped_iterations": counter(func(s metrics.Summary) int { return s.DroppedIterations }),
 }
 

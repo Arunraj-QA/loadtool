@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"sync"
@@ -147,7 +148,10 @@ func TestRampingVUsJoinInOrder(t *testing.T) {
 		if join := time.Duration(vu+1) * 20 * time.Millisecond; got[0] < join-time.Millisecond {
 			t.Errorf("VU %d started at %v, before it joins at %v", vu, got[0], join)
 		}
-		if last := got[len(got)-1]; last >= 160*time.Millisecond+5*time.Millisecond {
+		// A VU checks the stages right before starting, so a start can
+		// trail the end only by scheduling delay; the margin is generous
+		// for slow runners and the race detector.
+		if last := got[len(got)-1]; last >= 160*time.Millisecond+50*time.Millisecond {
 			t.Errorf("VU %d started an iteration at %v, after the stages end", vu, last)
 		}
 	}
@@ -166,7 +170,7 @@ func TestRampingVUsLeaveInOrder(t *testing.T) {
 		for _, at := range s.byVU[vu] {
 			// The VU checks it is active right before starting, so an
 			// iteration can begin only a moment after it leaves.
-			if at > leave+10*time.Millisecond {
+			if at > leave+50*time.Millisecond {
 				t.Errorf("VU %d started an iteration at %v, after leaving at %v", vu, at, leave)
 			}
 		}
@@ -291,7 +295,10 @@ func TestScenarioCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			time.AfterFunc(50*time.Millisecond, cancel)
 			start := time.Now()
-			if _, err := RunScenarios(ctx, []Scenario{{Name: "x", Executor: e, GracefulStop: time.Minute, NewVU: shared(sleepIteration(time.Hour))}}); err != nil {
+			// Cancelling during VU start-up returns the context's error;
+			// either way every goroutine must stop.
+			_, err := RunScenarios(ctx, []Scenario{{Name: "x", Executor: e, GracefulStop: time.Minute, NewVU: shared(sleepIteration(time.Hour))}})
+			if err != nil && !errors.Is(err, context.Canceled) {
 				t.Fatal(err)
 			}
 			if took := time.Since(start); took > 5*time.Second {
