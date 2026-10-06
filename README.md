@@ -42,6 +42,19 @@ go build -o bin/loadtool ./cmd/loadtool
 ./bin/loadtool run examples/basic-http.ts --vus 10 --duration 10s
 ```
 
+Released versions are published as static binaries for Linux, macOS and
+Windows (amd64 and arm64), with `checksums.txt`, on the
+[GitHub releases page](https://github.com/Arunraj-QA/loadtool/releases).
+No release has been published yet; [docs/releasing.md](docs/releasing.md)
+describes how one is made.
+
+### In CI
+
+`loadtool run` exits 0 when every threshold passes, 99 when a threshold
+fails and 1 on any other failure, so a CI job fails on a failed load
+test. For GitHub Actions there is a ready-made action (`action.yml`);
+other systems need three commands. See [docs/ci](docs/ci/README.md).
+
 | Flag | Default | Meaning |
 |---|---|---|
 | `-u, --vus` | `1` | Concurrent virtual users (one goroutine each) |
