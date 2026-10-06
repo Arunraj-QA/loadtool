@@ -33,7 +33,23 @@ const DefaultTimeout = 30 * time.Second
 // "Accept-Encoding: gzip" and decompress responses, which k6 and JMeter do
 // not do and which changes the work the server and the client perform.
 func New(maxConnsPerHost int, timeout time.Duration) *http.Client {
+	return NewWithOptions(Options{MaxConnsPerHost: maxConnsPerHost, Timeout: timeout})
+}
+
+// Options configure NewWithOptions.
+type Options struct {
+	MaxConnsPerHost int
+	Timeout         time.Duration
+	// NoConnectionReuse disables keep-alive: every request opens a new
+	// connection (options.noConnectionReuse, ADR-009).
+	NoConnectionReuse bool
+}
+
+// NewWithOptions is New with every setting (see New).
+func NewWithOptions(o Options) *http.Client {
+	maxConnsPerHost, timeout := o.MaxConnsPerHost, o.Timeout
 	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.DisableKeepAlives = o.NoConnectionReuse
 	t.MaxConnsPerHost = maxConnsPerHost
 	t.MaxIdleConns = maxConnsPerHost
 	t.MaxIdleConnsPerHost = maxConnsPerHost
