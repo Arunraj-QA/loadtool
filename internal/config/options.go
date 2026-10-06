@@ -25,10 +25,14 @@ type Options struct {
 	// Thresholds maps a metric name to its threshold expressions, as
 	// written; package thresholds parses them.
 	Thresholds map[string][]string
+	// Scenarios and Stages define the workload (ADR-008); Stages is the
+	// shorthand for one ramping-vus scenario.
+	Scenarios map[string]ScenarioOptions
+	Stages    []StageOptions
 }
 
 // knownOptions lists the keys Options understands.
-var knownOptions = []string{"discardResponseBodies", "duration", "setupTimeout", "teardownTimeout", "thresholds", "vus"}
+var knownOptions = []string{"discardResponseBodies", "duration", "scenarios", "setupTimeout", "stages", "teardownTimeout", "thresholds", "vus"}
 
 // Duration accepts a duration string ("30s", "1m30s") or a number of
 // milliseconds, as k6 options do.
@@ -104,6 +108,25 @@ func ParseOptions(raw []byte) (Options, []string, error) {
 			}
 			*f.dst = &d
 		}
+	}
+	if v, ok := fields["scenarios"]; ok {
+		sc, extra, err := parseScenarios(v)
+		if err != nil {
+			return opts, nil, err
+		}
+		opts.Scenarios = sc
+		unknown = append(unknown, extra...)
+		slices.Sort(unknown)
+	}
+	if v, ok := fields["stages"]; ok {
+		st, err := parseStages(v)
+		if err != nil {
+			return opts, nil, err
+		}
+		if st == nil {
+			st = []StageOptions{}
+		}
+		opts.Stages = st
 	}
 	if v, ok := fields["thresholds"]; ok {
 		t, err := parseThresholds(v)
@@ -185,7 +208,19 @@ func (c *Config) Resolve(cli Overrides, getenv func(string) (string, bool), scri
 		return fmt.Errorf("duration must be positive, got %s (from %s)", dur, dsrc)
 	}
 
-	c.VUs, c.Duration = vus, dur
+	override := cli.VUs != nil || cli.Duration != nil || hasEnv(getenv, EnvVUs) || hasEnv(getenv, EnvDuration)
+	scenarios, replaced, err := resolveScenarios(script, override, vus, dur, c.GracefulStop)
+	if err != nil {
+		return err
+	}
+	c.Scenarios, c.ScenariosReplaced = scenarios, replaced
+	// VUs and Duration summarize the scenarios: every VU, and the time
+	// until the last scenario stops starting iterations.
+	c.VUs, c.Duration = 0, 0
+	for _, s := range scenarios {
+		c.VUs += s.MaxVUs()
+		c.Duration = max(c.Duration, s.StartTime+s.Length())
+	}
 	// Only the script sets these; there are no flags or variables for them.
 	c.DiscardResponseBodies = script.DiscardResponseBodies != nil && *script.DiscardResponseBodies
 	c.SetupTimeout, c.TeardownTimeout = DefaultLifecycleTimeout, DefaultLifecycleTimeout

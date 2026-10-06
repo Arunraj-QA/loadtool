@@ -42,14 +42,14 @@ func TestParseOptions(t *testing.T) {
 		}
 	}
 
-	opts, unknown, err := ParseOptions([]byte(`{"vus": 25, "duration": "45s", "scenarios": {}, "insecureSkipTLSVerify": true}`))
+	opts, unknown, err := ParseOptions([]byte(`{"vus": 25, "duration": "45s", "tags": {}, "insecureSkipTLSVerify": true}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if opts.VUs == nil || *opts.VUs != 25 || opts.Duration == nil || time.Duration(*opts.Duration) != 45*time.Second {
 		t.Fatalf("got VUs=%v Duration=%v, want 25 and 45s", opts.VUs, opts.Duration)
 	}
-	if want := []string{"insecureSkipTLSVerify", "scenarios"}; !slices.Equal(unknown, want) {
+	if want := []string{"insecureSkipTLSVerify", "tags"}; !slices.Equal(unknown, want) {
 		t.Errorf("unknown = %v, want %v (sorted)", unknown, want)
 	}
 }

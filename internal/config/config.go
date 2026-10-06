@@ -11,9 +11,10 @@ import (
 type Config struct {
 	// Script is the path to the test script.
 	Script string
-	// VUs is the number of concurrent virtual users.
+	// VUs is the total number of virtual users across all scenarios.
 	VUs int
-	// Duration is how long VUs keep starting new iterations.
+	// Duration is how long, from the start of the test, iterations keep
+	// starting: the end of the last scenario.
 	Duration time.Duration
 	// GracefulStop is how long iterations still running when Duration ends
 	// may take to finish before they are cancelled.
@@ -24,6 +25,13 @@ type Config struct {
 	// SetupTimeout and TeardownTimeout bound the script's setup() and
 	// teardown().
 	SetupTimeout, TeardownTimeout time.Duration
+	// Scenarios are the resolved workloads; one constant-vus scenario
+	// when the script uses the vus/duration shorthand.
+	Scenarios []Scenario
+	// ScenariosReplaced reports that a typed --vus/--duration (or
+	// LOADTOOL_VUS/LOADTOOL_DURATION) replaced the script's scenarios or
+	// stages with one constant-vus scenario.
+	ScenariosReplaced bool
 }
 
 // Validate reports every invalid field in c.
