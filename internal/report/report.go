@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/Arunraj-QA/loadtool/internal/config"
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
 	"github.com/Arunraj-QA/loadtool/internal/thresholds"
 )
@@ -35,9 +36,11 @@ type Result struct {
 	// Thresholds are the evaluated threshold expressions, in the order
 	// the summary lists them.
 	Thresholds []thresholds.Result
-	// Scenarios describes the scenarios, one line each; empty for the
-	// plain vus/duration shorthand.
-	Scenarios []string
+	// Scenarios are the run's scenarios. The console lists them unless the
+	// run is the plain vus/duration shorthand (one constant-vus scenario).
+	Scenarios []config.Scenario
+	// Started is when the test clock started; zero if unknown.
+	Started time.Time
 }
 
 // Console writes the human-readable summary to w.
@@ -56,12 +59,14 @@ func Console(w io.Writer, r Result) {
 	fmt.Fprintf(w, "  Script:      %s\n", r.Script)
 	fmt.Fprintf(w, "  VUs:         %d\n", r.VUs)
 	fmt.Fprintf(w, "  Duration:    %s (elapsed %s)\n", r.Duration, formatDuration(r.Elapsed))
-	for i, sc := range r.Scenarios {
-		label := ""
-		if i == 0 {
-			label = "Scenarios:"
+	if !isShorthand(r.Scenarios) {
+		for i, sc := range r.Scenarios {
+			label := ""
+			if i == 0 {
+				label = "Scenarios:"
+			}
+			fmt.Fprintf(w, "  %-12s %s\n", label, sc.Describe())
 		}
-		fmt.Fprintf(w, "  %-12s %s\n", label, sc)
 	}
 	fmt.Fprintf(w, "  Status:      %s\n", status)
 	if r.TeardownError != "" {
@@ -105,6 +110,13 @@ func Console(w io.Writer, r Result) {
 	printLatencies(w, []latencyRow{
 		{"p50", s.SuccessP50}, {"p90", s.SuccessP90}, {"p95", s.SuccessP95}, {"p99", s.SuccessP99},
 	})
+}
+
+// isShorthand reports whether scenarios are just the vus/duration
+// shorthand, which the VUs and Duration lines already describe.
+func isShorthand(scenarios []config.Scenario) bool {
+	return len(scenarios) == 0 ||
+		(len(scenarios) == 1 && scenarios[0].Executor == config.ConstantVUs && scenarios[0].Name == config.DefaultScenario)
 }
 
 // printChecks lists each check with its pass rate, ✓ when it never

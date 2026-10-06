@@ -2,11 +2,13 @@ package report
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/Arunraj-QA/loadtool/internal/config"
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
 	"github.com/Arunraj-QA/loadtool/internal/thresholds"
 )
@@ -36,7 +38,7 @@ var goldenCases = map[string]Result{
 	},
 	"checks": {
 		Script: "examples/checks.ts", VUs: 10, Duration: 30 * time.Second, GracefulStop: 30 * time.Second,
-		Elapsed: 30 * time.Second,
+		Elapsed: 30 * time.Second, Started: time.Date(2026, 10, 6, 9, 30, 0, 123456789, time.FixedZone("IST", 5*3600+1800)),
 		Summary: metrics.Summary{
 			Requests: 3000, Successes: 3000, Sent: 3000,
 			Min: 9 * time.Millisecond, Mean: 11 * time.Millisecond, Max: 30 * time.Millisecond,
@@ -70,9 +72,11 @@ var goldenCases = map[string]Result{
 	"scenarios": {
 		Script: "examples/scenarios.ts", VUs: 81, Duration: 70 * time.Second, GracefulStop: 30 * time.Second,
 		Elapsed: 71 * time.Second,
-		Scenarios: []string{
-			"browse: ramping-vus, up to 50 VUs over 30s",
-			"orders: constant-arrival-rate, 20 iterations per 1s for 1m0s, 30 VUs, starting at 10s, exec placeOrder",
+		Scenarios: []config.Scenario{
+			{Name: "browse", Executor: config.RampingVUs, Exec: "default", GracefulStop: 30 * time.Second,
+				StartVUs: 1, Stages: []config.Stage{{Duration: 30 * time.Second, Target: 50}}, GracefulRampDown: 30 * time.Second},
+			{Name: "orders", Executor: config.ConstantArrivalRate, Exec: "placeOrder", StartTime: 10 * time.Second, GracefulStop: 30 * time.Second,
+				Rate: 20, TimeUnit: time.Second, Duration: time.Minute, PreAllocatedVUs: 30},
 		},
 		Summary: metrics.Summary{
 			Requests: 5000, Successes: 5000, Sent: 5000, Iterations: 4900, DroppedIterations: 1234,
@@ -101,6 +105,33 @@ func TestConsoleMatchesGolden(t *testing.T) {
 			Console(&got, r)
 			if got.String() != string(want) {
 				t.Errorf("output differs from %s.golden\n--- got ---\n%s\n--- want ---\n%s", name, got.String(), want)
+			}
+		})
+	}
+}
+
+// The JSON summary of every golden case matches testdata/<name>.json.
+// Each document must also be valid JSON with schema version 1.
+func TestJSONMatchesGolden(t *testing.T) {
+	for name, r := range goldenCases {
+		t.Run(name, func(t *testing.T) {
+			var got bytes.Buffer
+			if err := JSON(&got, r, "v0.0.0-test"); err != nil {
+				t.Fatal(err)
+			}
+			var doc map[string]any
+			if err := json.Unmarshal(got.Bytes(), &doc); err != nil {
+				t.Fatalf("invalid JSON: %v\n%s", err, got.String())
+			}
+			if doc["schemaVersion"] != float64(SchemaVersion) {
+				t.Errorf("schemaVersion = %v", doc["schemaVersion"])
+			}
+			want, err := os.ReadFile(filepath.Join("testdata", name+".json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.String() != string(want) {
+				t.Errorf("output differs from %s.json\n--- got ---\n%s\n--- want ---\n%s", name, got.String(), want)
 			}
 		})
 	}

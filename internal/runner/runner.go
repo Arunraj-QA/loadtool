@@ -142,17 +142,13 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		VUs:          cfg.VUs,
 		Duration:     cfg.Duration,
 		GracefulStop: cfg.GracefulStop,
+		Started:      res.Started,
 		Elapsed:      res.Elapsed,
 		Interrupted:  interrupted,
 		Summary:      res.Summary,
 		Thresholds:   thresholds.Evaluate(ths, res.Summary, res.Elapsed),
 	}
-	// The plain vus/duration shorthand needs no scenario list.
-	if len(cfg.Scenarios) > 1 || cfg.Scenarios[0].Executor != config.ConstantVUs {
-		for _, s := range cfg.Scenarios {
-			result.Scenarios = append(result.Scenarios, s.Describe())
-		}
-	}
+	result.Scenarios = cfg.Scenarios
 	if teardownErr != nil {
 		result.TeardownError = teardownErr.Error()
 	}

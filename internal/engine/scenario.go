@@ -111,7 +111,7 @@ func RunScenarios(ctx context.Context, scenarios []Scenario) (Result, error) {
 	for _, s := range runs {
 		summary.DroppedIterations += int(s.dropped.Load())
 	}
-	return Result{Summary: summary, Elapsed: elapsed}, nil
+	return Result{Summary: summary, Started: start, Elapsed: elapsed}, nil
 }
 
 // waitUntil blocks until t or until ctx is done, and reports whether t was

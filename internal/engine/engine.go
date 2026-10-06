@@ -24,6 +24,8 @@ type NewVUFunc func(id int) (IterationFunc, error)
 // Result is the outcome of a run.
 type Result struct {
 	Summary metrics.Summary
+	// Started is when the test clock started, after every VU was ready.
+	Started time.Time
 	// Elapsed is the wall-clock time from the start of the test clock until
 	// the last VU stopped.
 	Elapsed time.Duration

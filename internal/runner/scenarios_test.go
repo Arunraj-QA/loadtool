@@ -78,8 +78,8 @@ export function order() { http.get("`+srv.URL+`/order?vu=" + __VU); }`, config.O
 	if len(order) == 0 {
 		t.Error("the arrival-rate scenario never ran")
 	}
-	if len(res.Scenarios) != 2 || !strings.HasPrefix(res.Scenarios[1], "orders: constant-arrival-rate") {
-		t.Errorf("Scenarios = %q", res.Scenarios)
+	if len(res.Scenarios) != 2 || !strings.HasPrefix(res.Scenarios[1].Describe(), "orders: constant-arrival-rate") {
+		t.Errorf("Scenarios = %+v", res.Scenarios)
 	}
 	if res.VUs != 4 {
 		t.Errorf("VUs = %d, want 4", res.VUs)
@@ -98,7 +98,7 @@ export default function () { http.get("`+srv.URL+`/x?vu=" + __VU); }`, config.Ov
 		t.Errorf("VUs that ran: %v, want 3 (the stages reach 3)", got)
 	}
 	if res.VUs != 3 || res.Duration != 600*time.Millisecond || len(res.Scenarios) != 1 {
-		t.Errorf("VUs=%d Duration=%v Scenarios=%q", res.VUs, res.Duration, res.Scenarios)
+		t.Errorf("VUs=%d Duration=%v Scenarios=%+v", res.VUs, res.Duration, res.Scenarios)
 	}
 }
 
@@ -159,8 +159,8 @@ export default function () { http.get("`+srv.URL+`/x?vu=" + __VU); }`,
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.VUs != 2 || res.Duration != 100*time.Millisecond || res.Scenarios != nil {
-		t.Errorf("VUs=%d Duration=%v Scenarios=%q, want the 2-VU shorthand", res.VUs, res.Duration, res.Scenarios)
+	if res.VUs != 2 || res.Duration != 100*time.Millisecond || len(res.Scenarios) != 1 || res.Scenarios[0].Executor != config.ConstantVUs {
+		t.Errorf("VUs=%d Duration=%v Scenarios=%+v, want the 2-VU shorthand", res.VUs, res.Duration, res.Scenarios)
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "replace the script's scenarios") {
 		t.Errorf("warnings = %q", warnings)
