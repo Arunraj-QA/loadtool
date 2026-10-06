@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "loadtool",
+    "version": "v0.0.0-test"
+  },
+  "script": "examples/scenarios.ts",
+  "status": "completed",
+  "startedAt": "",
+  "elapsedMs": 71000,
+  "teardownError": "",
+  "config": {
+    "vus": 81,
+    "durationMs": 70000,
+    "scenarios": [
+      {
+        "name": "browse",
+        "executor": "ramping-vus",
+        "exec": "default",
+        "startTimeMs": 0,
+        "gracefulStopMs": 30000,
+        "startVUs": 1,
+        "stages": [
+          {
+            "durationMs": 30000,
+            "target": 50
+          }
+        ],
+        "gracefulRampDownMs": 30000
+      },
+      {
+        "name": "orders",
+        "executor": "constant-arrival-rate",
+        "exec": "placeOrder",
+        "startTimeMs": 10000,
+        "gracefulStopMs": 30000,
+        "durationMs": 60000,
+        "rate": 20,
+        "timeUnitMs": 1000,
+        "preAllocatedVUs": 30
+      }
+    ]
+  },
+  "metrics": {
+    "http_reqs": {
+      "count": 5000,
+      "rate": 70.4225352112676
+    },
+    "http_req_failed": {
+      "rate": 0,
+      "failed": 0,
+      "count": 5000
+    },
+    "http_req_duration": {
+      "count": 5000,
+      "min": 9,
+      "avg": 11,
+      "max": 30,
+      "p50": 11,
+      "p90": 12,
+      "p95": 13,
+      "p99": 20
+    },
+    "http_req_duration_successful": {
+      "count": 5000,
+      "p50": 11,
+      "p90": 12,
+      "p95": 13,
+      "p99": 20
+    },
+    "iterations": {
+      "count": 4900,
+      "rate": 69.01408450704226
+    },
+    "dropped_iterations": {
+      "count": 1234,
+      "rate": 17.380281690140844
+    },
+    "checks": {
+      "rate": null,
+      "passes": 0,
+      "fails": 0,
+      "count": 0
+    },
+    "script_errors": {
+      "count": 0,
+      "first": ""
+    }
+  },
+  "checks": [],
+  "thresholds": []
+}

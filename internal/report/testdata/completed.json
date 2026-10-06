@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "loadtool",
+    "version": "v0.0.0-test"
+  },
+  "script": "examples/basic-http.ts",
+  "status": "completed",
+  "startedAt": "",
+  "elapsedMs": 30120,
+  "teardownError": "",
+  "config": {
+    "vus": 100,
+    "durationMs": 30000,
+    "scenarios": []
+  },
+  "metrics": {
+    "http_reqs": {
+      "count": 125430,
+      "rate": 4164.342629482072
+    },
+    "http_req_failed": {
+      "rate": 0.0035876584549150922,
+      "failed": 450,
+      "count": 125430
+    },
+    "http_req_duration": {
+      "count": 125430,
+      "min": 9.8,
+      "avg": 12.345,
+      "max": 1500,
+      "p50": 11,
+      "p90": 15,
+      "p95": 18,
+      "p99": 250
+    },
+    "http_req_duration_successful": {
+      "count": 124980,
+      "p50": 11,
+      "p90": 15,
+      "p95": 17,
+      "p99": 40
+    },
+    "iterations": {
+      "count": 0,
+      "rate": 0
+    },
+    "dropped_iterations": {
+      "count": 0,
+      "rate": 0
+    },
+    "checks": {
+      "rate": null,
+      "passes": 0,
+      "fails": 0,
+      "count": 0
+    },
+    "script_errors": {
+      "count": 3,
+      "first": "Error: boom at default (test.ts:4:9(4))"
+    }
+  },
+  "checks": [],
+  "thresholds": []
+}

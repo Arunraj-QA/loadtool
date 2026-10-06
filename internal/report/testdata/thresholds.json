@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "loadtool",
+    "version": "v0.0.0-test"
+  },
+  "script": "examples/thresholds.ts",
+  "status": "completed",
+  "startedAt": "",
+  "elapsedMs": 30000,
+  "teardownError": "",
+  "config": {
+    "vus": 10,
+    "durationMs": 30000,
+    "scenarios": []
+  },
+  "metrics": {
+    "http_reqs": {
+      "count": 3000,
+      "rate": 100
+    },
+    "http_req_failed": {
+      "rate": 0.02,
+      "failed": 60,
+      "count": 3000
+    },
+    "http_req_duration": {
+      "count": 3000,
+      "min": 9,
+      "avg": 11,
+      "max": 30,
+      "p50": 11,
+      "p90": 12,
+      "p95": 13,
+      "p99": 20
+    },
+    "http_req_duration_successful": {
+      "count": 2940,
+      "p50": 11,
+      "p90": 12,
+      "p95": 13,
+      "p99": 20
+    },
+    "iterations": {
+      "count": 0,
+      "rate": 0
+    },
+    "dropped_iterations": {
+      "count": 0,
+      "rate": 0
+    },
+    "checks": {
+      "rate": null,
+      "passes": 0,
+      "fails": 0,
+      "count": 0
+    },
+    "script_errors": {
+      "count": 0,
+      "first": ""
+    }
+  },
+  "checks": [],
+  "thresholds": [
+    {
+      "metric": "http_req_duration",
+      "expression": "p(95)<500",
+      "passed": true,
+      "noData": false,
+      "observed": 13,
+      "unit": "ms",
+      "approximate": false
+    },
+    {
+      "metric": "http_req_duration",
+      "expression": "p(99)<20.1",
+      "passed": true,
+      "noData": false,
+      "observed": 20.05,
+      "unit": "ms",
+      "approximate": true
+    },
+    {
+      "metric": "http_req_failed",
+      "expression": "rate<0.01",
+      "passed": false,
+      "noData": false,
+      "observed": 0.02,
+      "unit": "fraction",
+      "approximate": false
+    },
+    {
+      "metric": "http_reqs",
+      "expression": "rate>50",
+      "passed": true,
+      "noData": false,
+      "observed": 100,
+      "unit": "per-second",
+      "approximate": false
+    },
+    {
+      "metric": "iterations",
+      "expression": "count>1000",
+      "passed": true,
+      "noData": false,
+      "observed": 3000,
+      "unit": "count",
+      "approximate": false
+    },
+    {
+      "metric": "checks",
+      "expression": "rate>0.99",
+      "passed": false,
+      "noData": true,
+      "observed": null,
+      "unit": "fraction",
+      "approximate": false
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "loadtool",
+    "version": "v0.0.0-test"
+  },
+  "script": "examples/checks.ts",
+  "status": "completed",
+  "startedAt": "2026-10-06T04:00:00.123Z",
+  "elapsedMs": 30000,
+  "teardownError": "",
+  "config": {
+    "vus": 10,
+    "durationMs": 30000,
+    "scenarios": []
+  },
+  "metrics": {
+    "http_reqs": {
+      "count": 3000,
+      "rate": 100
+    },
+    "http_req_failed": {
+      "rate": 0,
+      "failed": 0,
+      "count": 3000
+    },
+    "http_req_duration": {
+      "count": 3000,
+      "min": 9,
+      "avg": 11,
+      "max": 30,
+      "p50": 11,
+      "p90": 12,
+      "p95": 13,
+      "p99": 20
+    },
+    "http_req_duration_successful": {
+      "count": 3000,
+      "p50": 11,
+      "p90": 12,
+      "p95": 13,
+      "p99": 20
+    },
+    "iterations": {
+      "count": 0,
+      "rate": 0
+    },
+    "dropped_iterations": {
+      "count": 0,
+      "rate": 0
+    },
+    "checks": {
+      "rate": 0.9993333333333333,
+      "passes": 8994,
+      "fails": 6,
+      "count": 9000
+    },
+    "script_errors": {
+      "count": 0,
+      "first": ""
+    }
+  },
+  "checks": [
+    {
+      "name": "status is 200",
+      "passes": 3000,
+      "fails": 0,
+      "rate": 1,
+      "firstError": ""
+    },
+    {
+      "name": "has products",
+      "passes": 2994,
+      "fails": 6,
+      "rate": 0.998,
+      "firstError": "SyntaxError: Unexpected token <"
+    },
+    {
+      "name": "ünïcode name",
+      "passes": 3000,
+      "fails": 0,
+      "rate": 1,
+      "firstError": ""
+    }
+  ],
+  "thresholds": []
+}

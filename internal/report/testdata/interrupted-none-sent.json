@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "loadtool",
+    "version": "v0.0.0-test"
+  },
+  "script": "examples/basic-http.ts",
+  "status": "interrupted",
+  "startedAt": "",
+  "elapsedMs": 2000,
+  "teardownError": "",
+  "config": {
+    "vus": 100,
+    "durationMs": 30000,
+    "scenarios": []
+  },
+  "metrics": {
+    "http_reqs": {
+      "count": 2,
+      "rate": 1
+    },
+    "http_req_failed": {
+      "rate": 1,
+      "failed": 2,
+      "count": 2
+    },
+    "http_req_duration": null,
+    "http_req_duration_successful": null,
+    "iterations": {
+      "count": 0,
+      "rate": 0
+    },
+    "dropped_iterations": {
+      "count": 0,
+      "rate": 0
+    },
+    "checks": {
+      "rate": null,
+      "passes": 0,
+      "fails": 0,
+      "count": 0
+    },
+    "script_errors": {
+      "count": 1,
+      "first": "TypeError: x"
+    }
+  },
+  "checks": [],
+  "thresholds": []
+}
