@@ -90,8 +90,7 @@ var known = map[string]metric{
 	},
 	"http_reqs":  counter(func(s metrics.Summary) int { return s.Requests }),
 	"iterations": counter(func(s metrics.Summary) int { return s.Iterations }),
-	// dropped_iterations is always 0 until arrival-rate executors exist.
-	"dropped_iterations": counter(func(metrics.Summary) int { return 0 }),
+	"dropped_iterations": counter(func(s metrics.Summary) int { return s.DroppedIterations }),
 }
 
 // counter is a metric with a total (count) and a per-second rate. A count

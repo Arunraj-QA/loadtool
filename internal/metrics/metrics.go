@@ -121,6 +121,9 @@ type Summary struct {
 
 	// Iterations counts iterations that ran to their end.
 	Iterations int
+	// DroppedIterations counts arrival-rate starts no VU was free for.
+	// The engine sets it; recorders do not track it.
+	DroppedIterations int
 
 	// latency is the merged histogram of every request sent; nil when
 	// none was. It backs Percentile.

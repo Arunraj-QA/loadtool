@@ -55,9 +55,11 @@ func TestEvaluate(t *testing.T) {
 		{"iterations", "rate>0.5", true, 1},
 		{"checks", "rate>0.7", true, 0.75},
 		{"checks", "rate>0.99", false, 0.75},
-		{"dropped_iterations", "count==0", true, 0},
+		{"dropped_iterations", "count==0", false, 7},
+		{"dropped_iterations", "rate<1", true, 0.7},
 	}
 	s := summary()
+	s.DroppedIterations = 7
 	for _, tt := range tests {
 		t.Run(tt.metric+" "+tt.expr, func(t *testing.T) {
 			r := evaluate(t, map[string][]string{tt.metric: {tt.expr}}, s)[0]

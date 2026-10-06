@@ -6,8 +6,6 @@ package engine
 
 import (
 	"context"
-	"fmt"
-	"sync"
 	"time"
 
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
@@ -31,10 +29,9 @@ type Result struct {
 	Elapsed time.Duration
 }
 
-// Run initializes vus VUs with newVU, then starts one goroutine per VU that
-// calls its iteration in a loop. It returns only after every VU goroutine
-// has exited. If any VU fails to initialize, no load is generated and the
-// error is returned.
+// Run runs one constant-vus scenario: vus VUs, each calling its iteration
+// in a loop, for duration (see RunScenarios). If any VU fails to
+// initialize, no load is generated and the error is returned.
 //
 // When duration elapses, VUs stop starting new iterations, but iterations
 // already running may finish for up to gracefulStop; only then is their
@@ -42,45 +39,10 @@ type Result struct {
 // latency percentiles low, because the requests still running are mostly
 // the slow ones. Cancelling ctx (Ctrl+C) stops everything at once.
 func Run(ctx context.Context, vus int, duration, gracefulStop time.Duration, newVU NewVUFunc) (Result, error) {
-	iters := make([]IterationFunc, vus)
-	for i := range iters {
-		if err := ctx.Err(); err != nil {
-			return Result{}, err
-		}
-		iter, err := newVU(i)
-		if err != nil {
-			return Result{}, fmt.Errorf("initialize VU %d: %w", i, err)
-		}
-		iters[i] = iter
-	}
-
-	// The clock starts only after every VU is ready. start is taken before
-	// the deadlines are set so Elapsed is never shorter than duration.
-	start := time.Now()
-	stopStarting := start.Add(duration)
-	ctx, cancel := context.WithDeadline(ctx, stopStarting.Add(gracefulStop))
-	defer cancel()
-
-	recorders := metrics.NewRecorders(vus)
-	var wg sync.WaitGroup
-	for i, iter := range iters {
-		rec := recorders[i]
-		wg.Go(func() { runVU(ctx, stopStarting, rec, iter) })
-	}
-	wg.Wait()
-	elapsed := time.Since(start)
-
-	return Result{Summary: metrics.Merge(recorders), Elapsed: elapsed}, nil
-}
-
-// runVU starts iterations until stopStarting, and stops early if ctx ends.
-// An iteration counts as completed when it returns before ctx ends; one
-// cut short by the end of the test or Ctrl+C is not counted.
-func runVU(ctx context.Context, stopStarting time.Time, rec *metrics.Recorder, iter IterationFunc) {
-	for ctx.Err() == nil && time.Now().Before(stopStarting) {
-		iter(ctx, rec)
-		if ctx.Err() == nil {
-			rec.RecordIteration()
-		}
-	}
+	return RunScenarios(ctx, []Scenario{{
+		Name:         "default",
+		Executor:     ConstantVUs{VUs: vus, Duration: duration},
+		GracefulStop: gracefulStop,
+		NewVU:        newVU,
+	}})
 }
