@@ -143,6 +143,7 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		Duration:     cfg.Duration,
 		GracefulStop: cfg.GracefulStop,
 		Started:      res.Started,
+		Series:       res.Series,
 		Elapsed:      res.Elapsed,
 		Interrupted:  interrupted,
 		Summary:      res.Summary,

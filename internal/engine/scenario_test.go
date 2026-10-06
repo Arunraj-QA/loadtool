@@ -309,3 +309,86 @@ func TestScenarioCancellation(t *testing.T) {
 		})
 	}
 }
+
+// The time series has one point per second plus a final one, and its
+// intervals add up to the run's totals.
+func TestTimeSeries(t *testing.T) {
+	res, err := RunScenarios(context.Background(), []Scenario{{
+		Name: "x", Executor: ConstantVUs{VUs: 2, Duration: 1300 * time.Millisecond},
+		GracefulStop: time.Second, NewVU: shared(sleepIteration(10 * time.Millisecond)),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pts := res.Series
+	// One point per second (a busy machine may stretch the run) and a
+	// final one.
+	if len(pts) < 2 {
+		t.Fatalf("got %d points, want at least 2 (one at 1s, one at the end): %+v", len(pts), pts)
+	}
+	total := 0
+	for i, p := range pts {
+		total += p.Requests
+		if i > 0 && p.At < pts[i-1].At {
+			t.Errorf("point %d at %v is before point %d at %v", i, p.At, i-1, pts[i-1].At)
+		}
+	}
+	if pts[0].At < time.Second || pts[len(pts)-1].At < res.Elapsed {
+		t.Errorf("first point at %v, last at %v, elapsed %v", pts[0].At, pts[len(pts)-1].At, res.Elapsed)
+	}
+	if total != res.Summary.Sent {
+		t.Errorf("series adds up to %d requests, summary has %d", total, res.Summary.Sent)
+	}
+	if last := pts[len(pts)-1]; pts[0].VUs != 2 || last.VUs != 0 {
+		t.Errorf("VUs = %d first, %d last; want 2 while running, then 0", pts[0].VUs, last.VUs)
+	}
+	if pts[0].Requests == 0 || pts[0].P95 < 10*time.Millisecond-time.Millisecond {
+		t.Errorf("first second: %+v, want requests of about 10ms", pts[0])
+	}
+}
+
+// activeAt agrees with the scheduling definition: at any time it is the
+// number of VUs that are active.
+func TestRampingActiveAtMatchesDefinition(t *testing.T) {
+	r := rand.New(rand.NewPCG(3, 4))
+	for range 300 {
+		e := RampingVUs{StartVUs: r.IntN(5)}
+		for range 1 + r.IntN(4) {
+			e.Stages = append(e.Stages, Stage{time.Duration(r.IntN(4)) * time.Millisecond, r.IntN(6)})
+		}
+		length := e.Length()
+		for range 20 {
+			at := time.Duration(r.Int64N(int64(length) + 1)).Truncate(time.Microsecond)
+			want := 0
+			if at < length {
+				for vu := range e.MaxVUs() {
+					if e.active(vu, at) {
+						want++
+					}
+				}
+			}
+			if got := e.activeAt(at); got != want {
+				t.Fatalf("stages %+v start %d: activeAt(%v) = %d, want %d", e.Stages, e.StartVUs, at, got, want)
+			}
+		}
+	}
+}
+
+func TestActiveVUsAcrossScenarios(t *testing.T) {
+	scenarios := []Scenario{
+		{Executor: ConstantVUs{VUs: 3, Duration: 10 * time.Second}},
+		{Executor: RampingVUs{Stages: []Stage{{10 * time.Second, 10}}}, StartTime: 5 * time.Second},
+		{Executor: ConstantArrivalRate{Rate: 1, TimeUnit: time.Second, Duration: time.Second, PreAllocatedVUs: 7}, StartTime: 20 * time.Second},
+	}
+	for _, tt := range []struct {
+		at   time.Duration
+		want int
+	}{
+		{0, 3}, {5 * time.Second, 3}, {10 * time.Second, 5}, // ramp: 5s in = 5 VUs
+		{14 * time.Second, 9}, {16 * time.Second, 0}, {20 * time.Second, 7}, {21 * time.Second, 0},
+	} {
+		if got := activeVUs(scenarios, tt.at); got != tt.want {
+			t.Errorf("activeVUs at %v = %d, want %d", tt.at, got, tt.want)
+		}
+	}
+}

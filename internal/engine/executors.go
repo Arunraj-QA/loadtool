@@ -20,6 +20,13 @@ type ConstantVUs struct {
 func (e ConstantVUs) MaxVUs() int           { return e.VUs }
 func (e ConstantVUs) Length() time.Duration { return e.Duration }
 
+func (e ConstantVUs) activeAt(t time.Duration) int {
+	if t < e.Duration {
+		return e.VUs
+	}
+	return 0
+}
+
 func (e ConstantVUs) validate() error {
 	if e.VUs < 1 || e.Duration <= 0 {
 		return fmt.Errorf("constant-vus needs at least 1 VU and a positive duration, got %d VUs for %s", e.VUs, e.Duration)
@@ -35,7 +42,7 @@ func (e ConstantVUs) drive(s *scenarioRun, wg *sync.WaitGroup) {
 				return
 			}
 			for s.ctx.Err() == nil && time.Now().Before(s.stopStarting) {
-				iterate(s.ctx, rec, iter)
+				s.iterate(s.ctx, rec, iter)
 			}
 		})
 	}
@@ -157,6 +164,23 @@ func (e RampingVUs) crossing(i int, t time.Duration, want bool) (time.Duration, 
 
 func ceilDiv(a, b int64) int64 { return (a + b - 1) / b }
 
+// activeAt is the number of active VUs at t: the floor of the stage
+// line's value, in the same integer microseconds as next, so it agrees
+// with when VUs actually join and leave. 0 once the stages have ended.
+func (e RampingVUs) activeAt(t time.Duration) int {
+	segStart, from := time.Duration(0), int64(e.StartVUs)
+	for _, st := range e.Stages {
+		to := int64(st.Target)
+		if st.Duration > 0 && t < segStart+st.Duration {
+			d := st.Duration.Microseconds()
+			x := (t - segStart).Microseconds()
+			return int((from*d + (to-from)*x) / d) // values are >= 0, so this is the floor
+		}
+		segStart, from = segStart+st.Duration, to
+	}
+	return 0
+}
+
 func (e RampingVUs) drive(s *scenarioRun, wg *sync.WaitGroup) {
 	length := e.Length()
 	hardStop, _ := s.ctx.Deadline()
@@ -198,7 +222,7 @@ func (e RampingVUs) runIteration(s *scenarioRun, rec *metrics.Recorder, iter Ite
 			defer cancel()
 		}
 	}
-	iterate(ctx, rec, iter)
+	s.iterate(ctx, rec, iter)
 }
 
 // ConstantArrivalRate starts Rate iterations per TimeUnit for Duration,
@@ -216,6 +240,15 @@ type ConstantArrivalRate struct {
 
 func (e ConstantArrivalRate) MaxVUs() int           { return e.PreAllocatedVUs }
 func (e ConstantArrivalRate) Length() time.Duration { return e.Duration }
+
+// activeAt is the VU pool while the scenario runs; how busy it was shows
+// in dropped iterations.
+func (e ConstantArrivalRate) activeAt(t time.Duration) int {
+	if t < e.Duration {
+		return e.PreAllocatedVUs
+	}
+	return 0
+}
 
 func (e ConstantArrivalRate) validate() error {
 	if e.Rate < 1 || e.TimeUnit <= 0 || e.Duration <= 0 || e.PreAllocatedVUs < 1 {
@@ -268,7 +301,7 @@ func (e ConstantArrivalRate) drive(s *scenarioRun, wg *sync.WaitGroup) {
 					if !ok {
 						return
 					}
-					iterate(s.ctx, rec, iter)
+					s.iterate(s.ctx, rec, iter)
 				case <-s.ctx.Done():
 					return
 				}

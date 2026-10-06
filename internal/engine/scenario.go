@@ -41,6 +41,10 @@ type Executor interface {
 	// drive starts the scenario's goroutines in wg. They must all return
 	// once s.ctx is done.
 	drive(s *scenarioRun, wg *sync.WaitGroup)
+	// activeAt is how many VUs the executor has active at offset t from
+	// the scenario's start, computed from its definition; the time series
+	// uses it, so iterations touch no shared counter.
+	activeAt(t time.Duration) int
 }
 
 // scenarioRun is the state of one running scenario.
@@ -89,6 +93,7 @@ func RunScenarios(ctx context.Context, scenarios []Scenario) (Result, error) {
 	}
 
 	recorders := metrics.NewRecorders(total)
+	sampler := metrics.NewSampler(recorders)
 	// The clock starts only after every VU is ready.
 	start := time.Now()
 	var wg sync.WaitGroup
@@ -104,14 +109,21 @@ func RunScenarios(ctx context.Context, scenarios []Scenario) (Result, error) {
 		next += len(s.iters)
 		sc.Executor.drive(s, &wg)
 	}
+	// The sampler is the one goroutine besides the VUs and schedulers;
+	// it stops, and is waited for, once they have all returned.
+	stopSampling := make(chan struct{})
+	seriesDone := make(chan []metrics.Point)
+	go func() { seriesDone <- sample(sampler, start, scenarios, stopSampling) }()
 	wg.Wait()
 	elapsed := time.Since(start)
+	close(stopSampling)
+	series := <-seriesDone
 
 	summary := metrics.Merge(recorders)
 	for _, s := range runs {
 		summary.DroppedIterations += int(s.dropped.Load())
 	}
-	return Result{Summary: summary, Started: start, Elapsed: elapsed}, nil
+	return Result{Summary: summary, Started: start, Elapsed: elapsed, Series: series}, nil
 }
 
 // waitUntil blocks until t or until ctx is done, and reports whether t was
@@ -133,9 +145,42 @@ func waitUntil(ctx context.Context, t time.Time) bool {
 
 // iterate runs one iteration and counts it if it returned before ctx
 // ended; one cut short by a deadline or Ctrl+C is not counted.
-func iterate(ctx context.Context, rec *metrics.Recorder, iter IterationFunc) {
+func (s *scenarioRun) iterate(ctx context.Context, rec *metrics.Recorder, iter IterationFunc) {
 	iter(ctx, rec)
 	if ctx.Err() == nil {
 		rec.RecordIteration()
 	}
+}
+
+// SampleInterval is how often the time series is sampled (ADR-012).
+const SampleInterval = time.Second
+
+// sample records a time-series point every SampleInterval until stop is
+// closed, then a last point for the final, partial interval.
+func sample(sampler *metrics.Sampler, start time.Time, scenarios []Scenario, stop <-chan struct{}) []metrics.Point {
+	var series []metrics.Point
+	ticker := time.NewTicker(SampleInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case now := <-ticker.C:
+			at := now.Sub(start)
+			series = append(series, sampler.Sample(at, activeVUs(scenarios, at)))
+		case <-stop:
+			at := time.Since(start)
+			return append(series, sampler.Sample(at, activeVUs(scenarios, at)))
+		}
+	}
+}
+
+// activeVUs sums the scenarios' active VUs at offset at from the test
+// start.
+func activeVUs(scenarios []Scenario, at time.Duration) int {
+	n := 0
+	for _, sc := range scenarios {
+		if t := at - sc.StartTime; t >= 0 {
+			n += sc.Executor.activeAt(t)
+		}
+	}
+	return n
 }

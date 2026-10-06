@@ -29,6 +29,9 @@ type Result struct {
 	// Elapsed is the wall-clock time from the start of the test clock until
 	// the last VU stopped.
 	Elapsed time.Duration
+	// Series is the time series, one point per SampleInterval plus a
+	// final, partial one (ADR-012).
+	Series []metrics.Point
 }
 
 // Run runs one constant-vus scenario: vus VUs, each calling its iteration
