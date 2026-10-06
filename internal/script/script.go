@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -32,6 +33,12 @@ import (
 // Program is a compiled test script, safe to share between VUs.
 type Program struct {
 	prog *goja.Program
+	// filename, dir and src are kept so WithExecs can rebuild the entry.
+	filename, dir string
+	src           []byte
+	// execs are the exported functions, besides default, that scenarios
+	// run (WithExecs); sorted.
+	execs []string
 	// env backs every VU's __ENV. It is never written after WithEnv, so
 	// VUs on different goroutines read it safely.
 	env map[string]string
@@ -123,7 +130,9 @@ var entrySource = fmt.Sprintf("import * as mod from %q;\n"+
 	"if (__VU === 0) { globalThis.%s = mod.setup; globalThis.%s = mod.teardown; }\n",
 	scriptImport, defaultExportGlobal, optionsGlobal, setupGlobal, teardownGlobal)
 
-var errNoDefaultExport = errors.New("script must export a default function: `export default function () { ... }`")
+// ErrNoDefaultExport is returned when a VU should run the default export
+// and the script has none.
+var ErrNoDefaultExport = errors.New("script must export a default function: `export default function () { ... }`")
 
 // Compile transpiles src to JavaScript (stripping TypeScript types and
 // resolving the default export) and compiles it for goja. Files ending in
@@ -145,18 +154,23 @@ func compileIn(filename, dir string, src []byte) (*Program, error) {
 	if err != nil {
 		return nil, fmt.Errorf("compile %s: %w", filename, err)
 	}
-	return &Program{prog: prog}, nil
+	return &Program{prog: prog, filename: filename, dir: dir, src: src}, nil
 }
 
 // transpile turns the script, and the files it imports, into one plain
 // JavaScript program that stores its default export in defaultExportGlobal.
 func transpile(filename, dir string, src []byte) (string, error) {
+	return transpileEntry(filename, dir, src, entrySource)
+}
+
+// transpileEntry is transpile with a given generated entry.
+func transpileEntry(filename, dir string, src []byte, entry string) (string, error) {
 	loader := api.LoaderJS
 	if strings.EqualFold(filepath.Ext(filename), ".ts") {
 		loader = api.LoaderTS
 	}
 	out := api.Build(api.BuildOptions{
-		Stdin:  &api.StdinOptions{Contents: entrySource},
+		Stdin:  &api.StdinOptions{Contents: entry},
 		Bundle: true,
 		// IIFE keeps top-level declarations module-scoped, as in an ES
 		// module. As globals they would cost every VU about 2 KB more.
@@ -319,6 +333,8 @@ type VU struct {
 	iter int64
 	// id is the VU number, exposed as __VU.
 	id int64
+	// exec is the exported function this VU's iterations call.
+	exec string
 	// console receives console output; nil discards it.
 	console io.Writer
 	// discardBodies and warn come from the Program.
@@ -329,16 +345,25 @@ type VU struct {
 	data goja.Value
 }
 
-// NewVU creates a runtime for VU number id, runs the script's top-level
-// (init) code once, and resolves its default export. id is exposed as __VU:
+// NewVU is NewVUExec for the default export.
+func (p *Program) NewVU(ctx context.Context, id int, client *http.Client) (*VU, error) {
+	return p.NewVUExec(ctx, id, "default", client)
+}
+
+// NewVUExec creates a runtime for VU number id, runs the script's top-level
+// (init) code once, and resolves the exported function exec, which each
+// iteration calls ("default", or a name given to WithExecs). id is exposed as __VU:
 // 1..N for VUs, 0 for the runtime that only reads options. client is shared
 // between VUs; http.Client is safe for concurrent use. If ctx ends while
 // the top-level code runs (for example on Ctrl+C), the code is interrupted
 // and ctx's error is returned.
-func (p *Program) NewVU(ctx context.Context, id int, client *http.Client) (*VU, error) {
+func (p *Program) NewVUExec(ctx context.Context, id int, exec string, client *http.Client) (*VU, error) {
+	if exec != "default" && !slices.Contains(p.execs, exec) {
+		return nil, fmt.Errorf("exec %q was not prepared with WithExecs", exec)
+	}
 	rt := goja.New()
 	rt.SetMaxCallStackSize(maxCallStackSize)
-	vu := &VU{rt: rt, client: client, id: int64(id), discardBodies: p.discardBodies, warn: p.warn}
+	vu := &VU{rt: rt, client: client, id: int64(id), exec: exec, discardBodies: p.discardBodies, warn: p.warn}
 	// A nil *lockedWriter must become a nil io.Writer, not a non-nil
 	// interface holding a nil pointer.
 	if p.console != nil {
@@ -366,9 +391,15 @@ func (p *Program) NewVU(ctx context.Context, id int, client *http.Client) (*VU, 
 		return nil, fmt.Errorf("script init: %s", scriptErrorMessage(err))
 	}
 
+	// The lifecycle runtime (VU 0) never iterates, so a script whose
+	// scenarios only use named exec functions needs no default export;
+	// the runner checks what the scenarios need.
 	fn, ok := goja.AssertFunction(rt.Get(defaultExportGlobal))
-	if !ok {
-		return nil, errNoDefaultExport
+	if !ok && id != 0 {
+		if exec != "default" {
+			return nil, fmt.Errorf("exec %q is not an exported function", exec)
+		}
+		return nil, ErrNoDefaultExport
 	}
 	vu.fn = fn
 	vu.data, err = vu.parseData(p.setupData)

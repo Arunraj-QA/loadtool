@@ -445,6 +445,19 @@ func TestExamplesLoad(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Load: %v", err)
 			}
+			// As the runner does: init code and options in the lifecycle
+			// runtime, then a VU, unless the example's scenarios only
+			// run named functions.
+			l, err := p.NewLifecycle(context.Background())
+			if err != nil {
+				t.Fatalf("NewLifecycle: %v", err)
+			}
+			if _, err := l.Options(); err != nil {
+				t.Fatalf("Options: %v", err)
+			}
+			if !l.HasDefault() {
+				return
+			}
 			if _, err := p.NewVU(context.Background(), 1, http.DefaultClient); err != nil {
 				t.Fatalf("NewVU: %v", err)
 			}

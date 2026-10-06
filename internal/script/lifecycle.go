@@ -55,6 +55,9 @@ func (l *Lifecycle) Options() ([]byte, error) {
 	return []byte(v.String()), nil
 }
 
+// HasDefault reports whether the script exports a default function.
+func (l *Lifecycle) HasDefault() bool { return l.function(defaultExportGlobal) != nil }
+
 // HasSetup and HasTeardown report whether the script exports them.
 func (l *Lifecycle) HasSetup() bool    { return l.function(setupGlobal) != nil }
 func (l *Lifecycle) HasTeardown() bool { return l.function(teardownGlobal) != nil }

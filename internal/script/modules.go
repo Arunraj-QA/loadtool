@@ -21,6 +21,8 @@ const (
 var builtinProps = []lazyProp{
 	{"http", func(vu *VU) goja.Value { return vu.newHTTPModule() }},
 	{"core", func(vu *VU) goja.Value { return vu.newCoreModule() }},
+	// exec tells the generated entry which function this VU runs.
+	{"exec", func(vu *VU) goja.Value { return vu.rt.ToValue(vu.exec) }},
 }
 
 // builtinModules are the modules scripts import by name (ADR-005, ADR-007).
