@@ -25,7 +25,7 @@ Exit code 1 covers two kinds of failure:
 
 Thresholds are what turn a load test into a pass/fail check. Without
 them, a run that completes exits 0 however slow it was. See
-[Thresholds](../../README.md#thresholds).
+[Thresholds](../options.md#thresholds).
 
 ## Outputs to keep
 
