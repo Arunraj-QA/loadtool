@@ -269,6 +269,61 @@ Fields every executor accepts:
 The default function receives `data` (or `undefined` without `setup`).
 Mutations to `data` stay inside that VU.
 
+**Details settled when the lifecycle was implemented (2026-10-06).**
+
+*Scope and state:*
+
+- **One lifecycle runtime.** Top-level code, options, `setup` and
+  `teardown` all use one VU-0 runtime (`script.Lifecycle`), so module
+  state that setup sets is visible to teardown. No VU runs JavaScript
+  while setup or teardown does: setup ends before the first VU is created,
+  and teardown starts after `engine.Run` has waited for every VU
+  goroutine.
+- **Only VU 0 holds `setup` and `teardown`.** The generated entry stores
+  them only when `__VU === 0`. Exporting them costs other VUs nothing
+  (retained memory per VU is unchanged, measured with
+  `BenchmarkVURetainedMemory`).
+- **Data.**
+  - Setup's return value becomes JSON once. Each VU parses it once when
+    created.
+  - `teardown` parses the same JSON, so it sees exactly what the VUs saw.
+  - A value `JSON.stringify` rejects (a cycle, a BigInt) fails setup.
+  - `undefined` or a function means no data.
+- **Results not counted.** `setup` and `teardown` record into a recorder
+  that is thrown away, which covers both requests and checks.
+- **Response bodies are always kept** in `setup` and `teardown`, whatever
+  `discardResponseBodies` says, because setup typically reads a token.
+
+*When teardown runs:*
+
+- **Rule:** teardown runs if and only if setup completed, or the script
+  has no setup.
+- That includes VU start-up failing after setup. The start-up error and
+  any teardown error are then returned together.
+- It includes a load phase stopped by Ctrl+C.
+- It never runs after a failed or interrupted setup.
+
+*Cancellation:*
+
+- Ctrl+C during setup stops setup and ends the test.
+- After a Ctrl+C that stopped the load phase, teardown runs on a context
+  that ignores that cancellation, bounded by `teardownTimeout`. A second
+  Ctrl+C ends the process.
+- A Ctrl+C that arrives during teardown (after a completed load phase)
+  stops teardown. That is reported as a teardown failure; the load phase
+  is not marked interrupted.
+- When a timeout or Ctrl+C fires just as setup returns, goja keeps the
+  runtime's interrupt flag set and would abort teardown at once. The
+  lifecycle waits for the interrupt to fire and then clears it.
+
+*Failures:*
+
+- **A setup failure** is an error with no result (exit 1). It covers a
+  throw, `setupTimeout`, Ctrl+C or unserializable data.
+- **A teardown failure** never replaces the result. It is returned in
+  `report.Result.TeardownError`, shown in the summary after the status
+  line, and makes the CLI exit 1 after printing the full summary.
+
 ### 8. Error handling
 
 | Where | What happens | Exit code |

@@ -162,7 +162,7 @@ Globals:
 | Name | Value |
 |---|---|
 | `__ENV` | Environment variables, plus `--env KEY=VALUE` flags (which win). Changes a VU makes stay in that VU. |
-| `__VU` | The VU number, from 1. It is 0 while `options` are read. |
+| `__VU` | The VU number, from 1. It is 0 while `options` are read and in `setup`/`teardown`. |
 | `__ITER` | The VU's iteration number, from 0 |
 | `console` | `log`, `info`, `warn`, `error`, `debug`. Writes to stderr as `INFO  [VU 3] message`; objects are printed as JSON. |
 
@@ -173,6 +173,68 @@ Imports:
   npm packages are not supported.
 - Top-level variables belong to the script, as in an ES module. They are
   not properties of `globalThis`.
+
+### Setup and teardown
+
+A script can export `setup` and `teardown` functions
+([ADR-008](docs/decisions/ADR-008-test-dsl.md); see
+[`examples/lifecycle.ts`](examples/lifecycle.ts)):
+
+```typescript
+export function setup() {
+  const res = http.post(`${BASE}/login`, JSON.stringify({ user: "load" }),
+    { headers: { "Content-Type": "application/json" } });
+  return { token: res.json().token };
+}
+
+export default function (data) {
+  http.get(`${BASE}/orders`, { headers: { Authorization: `Bearer ${data.token}` } });
+}
+
+export function teardown(data) {
+  http.post(`${BASE}/logout`, data.token);
+}
+```
+
+A test runs in this order:
+
+1. **Top-level code** runs once in a lifecycle runtime (`__VU` 0), where
+   `options` are read.
+2. **`setup()`** runs once in that runtime, before any VU exists.
+3. **VUs start**: each runs the top-level code and gets its own copy of
+   the setup data.
+4. **Load phase**: every iteration calls `default(data)`.
+5. **`teardown(data)`** runs once in the lifecycle runtime, after all VUs
+   have stopped.
+6. The summary is printed.
+
+Rules:
+- **Data.** `setup`'s return value is passed as JSON. Functions and
+  `undefined` are dropped, and a value JSON cannot represent (a cycle, a
+  BigInt) fails setup.
+  - Each VU parses its own copy once. Changes a VU makes stay in that VU,
+    across its iterations.
+  - `teardown` gets the data as setup returned it.
+  - Without `setup`, or when it returns nothing, `data` is `undefined`.
+  - Large setup data is held once per VU, so it costs memory × VUs.
+- **Not counted.** `setup` and `teardown` may make requests, `sleep` and run
+  `check`. None of it is counted in the results or thresholds.
+  - Response bodies are always kept there, even with
+    `discardResponseBodies`.
+- **Setup failure** ends the test: no load phase, no teardown, exit code 1.
+  This includes a throw, `setupTimeout`, or Ctrl+C during setup. Use it to
+  fail fast when the target is down.
+- **Teardown runs whenever setup completed**, or the script has no setup:
+  after a normal run, after Ctrl+C during the load phase, and even if the
+  VUs failed to start.
+- **Teardown failure** is shown in the summary (`Teardown: failed (...)`)
+  and the exit code is 1, but the results are printed in full first. This
+  covers a throw, `teardownTimeout`, or Ctrl+C during teardown.
+- **Timeouts.** `options.setupTimeout` and `options.teardownTimeout` bound
+  each function (default `"60s"`).
+- **Ctrl+C:**
+  - during the load phase, it stops the load, and teardown still runs.
+  - a second Ctrl+C exits at once and skips teardown.
 
 How results are counted:
 - A request succeeds when it gets a 2xx or 3xx response. Redirects are not

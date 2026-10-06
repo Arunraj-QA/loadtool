@@ -53,7 +53,7 @@ Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd)
 | Component | Package | Status |
 |---|---|---|
 | CLI | `cmd/loadtool`, `internal/cli` | Done |
-| Runner | `internal/runner` | Done. Orchestrates a run: load the script, resolve options, start VUs, run the engine, return the `report.Result`. Extracted from the CLI in Phase 1 step 3, so the CLI only parses flags and prints. Scenarios, setup/teardown and thresholds extend the Runner. |
+| Runner | `internal/runner` | Done. Orchestrates a run: load the script, resolve options, start VUs, run the engine, return the `report.Result`. Extracted from the CLI in Phase 1 step 3, so the CLI only parses flags and prints. Runs the lifecycle: setup once, the load phase, then teardown whenever setup completed (ADR-008). Scenarios and thresholds extend the Runner. |
 | VU | `internal/engine` | Done: goroutine per VU, started before the clock, graceful stop |
 | goja | `internal/script` | Done: one runtime per VU, call-depth limit, interrupts |
 | HTTP | `internal/httpclient` | Done: HTTP/1.1, at most one connection per VU, keep-alive |
@@ -64,10 +64,10 @@ Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd)
 
 | Component | Extends | Package | Covers roadmap items | Status |
 |---|---|---|---|---|
-| DSL | goja | `internal/script` (built-in modules `loadtool`, `loadtool/http`; lifecycle exports; `__ENV`, `__VU`, `__ITER`), published `types/loadtool.d.ts` | 1 TypeScript DSL, 2 setup/teardown (script side) | Core done: `options` (ADR-006); built-in modules, relative imports, `__ENV`/`__VU`/`__ITER`, `console`, `sleep`, `group` (ADR-007). Lifecycle exports come with the Scenario Engine. k6-shaped (ADR-005) |
-| Scenario Engine | VU, Runner | `internal/engine` (executors: constant-vus, ramping-vus, constant-arrival-rate; scenarios) | 5 scenarios, 2 setup/teardown (run order) | Planned |
-| Checks | DSL, Metrics | `check()` in `internal/script`; `checks` metric in `internal/metrics` | 3 checks/assertions | Planned |
-| Thresholds | Metrics, Runner | new `internal/thresholds` | 4 thresholds; exit code | Planned |
+| DSL | goja | `internal/script` (built-in modules `loadtool`, `loadtool/http`; lifecycle exports; `__ENV`, `__VU`, `__ITER`), published `types/loadtool.d.ts` | 1 TypeScript DSL, 2 setup/teardown (script side) | Core done: `options` (ADR-006); built-in modules, relative imports, `__ENV`/`__VU`/`__ITER`, `console`, `sleep`, `group` (ADR-007). Responses and `post`/`put`/`patch`/`del`, `setup`/`teardown` (ADR-008). k6-shaped (ADR-005) |
+| Scenario Engine | VU, Runner | `internal/engine` (executors: constant-vus, ramping-vus, constant-arrival-rate; scenarios) | 5 scenarios, 2 setup/teardown (run order) | Setup/teardown run order done in the Runner (`script.Lifecycle`, ADR-008); executors planned |
+| Checks | DSL, Metrics | `check()` in `internal/script`; `checks` metric in `internal/metrics` | 3 checks/assertions | Done (ADR-008) |
+| Thresholds | Metrics, Runner | new `internal/thresholds` | 4 thresholds; exit code | In progress (metrics groundwork on `p1/thresholds`) |
 | HTTP/2 | HTTP | `internal/httpclient` | 6 HTTP/2 | Planned |
 | Sessions | HTTP | `internal/httpclient` (per-VU client and cookie jar; reuse options) | 7 connection reuse, 8 cookies/sessions | Planned |
 | JSON Reporter | Console (`report.Result`) | `internal/report` | 9 JSON output | Planned |
@@ -88,9 +88,9 @@ Each step is one branch merged into `phase-1-mvp` after CI passes.
 | 2 | `export const options`, with precedence (ADR-006) | DSL / Runner | Done |
 | 3 | Extract the Runner from the CLI into `internal/runner` (no behaviour change) | Runner | Done |
 | 4 | Built-in modules, local imports, `sleep`/`group`, `__ENV`/`__VU`/`__ITER`, `console`, published types (ADR-007) | DSL | Done |
-| 5 | `check()` and the `checks` metric | Checks | Next |
-| 6 | Threshold expressions and exit code | Thresholds | Planned |
-| 7 | Executors, multiple scenarios, setup/teardown run order | Scenario Engine | Planned |
+| 5 | Response access, `post`/`put`/`patch`/`del` (5a); `check()` and per-check results (5b) | Checks | Done |
+| 6 | Threshold expressions and exit code | Thresholds | In progress |
+| 7 | `setup`/`teardown` lifecycle (7a, done); executors and multiple scenarios (7b) | Scenario Engine | 7a done, 7b planned |
 | 8 | Per-VU client and cookie jar, connection-reuse options | Sessions | Planned |
 | 9 | HTTP/2 and h2c | HTTP/2 | Planned |
 | 10 | Versioned JSON output | JSON Reporter | Planned |
