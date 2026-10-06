@@ -39,8 +39,20 @@ type Program struct {
 	console *lockedWriter
 	// discardBodies drops response bodies (options.discardResponseBodies).
 	discardBodies bool
+	// setupData is the JSON setup() returned, nil without setup or data.
+	// Read-only once set; each VU parses its own copy.
+	setupData []byte
 	// warn reports non-fatal problems found while the script runs.
 	warn *warner
+}
+
+// WithSetupData returns a copy of p whose VUs pass data, the JSON that
+// setup() returned, to every iteration. data must not be modified
+// afterwards; nil means no data (the default function gets undefined).
+func (p *Program) WithSetupData(data []byte) *Program {
+	c := *p
+	c.setupData = data
+	return &c
 }
 
 // WithDiscardResponseBodies returns a copy of p whose VUs drop response
@@ -92,19 +104,24 @@ const (
 	defaultExportGlobal = "__loadtool_default"
 	// optionsGlobal is where the entry stores `export const options`.
 	optionsGlobal = "__loadtool_options"
+	// setupGlobal and teardownGlobal hold the setup and teardown exports.
+	setupGlobal    = "__loadtool_setup"
+	teardownGlobal = "__loadtool_teardown"
 	// outfile names the in-memory build output; nothing is written to disk.
 	outfile = "script.js"
 )
 
-// entrySource stores the script's default export and its options in
-// globals. Bundling this entry lets esbuild bind the exports directly
+// entrySource stores the script's default export, options, setup and
+// teardown in globals. Bundling this entry lets esbuild bind the exports directly
 // (property reads on a namespace import become plain references), so the
 // output needs no CommonJS interop helpers. Every VU runs the output, and
 // those helpers made up about 75% of per-VU memory (see
 // benchmarks/results/2026-09-24-vu-memory.md). A missing export becomes
 // undefined, not a build error.
-var entrySource = fmt.Sprintf("import * as mod from %q;\nglobalThis.%s = mod.default;\nglobalThis.%s = mod.options;\n",
-	scriptImport, defaultExportGlobal, optionsGlobal)
+var entrySource = fmt.Sprintf("import * as mod from %q;\n"+
+	"globalThis.%s = mod.default;\nglobalThis.%s = mod.options;\n"+
+	"if (__VU === 0) { globalThis.%s = mod.setup; globalThis.%s = mod.teardown; }\n",
+	scriptImport, defaultExportGlobal, optionsGlobal, setupGlobal, teardownGlobal)
 
 var errNoDefaultExport = errors.New("script must export a default function: `export default function () { ... }`")
 
@@ -307,6 +324,9 @@ type VU struct {
 	// discardBodies and warn come from the Program.
 	discardBodies bool
 	warn          *warner
+	// data is this VU's copy of the setup data, passed to every iteration;
+	// undefined without setup data.
+	data goja.Value
 }
 
 // NewVU creates a runtime for VU number id, runs the script's top-level
@@ -336,9 +356,9 @@ func (p *Program) NewVU(ctx context.Context, id int, client *http.Client) (*VU, 
 	); err != nil {
 		return nil, err
 	}
-	stop := context.AfterFunc(ctx, func() { rt.Interrupt(errStopped) })
+	release := vu.interruptOn(ctx)
 	_, err := rt.RunProgram(p.prog)
-	stop()
+	release()
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("script init: %w", context.Cause(ctx))
@@ -351,26 +371,22 @@ func (p *Program) NewVU(ctx context.Context, id int, client *http.Client) (*VU, 
 		return nil, errNoDefaultExport
 	}
 	vu.fn = fn
+	vu.data, err = vu.parseData(p.setupData)
+	if err != nil {
+		return nil, err
+	}
 	return vu, nil
 }
 
 // Options runs the script's top-level code once in a runtime of its own and
 // returns its `export const options` as JSON, or nil if the script has no
-// options. Values JSON cannot represent, such as functions, are dropped.
+// options. Callers that also run setup and teardown use NewLifecycle.
 func (p *Program) Options(ctx context.Context) ([]byte, error) {
-	// No client: HTTP calls are not allowed in top-level code anyway.
-	vu, err := p.NewVU(ctx, 0, nil)
+	l, err := p.NewLifecycle(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !isSet(vu.rt.Get(optionsGlobal)) {
-		return nil, nil
-	}
-	v, err := vu.rt.RunString("JSON.stringify(globalThis." + optionsGlobal + ")")
-	if err != nil {
-		return nil, fmt.Errorf("options: %s", scriptErrorMessage(err))
-	}
-	return []byte(v.String()), nil
+	return l.Options()
 }
 
 // Iterate calls the script's default function once. HTTP requests made by
@@ -387,7 +403,7 @@ func (vu *VU) Iterate(ctx context.Context, rec *metrics.Recorder) {
 	_ = vu.rt.Set("__ITER", vu.iter)
 	vu.iter++
 	stop := context.AfterFunc(ctx, func() { vu.rt.Interrupt(errStopped) })
-	_, err := vu.fn(goja.Undefined())
+	_, err := vu.fn(goja.Undefined(), vu.data)
 	stop()
 	vu.ctx, vu.rec = nil, nil
 

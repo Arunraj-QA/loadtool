@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -94,10 +95,15 @@ func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env ma
 	if err != nil {
 		return err
 	}
+	// The results are printed first, so a failed teardown or an interrupt
+	// never hides them; either still fails the run so automation notices.
 	report.Console(cmd.OutOrStdout(), res)
+	var errs []error
 	if res.Interrupted {
-		// Partial results were printed; still fail so automation notices.
-		return fmt.Errorf("test interrupted: %w", context.Cause(ctx))
+		errs = append(errs, fmt.Errorf("test interrupted: %w", context.Cause(ctx)))
 	}
-	return nil
+	if res.TeardownError != "" {
+		errs = append(errs, errors.New(res.TeardownError))
+	}
+	return errors.Join(errs...)
 }

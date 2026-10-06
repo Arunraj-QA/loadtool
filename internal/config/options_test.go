@@ -156,3 +156,30 @@ func TestDiscardResponseBodies(t *testing.T) {
 		}
 	}
 }
+
+func TestLifecycleTimeouts(t *testing.T) {
+	resolve := func(raw string) (Config, error) {
+		opts, _, err := ParseOptions([]byte(raw))
+		if err != nil {
+			return Config{}, err
+		}
+		var c Config
+		return c, c.Resolve(Overrides{}, nil, opts)
+	}
+	c, err := resolve(`{}`)
+	if err != nil || c.SetupTimeout != DefaultLifecycleTimeout || c.TeardownTimeout != DefaultLifecycleTimeout {
+		t.Fatalf("defaults: %+v, %v; want %s for both", c, err, DefaultLifecycleTimeout)
+	}
+	c, err = resolve(`{"setupTimeout": "2m", "teardownTimeout": 5000}`)
+	if err != nil || c.SetupTimeout != 2*time.Minute || c.TeardownTimeout != 5*time.Second {
+		t.Fatalf("set: %+v, %v; want 2m and 5s", c, err)
+	}
+	for _, raw := range []string{`{"setupTimeout": "0s"}`, `{"teardownTimeout": -1}`} {
+		if _, err := resolve(raw); err == nil || !strings.Contains(err.Error(), "must be positive") {
+			t.Errorf("%s: error = %v, want must be positive", raw, err)
+		}
+	}
+	if _, err := resolve(`{"setupTimeout": "soon"}`); err == nil || !strings.Contains(err.Error(), "options.setupTimeout") {
+		t.Errorf("invalid duration: error = %v", err)
+	}
+}

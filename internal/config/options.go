@@ -19,10 +19,13 @@ type Options struct {
 	// DiscardResponseBodies drops response bodies instead of handing them
 	// to the script (ADR-008).
 	DiscardResponseBodies *bool
+	// SetupTimeout and TeardownTimeout bound setup() and teardown().
+	SetupTimeout    *Duration
+	TeardownTimeout *Duration
 }
 
 // knownOptions lists the keys Options understands.
-var knownOptions = []string{"discardResponseBodies", "duration", "vus"}
+var knownOptions = []string{"discardResponseBodies", "duration", "setupTimeout", "teardownTimeout", "vus"}
 
 // Duration accepts a duration string ("30s", "1m30s") or a number of
 // milliseconds, as k6 options do.
@@ -87,6 +90,18 @@ func ParseOptions(raw []byte) (Options, []string, error) {
 		}
 		opts.Duration = &d
 	}
+	for _, f := range []struct {
+		key string
+		dst **Duration
+	}{{"setupTimeout", &opts.SetupTimeout}, {"teardownTimeout", &opts.TeardownTimeout}} {
+		if v, ok := fields[f.key]; ok {
+			var d Duration
+			if err := d.UnmarshalJSON(v); err != nil {
+				return opts, nil, fmt.Errorf("options.%s: %w", f.key, err)
+			}
+			*f.dst = &d
+		}
+	}
 	if v, ok := fields["discardResponseBodies"]; ok {
 		var b bool
 		if err := json.Unmarshal(v, &b); err != nil {
@@ -114,6 +129,9 @@ const (
 const (
 	DefaultVUs      = 1
 	DefaultDuration = 10 * time.Second
+	// DefaultLifecycleTimeout bounds setup() and teardown() unless the
+	// script sets setupTimeout or teardownTimeout.
+	DefaultLifecycleTimeout = 60 * time.Second
 )
 
 // Resolve sets c.VUs and c.Duration from, highest priority first: CLI
@@ -158,8 +176,22 @@ func (c *Config) Resolve(cli Overrides, getenv func(string) (string, bool), scri
 	}
 
 	c.VUs, c.Duration = vus, dur
-	// Only the script sets this; there is no flag or variable for it.
+	// Only the script sets these; there are no flags or variables for them.
 	c.DiscardResponseBodies = script.DiscardResponseBodies != nil && *script.DiscardResponseBodies
+	c.SetupTimeout, c.TeardownTimeout = DefaultLifecycleTimeout, DefaultLifecycleTimeout
+	for _, t := range []struct {
+		name string
+		src  *Duration
+		dst  *time.Duration
+	}{{"setupTimeout", script.SetupTimeout, &c.SetupTimeout}, {"teardownTimeout", script.TeardownTimeout, &c.TeardownTimeout}} {
+		if t.src == nil {
+			continue
+		}
+		if *t.src <= 0 {
+			return fmt.Errorf("%s must be positive, got %s (from script options)", t.name, time.Duration(*t.src))
+		}
+		*t.dst = time.Duration(*t.src)
+	}
 	return nil
 }
 

@@ -338,3 +338,32 @@ export default function () { if (__ITER === 0 && __VU === 1) console.warn("first
 		t.Errorf("console output must not go to stdout:\n%s", out)
 	}
 }
+
+// A failed teardown fails the command, but only after the full summary was
+// printed: the load phase's result is never hidden.
+func TestRunTeardownFailure(t *testing.T) {
+	path := scriptFile(t, `export default function () {}
+export function teardown() { throw new Error("cleanup failed"); }`)
+	out, _, err := execute(t, "run", path, "--duration", "50ms")
+	if err == nil || !strings.Contains(err.Error(), "teardown: Error: cleanup failed") {
+		t.Fatalf("error = %v, want the teardown error", err)
+	}
+	for _, want := range []string{"Status:      completed", "Teardown:    failed (teardown: Error: cleanup failed", "Requests:"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("summary missing %q:\n%s", want, out)
+		}
+	}
+}
+
+// A failed setup fails the command before any load: no summary is printed.
+func TestRunSetupFailure(t *testing.T) {
+	path := scriptFile(t, `export function setup() { throw new Error("no credentials"); }
+export default function () {}`)
+	out, _, err := execute(t, "run", path, "--duration", "50ms")
+	if err == nil || !strings.Contains(err.Error(), "setup: Error: no credentials") {
+		t.Fatalf("error = %v, want the setup error", err)
+	}
+	if strings.Contains(out, "LoadTool summary") {
+		t.Errorf("summary printed after a failed setup:\n%s", out)
+	}
+}

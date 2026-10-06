@@ -6,6 +6,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -36,11 +37,28 @@ type Params struct {
 	Warn func(msg string)
 }
 
-// Run executes a test. It returns an error, and no result, when the run
-// cannot start (script, options or VU start-up problems). Once load has
-// started it always returns a result. If ctx is cancelled during the run,
-// the result is partial and marked Interrupted; that is not an error here,
-// so the caller decides how to report it.
+// Run executes a test through its lifecycle (ADR-008):
+//
+//  1. load the script and run its top-level code once (VU 0)
+//  2. read and resolve options
+//  3. setup(), once
+//  4. create the VUs and run the load phase
+//  5. teardown(data), once
+//
+// It returns an error, and no result, when the test cannot start: script,
+// options, setup or VU start-up problems. A failed setup ends the test
+// there: no load phase and no teardown.
+//
+// Teardown runs whenever setup completed (or the script has none), even
+// if VU start-up failed or the load phase was interrupted, so resources
+// setup created are released. A teardown failure never hides the load
+// phase's result: it is returned in Result.TeardownError, or joined to
+// the start-up error.
+//
+// If ctx is cancelled during the load phase, the result is partial and
+// marked Interrupted; that is not an error here, so the caller decides
+// how to report it. Teardown then still runs, on a context that ignores
+// that cancellation, bounded by teardownTimeout.
 func Run(ctx context.Context, p Params) (report.Result, error) {
 	cfg := p.Config
 	if cfg.Script == "" {
@@ -53,7 +71,13 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	// Before reading options, so options can use __ENV too.
 	prog = prog.WithEnv(p.Env).WithConsole(p.Console).WithWarn(p.Warn)
 
-	raw, err := prog.Options(ctx)
+	// The lifecycle runtime runs the top-level code once, then options,
+	// setup and teardown.
+	lc, err := prog.NewLifecycle(ctx)
+	if err != nil {
+		return report.Result{}, err
+	}
+	raw, err := lc.Options()
 	if err != nil {
 		return report.Result{}, err
 	}
@@ -79,6 +103,12 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	client := httpclient.New(cfg.VUs, httpclient.DefaultTimeout)
 	defer client.CloseIdleConnections()
 
+	data, err := lc.Setup(ctx, client, cfg.SetupTimeout)
+	if err != nil {
+		return report.Result{}, err
+	}
+	prog = prog.WithSetupData(data)
+
 	newVU := func(i int) (engine.IterationFunc, error) {
 		// ctx lets Ctrl+C interrupt a script's top-level code. VUs are
 		// numbered from 1 in __VU, as in k6.
@@ -89,17 +119,38 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		return vu.Iterate, nil
 	}
 
-	res, err := engine.Run(ctx, cfg.VUs, cfg.Duration, cfg.GracefulStop, newVU)
-	if err != nil {
-		return report.Result{}, err
+	res, runErr := engine.Run(ctx, cfg.VUs, cfg.Duration, cfg.GracefulStop, newVU)
+	// Read before teardown: a Ctrl+C during teardown does not make the
+	// load phase interrupted.
+	interrupted := ctx.Err() != nil
+
+	teardownErr := lc.Teardown(teardownContext(ctx), client, cfg.TeardownTimeout, data)
+	if runErr != nil {
+		return report.Result{}, errors.Join(runErr, teardownErr)
 	}
-	return report.Result{
+	result := report.Result{
 		Script:       cfg.Script,
 		VUs:          cfg.VUs,
 		Duration:     cfg.Duration,
 		GracefulStop: cfg.GracefulStop,
 		Elapsed:      res.Elapsed,
-		Interrupted:  ctx.Err() != nil,
+		Interrupted:  interrupted,
 		Summary:      res.Summary,
-	}, nil
+	}
+	if teardownErr != nil {
+		result.TeardownError = teardownErr.Error()
+	}
+	return result, nil
+}
+
+// teardownContext is the context teardown runs in. If ctx was cancelled
+// during the load phase (the first Ctrl+C), teardown must still release
+// what setup created, so it ignores that cancellation; teardownTimeout
+// still bounds it, and a second Ctrl+C ends the process. Otherwise a
+// Ctrl+C during teardown stops it.
+func teardownContext(ctx context.Context) context.Context {
+	if ctx.Err() != nil {
+		return context.WithoutCancel(ctx)
+	}
+	return ctx
 }

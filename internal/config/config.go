@@ -21,6 +21,9 @@ type Config struct {
 	// DiscardResponseBodies drops response bodies instead of handing them
 	// to the script.
 	DiscardResponseBodies bool
+	// SetupTimeout and TeardownTimeout bound the script's setup() and
+	// teardown().
+	SetupTimeout, TeardownTimeout time.Duration
 }
 
 // Validate reports every invalid field in c.

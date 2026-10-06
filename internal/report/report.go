@@ -28,6 +28,9 @@ type Result struct {
 	// the results are partial.
 	Interrupted bool
 	Summary     metrics.Summary
+	// TeardownError is set when the script's teardown() failed. The load
+	// phase's results are still complete.
+	TeardownError string
 }
 
 // Console writes the human-readable summary to w.
@@ -46,7 +49,11 @@ func Console(w io.Writer, r Result) {
 	fmt.Fprintf(w, "  Script:      %s\n", r.Script)
 	fmt.Fprintf(w, "  VUs:         %d\n", r.VUs)
 	fmt.Fprintf(w, "  Duration:    %s (elapsed %s)\n", r.Duration, formatDuration(r.Elapsed))
-	fmt.Fprintf(w, "  Status:      %s\n\n", status)
+	fmt.Fprintf(w, "  Status:      %s\n", status)
+	if r.TeardownError != "" {
+		fmt.Fprintf(w, "  Teardown:    failed (%s)\n", r.TeardownError)
+	}
+	fmt.Fprintln(w)
 
 	fmt.Fprintf(w, "  Requests:    %s (%.1f req/s)\n", formatCount(s.Requests), rps)
 	fmt.Fprintf(w, "  Success:     %s\n", formatCount(s.Successes))

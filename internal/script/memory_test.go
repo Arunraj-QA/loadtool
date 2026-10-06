@@ -58,6 +58,16 @@ export default function (): void {
 		sleep(1);
 	}
 }`},
+		{"http-setup-teardown", `
+import http from "loadtool/http";
+const BASE_URL = "http://localhost:8080";
+export function setup() { return { token: "t" }; }
+export default function (data: any): void {
+	let total = 0;
+	for (let i = 0; i < 10; i++) total += i;
+	if (total < 0) http.get(BASE_URL + data.token);
+}
+export function teardown(data: any) {}`},
 	}
 
 	for _, sc := range scripts {
