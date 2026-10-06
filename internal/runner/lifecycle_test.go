@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,11 +16,20 @@ import (
 
 // eventServer logs every request's path, in order, so tests can check the
 // lifecycle order. /work also records the Authorization header it got.
+//
+// cancelOn makes the server cancel a test's context when it first sees
+// that path: tests interrupt a phase by the request that proves the phase
+// is running, never by a timer, so they do not depend on how fast the
+// machine (or the race detector) is.
 type eventServer struct {
 	*httptest.Server
 	mu     sync.Mutex
 	events []string
 	auth   map[string]bool
+
+	cancelOn   string
+	cancel     context.CancelFunc
+	cancelOnce sync.Once
 }
 
 func newEventServer(t *testing.T) *eventServer {
@@ -33,13 +43,29 @@ func newEventServer(t *testing.T) *eventServer {
 		if r.URL.Path == "/work" {
 			s.auth[r.Header.Get("Authorization")] = true
 		}
+		cancel := s.cancel
+		match := r.URL.Path == s.cancelOn
 		s.mu.Unlock()
+		if match && cancel != nil {
+			s.cancelOnce.Do(cancel)
+		}
 		if r.URL.Path == "/login" {
 			w.Write([]byte(`{"token":"secret"}`))
 		}
 	}))
 	t.Cleanup(s.Close)
 	return s
+}
+
+// cancelWhenSeen returns a context that the server cancels when it first
+// receives a request for path.
+func (s *eventServer) cancelWhenSeen(t *testing.T, path string) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	s.mu.Lock()
+	s.cancelOn, s.cancel = path, cancel
+	s.mu.Unlock()
+	return ctx
 }
 
 func (s *eventServer) log() string {
@@ -80,8 +106,11 @@ func TestLifecycleOrderAndMetrics(t *testing.T) {
 	if got := srv.log(); got != "/login /work /logout" {
 		t.Errorf("server saw %q, want setup, then the load phase, then teardown", got)
 	}
-	if len(srv.auth) != 1 || !srv.auth["secret"] {
-		t.Errorf("work requests carried %v, want only the setup token", srv.auth)
+	srv.mu.Lock()
+	auth := maps.Clone(srv.auth)
+	srv.mu.Unlock()
+	if len(auth) != 1 || !auth["secret"] {
+		t.Errorf("work requests carried %v, want only the setup token", auth)
 	}
 	// Only the load phase's requests are counted.
 	s := res.Summary
@@ -142,8 +171,7 @@ func TestTeardownRunsWhenVUStartupFails(t *testing.T) {
 // marked interrupted.
 func TestTeardownRunsAfterInterrupt(t *testing.T) {
 	srv := newEventServer(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(100*time.Millisecond, cancel)
+	ctx := srv.cancelWhenSeen(t, "/work") // Ctrl+C once the load phase runs
 	res, err := runFor(ctx, lifecycleScript(t, srv.URL, ""), time.Minute)
 	if err != nil {
 		t.Fatal(err)
@@ -161,11 +189,10 @@ func TestInterruptDuringSetup(t *testing.T) {
 	srv := newEventServer(t)
 	path := scriptFile(t, `import http from "loadtool/http";
 import { sleep } from "loadtool";
-export function setup() { sleep(60); }
+export function setup() { http.get("`+srv.URL+`/setup-started"); sleep(60); }
 export default function () { http.get("`+srv.URL+`/work"); }
 export function teardown() { http.post("`+srv.URL+`/logout", ""); }`)
-	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(50*time.Millisecond, cancel)
+	ctx := srv.cancelWhenSeen(t, "/setup-started")
 	start := time.Now()
 	_, err := runFor(ctx, path, time.Minute)
 	if err == nil || !strings.Contains(err.Error(), "setup interrupted") {
@@ -174,8 +201,8 @@ export function teardown() { http.post("`+srv.URL+`/logout", ""); }`)
 	if time.Since(start) > 10*time.Second {
 		t.Errorf("Run took %v; setup did not stop promptly", time.Since(start))
 	}
-	if got := srv.log(); got != "" {
-		t.Errorf("server saw %q, want nothing", got)
+	if got := srv.log(); got != "/setup-started" {
+		t.Errorf("server saw %q, want only the setup request: no load phase and no teardown", got)
 	}
 }
 
@@ -186,11 +213,10 @@ func TestInterruptDuringTeardown(t *testing.T) {
 	path := scriptFile(t, `import http from "loadtool/http";
 import { sleep } from "loadtool";
 export default function () { http.get("`+srv.URL+`/work"); }
-export function teardown() { sleep(60); }`)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	// Cancel once the load phase (100ms) is over and teardown is sleeping.
-	time.AfterFunc(400*time.Millisecond, cancel)
+export function teardown() { http.get("`+srv.URL+`/teardown-started"); sleep(60); }`)
+	// Ctrl+C once teardown runs, so the load phase has completed.
+	ctx := srv.cancelWhenSeen(t, "/teardown-started")
+	start := time.Now()
 	res, err := runFor(ctx, path, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
@@ -200,5 +226,8 @@ export function teardown() { sleep(60); }`)
 	}
 	if !strings.Contains(res.TeardownError, "teardown interrupted") {
 		t.Errorf("TeardownError = %q, want teardown interrupted", res.TeardownError)
+	}
+	if time.Since(start) > 10*time.Second {
+		t.Errorf("Run took %v; teardown did not stop promptly", time.Since(start))
 	}
 }
