@@ -74,8 +74,13 @@ func Run(ctx context.Context, vus int, duration, gracefulStop time.Duration, new
 }
 
 // runVU starts iterations until stopStarting, and stops early if ctx ends.
+// An iteration counts as completed when it returns before ctx ends; one
+// cut short by the end of the test or Ctrl+C is not counted.
 func runVU(ctx context.Context, stopStarting time.Time, rec *metrics.Recorder, iter IterationFunc) {
 	for ctx.Err() == nil && time.Now().Before(stopStarting) {
 		iter(ctx, rec)
+		if ctx.Err() == nil {
+			rec.RecordIteration()
+		}
 	}
 }

@@ -256,3 +256,24 @@ func TestCancelStopsDuringGracefulStop(t *testing.T) {
 		t.Fatalf("Run took %v: cancelling must not wait for the graceful stop", took)
 	}
 }
+
+// Iterations that finish (here within the grace period) are counted; ones
+// cancelled at the deadline are not.
+func TestIterationsCountOnlyCompleted(t *testing.T) {
+	const vus = 4
+	res, err := Run(context.Background(), vus, 50*time.Millisecond, time.Second, shared(slowIteration(200*time.Millisecond)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Summary.Iterations != vus {
+		t.Errorf("Iterations = %d, want %d", res.Summary.Iterations, vus)
+	}
+
+	res, err = Run(context.Background(), vus, 50*time.Millisecond, 0, shared(slowIteration(200*time.Millisecond)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Summary.Iterations != 0 {
+		t.Errorf("Iterations = %d, want 0 when every iteration is cancelled", res.Summary.Iterations)
+	}
+}
