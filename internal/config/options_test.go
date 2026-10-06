@@ -220,3 +220,19 @@ func TestSessionOptions(t *testing.T) {
 		t.Errorf("error = %v", err)
 	}
 }
+
+func TestHTTPVersionOption(t *testing.T) {
+	if c := resolveOK(t, `{}`); c.HTTPVersion != "auto" {
+		t.Errorf("default = %q, want auto", c.HTTPVersion)
+	}
+	for _, v := range []string{"auto", "1.1", "2"} {
+		if c := resolveOK(t, `{"httpVersion": "`+v+`"}`); c.HTTPVersion != v {
+			t.Errorf("httpVersion %s resolved to %q", v, c.HTTPVersion)
+		}
+	}
+	for _, raw := range []string{`{"httpVersion": "3"}`, `{"httpVersion": 2}`, `{"httpVersion": "HTTP/2"}`} {
+		if _, _, err := ParseOptions([]byte(raw)); err == nil || !strings.Contains(err.Error(), `options.httpVersion must be "auto", "1.1" or "2"`) {
+			t.Errorf("%s: error = %v", raw, err)
+		}
+	}
+}

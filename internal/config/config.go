@@ -27,6 +27,8 @@ type Config struct {
 	NoCookiesReset bool
 	// NoConnectionReuse disables keep-alive (ADR-009).
 	NoConnectionReuse bool
+	// HTTPVersion is "auto", "1.1" or "2" (ADR-010).
+	HTTPVersion string
 	// SetupTimeout and TeardownTimeout bound the script's setup() and
 	// teardown().
 	SetupTimeout, TeardownTimeout time.Duration

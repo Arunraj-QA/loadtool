@@ -9,6 +9,8 @@ declare module "loadtool/http" {
   export interface Response {
     /** HTTP status code, or 0 if no response was received. */
     status: number;
+    /** "HTTP/1.1" or "HTTP/2.0"; empty if no response was received. */
+    proto: string;
     /** Transport error message; empty string when the request completed. */
     error: string;
     /** Response headers by canonical name; repeated headers are joined with ", ". */

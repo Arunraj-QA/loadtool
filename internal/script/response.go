@@ -20,6 +20,8 @@ import (
 //	json()    body parsed as JSON
 //	timings   { duration } in milliseconds
 //	url       the request URL
+//	proto     the protocol, "HTTP/1.1" or "HTTP/2.0"; "" without a response
+//	cookies   the cookies this response set
 //
 // It is a dynamic object so headers, body and json are converted only if
 // the script reads them: a script that only checks status pays for none
@@ -37,7 +39,7 @@ var _ goja.DynamicObject = (*response)(nil)
 
 // responseKeys are the enumerable properties; json is a method and, like
 // a prototype method, is not listed.
-var responseKeys = []string{"status", "error", "headers", "body", "timings", "url", "cookies"}
+var responseKeys = []string{"status", "proto", "error", "headers", "body", "timings", "url", "cookies"}
 
 func (r *response) Get(key string) goja.Value {
 	if v, ok := r.extra[key]; ok {
@@ -54,6 +56,8 @@ func (r *response) Get(key string) goja.Value {
 		return rt.ToValue(r.res.Err.Error())
 	case "url":
 		return rt.ToValue(r.url)
+	case "proto":
+		return rt.ToValue(r.res.Proto)
 	case "headers":
 		if r.headers == nil {
 			r.headers = r.headersObject()

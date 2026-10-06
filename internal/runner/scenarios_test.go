@@ -203,3 +203,30 @@ export default function () { http.get("`+srv.URL+`"); }`, config.Overrides{}, ni
 		})
 	}
 }
+
+// options.httpVersion reaches the transport: "2" speaks h2c to a
+// cleartext server that supports it, "auto" keeps HTTP/1.1 (ADR-010).
+func TestHTTPVersionOption(t *testing.T) {
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Config.Protocols = new(http.Protocols)
+	srv.Config.Protocols.SetHTTP1(true)
+	srv.Config.Protocols.SetUnencryptedHTTP2(true)
+	srv.Start()
+	t.Cleanup(srv.Close)
+	for version, want := range map[string]string{"2": "HTTP/2.0", "auto": "HTTP/1.1", "1.1": "HTTP/1.1"} {
+		t.Run(version, func(t *testing.T) {
+			res, err := runScript(t, `import http from "loadtool/http";
+export const options = { vus: 1, duration: "50ms", httpVersion: "`+version+`" };
+export default function () {
+	const res = http.get("`+srv.URL+`");
+	if (res.proto !== "`+want+`") throw new Error("proto " + res.proto);
+}`, config.Overrides{}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Summary.ScriptErrors != 0 || res.Summary.Requests == 0 {
+				t.Errorf("script errors %d (%s), requests %d", res.Summary.ScriptErrors, res.Summary.FirstScriptError, res.Summary.Requests)
+			}
+		})
+	}
+}

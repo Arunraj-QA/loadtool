@@ -23,6 +23,8 @@ type Options struct {
 	// NoConnectionReuse disables keep-alive (ADR-009).
 	NoCookiesReset    *bool
 	NoConnectionReuse *bool
+	// HTTPVersion is "auto", "1.1" or "2" (ADR-010).
+	HTTPVersion *string
 	// SetupTimeout and TeardownTimeout bound setup() and teardown().
 	SetupTimeout    *Duration
 	TeardownTimeout *Duration
@@ -35,8 +37,11 @@ type Options struct {
 	Stages    []StageOptions
 }
 
+// HTTPVersions are the values of options.httpVersion (ADR-010).
+var HTTPVersions = []string{"auto", "1.1", "2"}
+
 // knownOptions lists the keys Options understands.
-var knownOptions = []string{"discardResponseBodies", "duration", "noConnectionReuse", "noCookiesReset", "scenarios", "setupTimeout", "stages", "teardownTimeout", "thresholds", "vus"}
+var knownOptions = []string{"discardResponseBodies", "duration", "httpVersion", "noConnectionReuse", "noCookiesReset", "scenarios", "setupTimeout", "stages", "teardownTimeout", "thresholds", "vus"}
 
 // Duration accepts a duration string ("30s", "1m30s") or a number of
 // milliseconds, as k6 options do.
@@ -131,6 +136,13 @@ func ParseOptions(raw []byte) (Options, []string, error) {
 			st = []StageOptions{}
 		}
 		opts.Stages = st
+	}
+	if v, ok := fields["httpVersion"]; ok {
+		var hv string
+		if err := json.Unmarshal(v, &hv); err != nil || !slices.Contains(HTTPVersions, hv) {
+			return opts, nil, fmt.Errorf(`options.httpVersion must be "auto", "1.1" or "2", got %s`, v)
+		}
+		opts.HTTPVersion = &hv
 	}
 	if v, ok := fields["thresholds"]; ok {
 		t, err := parseThresholds(v)
@@ -238,6 +250,10 @@ func (c *Config) Resolve(cli Overrides, getenv func(string) (string, bool), scri
 	c.DiscardResponseBodies = isTrue(script.DiscardResponseBodies)
 	c.NoCookiesReset = isTrue(script.NoCookiesReset)
 	c.NoConnectionReuse = isTrue(script.NoConnectionReuse)
+	c.HTTPVersion = "auto"
+	if script.HTTPVersion != nil {
+		c.HTTPVersion = *script.HTTPVersion
+	}
 	c.SetupTimeout, c.TeardownTimeout = DefaultLifecycleTimeout, DefaultLifecycleTimeout
 	for _, t := range []struct {
 		name string

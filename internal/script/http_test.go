@@ -31,13 +31,14 @@ export default function () {
 	want(res.status === 201, "status " + res.status);
 	want(res.error === "", "error " + res.error);
 	want(res.url === "BASE_URL/items", "url " + res.url);
+	want(res.proto === "HTTP/1.1", "proto " + res.proto);
 	want(res.headers["Content-Type"] === "application/json", "content-type " + res.headers["Content-Type"]);
 	want(res.headers["X-Multi"] === "a, b", "joined header " + res.headers["X-Multi"]);
 	want(res.body === '{"id": 7, "tags": ["x"]}', "body " + res.body);
 	want(res.json().id === 7 && res.json().tags[0] === "x", "json");
 	want(typeof res.timings.duration === "number" && res.timings.duration >= 0, "duration");
 	want(res.headers === res.headers && res.body === res.body, "values are cached");
-	want(Object.keys(res).join(",") === "status,error,headers,body,timings,url,cookies", "keys " + Object.keys(res));
+	want(Object.keys(res).join(",") === "status,proto,error,headers,body,timings,url,cookies", "keys " + Object.keys(res));
 	want(JSON.parse(JSON.stringify(res)).status === 201, "stringify");
 
 	res.note = "added";

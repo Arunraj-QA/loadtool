@@ -118,6 +118,7 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		MaxConnsPerHost:   cfg.VUs,
 		Timeout:           httpclient.DefaultTimeout,
 		NoConnectionReuse: cfg.NoConnectionReuse,
+		HTTPVersion:       cfg.HTTPVersion,
 	})
 	defer client.CloseIdleConnections()
 
