@@ -21,9 +21,10 @@ func newRunCmd() *cobra.Command {
 	// vus and duration are separate from cfg: they only override the
 	// script's options and the environment when typed (ADR-006).
 	var (
-		vus      int
-		duration time.Duration
-		envFlags []string
+		vus         int
+		duration    time.Duration
+		envFlags    []string
+		summaryJSON string
 	)
 
 	cmd := &cobra.Command{
@@ -44,7 +45,7 @@ func newRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTest(cmd, cfg, cli, env)
+			return runTest(cmd, cfg, cli, env, summaryJSON)
 		},
 	}
 
@@ -55,6 +56,8 @@ func newRunCmd() *cobra.Command {
 		"test duration, e.g. 30s or 5m (overrides "+config.EnvDuration+" and options.duration)")
 	f.DurationVar(&cfg.GracefulStop, "graceful-stop", cfg.GracefulStop,
 		"how long iterations still running at the end of --duration may take to finish (0 cancels them at once)")
+	f.StringVar(&summaryJSON, "summary-json", "",
+		"also write the end-of-test summary as JSON to this file (docs/json-summary.md)")
 	f.StringArrayVarP(&envFlags, "env", "e", nil,
 		"set a variable for the script's __ENV, as KEY=VALUE (repeatable; overrides the process environment)")
 	return cmd
@@ -81,7 +84,7 @@ func scriptEnv(environ, flags []string) (map[string]string, error) {
 
 // runTest runs the test through the runner, prints the console report and
 // turns an interrupted run into an error (exit code 1).
-func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env map[string]string) error {
+func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env map[string]string, summaryJSON string) error {
 	ctx := cmd.Context()
 	res, err := runner.Run(ctx, runner.Params{
 		Config:    cfg,
@@ -100,6 +103,13 @@ func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env ma
 	// never hides them; either still fails the run so automation notices.
 	report.Console(cmd.OutOrStdout(), res)
 	var errs []error
+	// Written whenever there is a result, also for interrupted runs and
+	// failed thresholds; a write failure exits 1 after the summary.
+	if summaryJSON != "" {
+		if err := report.WriteJSONFile(summaryJSON, res, Version); err != nil {
+			errs = append(errs, fmt.Errorf("--summary-json: %w", err))
+		}
+	}
 	if res.Interrupted {
 		errs = append(errs, fmt.Errorf("test interrupted: %w", context.Cause(ctx)))
 	}

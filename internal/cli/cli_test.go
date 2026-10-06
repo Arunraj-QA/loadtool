@@ -3,12 +3,14 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -442,5 +444,101 @@ func TestExitCode(t *testing.T) {
 		if got := ExitCode(tt.err); got != tt.want {
 			t.Errorf("ExitCode(%v) = %d, want %d", tt.err, got, tt.want)
 		}
+	}
+}
+
+func readSummaryJSON(t *testing.T, path string) map[string]any {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(b, &doc); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, b)
+	}
+	return doc
+}
+
+func TestRunSummaryJSON(t *testing.T) {
+	srv := statusServer(t, http.StatusOK)
+	dir := t.TempDir()
+	out := filepath.Join(dir, "summary.json")
+	path := scriptFile(t, `import http from "loadtool/http";
+import { check } from "loadtool";
+export const options = { thresholds: { http_reqs: ["count>0"] } };
+export default function () { check(http.get("`+srv.URL+`"), { ok: (r) => r.status === 200 }); }`)
+	stdout, _, err := execute(t, "run", path, "--vus", "2", "--duration", "100ms", "--summary-json", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := readSummaryJSON(t, out)
+	metrics := doc["metrics"].(map[string]any)
+	reqs := metrics["http_reqs"].(map[string]any)["count"].(float64)
+	if doc["schemaVersion"] != 1.0 || doc["status"] != "completed" || reqs == 0 {
+		t.Errorf("schemaVersion=%v status=%v requests=%v", doc["schemaVersion"], doc["status"], reqs)
+	}
+	// The same numbers as the console summary.
+	if want := "Requests:    " + formatCountForTest(int(reqs)); !strings.Contains(stdout, want) {
+		t.Errorf("console does not show %q:\n%s", want, stdout)
+	}
+	if th := doc["thresholds"].([]any); len(th) != 1 || th[0].(map[string]any)["passed"] != true {
+		t.Errorf("thresholds = %v", th)
+	}
+	if checks := doc["checks"].([]any); len(checks) != 1 || checks[0].(map[string]any)["name"] != "ok" {
+		t.Errorf("checks = %v", checks)
+	}
+	// Written atomically: no temporary file is left behind.
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 1 {
+		t.Errorf("directory holds %d entries, want only summary.json", len(entries))
+	}
+}
+
+// formatCountForTest mirrors the console's thousands separators.
+func formatCountForTest(n int) string {
+	s := strconv.Itoa(n)
+	for i := len(s) - 3; i > 0; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
+}
+
+// Failed thresholds still write the summary (exit 99); a summary that
+// cannot be written fails the run with exit 1, after the console summary.
+func TestRunSummaryJSONWithFailures(t *testing.T) {
+	srv := statusServer(t, http.StatusOK)
+	path := scriptFile(t, `import http from "loadtool/http";
+export const options = { thresholds: { http_reqs: ["count<0"] } };
+export default function () { http.get("`+srv.URL+`"); }`)
+
+	out := filepath.Join(t.TempDir(), "summary.json")
+	_, _, err := execute(t, "run", path, "--duration", "50ms", "--summary-json", out)
+	if ExitCode(err) != ExitThresholdsFailed {
+		t.Fatalf("exit code %d (%v), want %d", ExitCode(err), err, ExitThresholdsFailed)
+	}
+	if th := readSummaryJSON(t, out)["thresholds"].([]any); th[0].(map[string]any)["passed"] != false {
+		t.Errorf("thresholds = %v", th)
+	}
+
+	missing := filepath.Join(t.TempDir(), "no-such-dir", "summary.json")
+	stdout, _, err := execute(t, "run", path, "--duration", "50ms", "--summary-json", missing)
+	if ExitCode(err) != 1 || !strings.Contains(err.Error(), "--summary-json") {
+		t.Fatalf("exit code %d (%v), want 1 with the write error", ExitCode(err), err)
+	}
+	if !strings.Contains(stdout, "LoadTool summary") {
+		t.Errorf("console summary missing:\n%s", stdout)
+	}
+}
+
+// No result, no file: a run that cannot start writes nothing.
+func TestRunSummaryJSONNotWrittenWithoutResult(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "summary.json")
+	path := scriptFile(t, `export const x = 1;`)
+	if _, _, err := execute(t, "run", path, "--summary-json", out); err == nil {
+		t.Fatal("want a start-up error")
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Errorf("summary file exists after a failed start (stat error %v)", err)
 	}
 }
