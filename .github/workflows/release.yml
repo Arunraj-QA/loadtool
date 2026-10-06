@@ -1,0 +1,46 @@
+name: Release
+
+# Pushing a version tag (v1.2.3) builds the release archives with
+# scripts/release-build.sh and publishes them, with checksums.txt, as a
+# GitHub release. A tag with a pre-release suffix (v1.2.3-rc.1) makes a
+# pre-release. action.yml installs from these archives.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      # Never publish a build that fails its own checks.
+      - name: Test
+        run: |
+          go vet ./...
+          go test -race ./...
+
+      - name: Build archives
+        run: scripts/release-build.sh "$GITHUB_REF_NAME" dist
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=()
+          case "$GITHUB_REF_NAME" in *-*) prerelease=(--prerelease) ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "LoadTool $GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag \
+            "${prerelease[@]}"
