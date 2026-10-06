@@ -53,3 +53,69 @@ jobs:
             echo "::error title=go test -race failed::${excerpt}"
             exit 1
           fi
+
+  # Builds release archives with the release script and runs the GitHub
+  # Action (action.yml) from this checkout against the benchmark server:
+  # a passing test, and a test whose threshold fails (exit code 99).
+  release-and-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Release build script
+        run: |
+          PLATFORMS="linux/amd64 windows/amd64 darwin/arm64" scripts/release-build.sh v0.0.0-ci dist
+          (cd dist && sha256sum -c checksums.txt)
+          tar -xzf dist/loadtool_v0.0.0-ci_linux_amd64.tar.gz -C dist
+          dist/loadtool_v0.0.0-ci_linux_amd64/loadtool --version | grep -q 'v0.0.0-ci'
+          unzip -l dist/loadtool_v0.0.0-ci_windows_amd64.zip | grep -q 'loadtool.exe'
+
+      - name: Start the benchmark server
+        run: |
+          go build -o bin/benchserver ./benchmarks/server
+          bin/benchserver &
+          for _ in $(seq 50); do curl -sf http://127.0.0.1:8080/health && break; sleep 0.1; done
+
+      - name: Action, passing test
+        id: pass
+        uses: ./
+        with:
+          binary: dist/loadtool_v0.0.0-ci_linux_amd64/loadtool
+          script: examples/thresholds.ts
+          args: --vus 5 --duration 3s
+          artifact-name: action-self-test
+
+      - name: Check the passing run
+        env:
+          CODE: ${{ steps.pass.outputs.exit-code }}
+        run: |
+          test "$CODE" = 0
+          jq -e '.schemaVersion == 1 and .status == "completed" and (.thresholds | all(.passed))' loadtool-summary.json
+          grep -q '<!doctype html>' loadtool-report.html
+
+      - name: Action, failing threshold
+        id: fail
+        continue-on-error: true
+        uses: ./
+        with:
+          binary: dist/loadtool_v0.0.0-ci_linux_amd64/loadtool
+          script: examples/thresholds.ts
+          args: --vus 2 --duration 2s
+          summary-json: failing-summary.json
+          report-html: failing-report.html
+          upload-artifact: 'false'
+        env:
+          BASE_URL: http://127.0.0.1:1 # nothing listens: every request fails
+
+      - name: Check the failing run
+        env:
+          OUTCOME: ${{ steps.fail.outcome }}
+          CODE: ${{ steps.fail.outputs.exit-code }}
+        run: |
+          test "$OUTCOME" = failure
+          test "$CODE" = 99
+          jq -e '.thresholds | any(.passed | not)' failing-summary.json

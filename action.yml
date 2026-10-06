@@ -1,0 +1,166 @@
+name: LoadTool
+description: Run a LoadTool load test, fail the job on failed thresholds, and keep the JSON summary and HTML report.
+author: Arunraj-QA
+branding:
+  icon: activity
+  color: blue
+
+inputs:
+  script:
+    description: Path of the test script (.ts or .js).
+    required: true
+  args:
+    description: Extra arguments for `loadtool run`, such as `--vus 20 --duration 1m -e BASE_URL=https://staging.example.test`.
+    required: false
+    default: ''
+  version:
+    description: LoadTool release to install, such as v0.1.0, or `latest`. Ignored when `binary` is set.
+    required: false
+    default: latest
+  binary:
+    description: Path of a LoadTool binary to use instead of installing a release.
+    required: false
+    default: ''
+  summary-json:
+    description: Where to write the JSON summary, relative to the workspace.
+    required: false
+    default: loadtool-summary.json
+  report-html:
+    description: Where to write the HTML report, relative to the workspace.
+    required: false
+    default: loadtool-report.html
+  upload-artifact:
+    description: Upload the JSON summary and HTML report as a workflow artifact (`true` or `false`).
+    required: false
+    default: 'true'
+  artifact-name:
+    description: Name of the uploaded artifact.
+    required: false
+    default: loadtool-report
+
+outputs:
+  exit-code:
+    description: "The exit code of `loadtool run`: 0 passed, 99 thresholds failed, 1 any other failure."
+    value: ${{ steps.run.outputs.exit-code }}
+  summary-json:
+    description: Path of the JSON summary (it exists only if the test produced a result).
+    value: ${{ inputs.summary-json }}
+  report-html:
+    description: Path of the HTML report (it exists only if the test produced a result).
+    value: ${{ inputs.report-html }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install LoadTool
+      if: inputs.binary == ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ inputs.version }}
+        REPO: ${{ github.action_repository || 'Arunraj-QA/loadtool' }}
+      run: |
+        set -euo pipefail
+        case "${RUNNER_OS}" in
+          Linux) os=linux ;; macOS) os=darwin ;; Windows) os=windows ;;
+          *) echo "::error::unsupported runner OS ${RUNNER_OS}"; exit 1 ;;
+        esac
+        case "${RUNNER_ARCH}" in
+          X64) arch=amd64 ;; ARM64) arch=arm64 ;;
+          *) echo "::error::unsupported runner architecture ${RUNNER_ARCH}"; exit 1 ;;
+        esac
+        if [ "$VERSION" = latest ]; then
+          VERSION=$(gh release view --repo "$REPO" --json tagName --jq .tagName)
+        fi
+        name="loadtool_${VERSION}_${os}_${arch}"
+        ext=tar.gz; [ "$os" = windows ] && ext=zip
+        dir="${RUNNER_TEMP}/loadtool-${VERSION}"
+        mkdir -p "$dir"
+        gh release download "$VERSION" --repo "$REPO" --dir "$dir" --clobber \
+          --pattern "${name}.${ext}" --pattern checksums.txt
+        # Verify the archive against the release's checksums.
+        expected=$(grep " [*]\{0,1\}${name}.${ext}\$" "$dir/checksums.txt" | cut -d' ' -f1)
+        if command -v sha256sum >/dev/null; then
+          actual=$(sha256sum "$dir/${name}.${ext}" | cut -d' ' -f1)
+        else
+          actual=$(shasum -a 256 "$dir/${name}.${ext}" | cut -d' ' -f1)
+        fi
+        if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+          echo "::error::checksum mismatch for ${name}.${ext}"; exit 1
+        fi
+        if [ "$ext" = zip ]; then
+          unzip -q -o "$dir/${name}.${ext}" -d "$dir"
+        else
+          tar -xzf "$dir/${name}.${ext}" -C "$dir"
+        fi
+        echo "$dir/$name" >> "$GITHUB_PATH"
+        echo "Installed LoadTool ${VERSION} (${os}/${arch})"
+
+    - name: Run the test
+      id: run
+      shell: bash
+      env:
+        LOADTOOL: ${{ inputs.binary || 'loadtool' }}
+        SCRIPT: ${{ inputs.script }}
+        ARGS: ${{ inputs.args }}
+        SUMMARY_JSON: ${{ inputs.summary-json }}
+        REPORT_HTML: ${{ inputs.report-html }}
+      run: |
+        set -uo pipefail
+        "$LOADTOOL" --version
+        # A file from an earlier run must not pass for this run's result.
+        rm -f "$SUMMARY_JSON" "$REPORT_HTML"
+        # ARGS is split on spaces, like a command line; quote-free values only.
+        set +e
+        # shellcheck disable=SC2086
+        "$LOADTOOL" run "$SCRIPT" --summary-json "$SUMMARY_JSON" --report-html "$REPORT_HTML" $ARGS
+        code=$?
+        set -e
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+
+    - name: Write the job summary
+      if: always() && hashFiles(inputs.summary-json) != ''
+      shell: bash
+      env:
+        SUMMARY_JSON: ${{ inputs.summary-json }}
+        CODE: ${{ steps.run.outputs.exit-code }}
+      run: |
+        set -euo pipefail
+        verdict="✅ passed"
+        case "$CODE" in 99) verdict="❌ thresholds failed" ;; 0) ;; *) verdict="❌ failed (exit code $CODE)" ;; esac
+        {
+          echo "## LoadTool: ${verdict}"
+          echo
+          jq -r '"`\(.script)` · \(.status) · \(.config.vus) VUs · \(.elapsedMs / 1000 | . * 10 | round / 10) s"' "$SUMMARY_JSON"
+          echo
+          echo "| Requests | req/s | Errors | p95 | p99 |"
+          echo "|---|---|---|---|---|"
+          jq -r '.metrics as $m | "| \($m.http_reqs.count) | \($m.http_reqs.rate * 10 | round / 10) | \(if $m.http_req_failed.rate == null then "–" else "\($m.http_req_failed.rate * 10000 | round / 100) %" end) | \(if $m.http_req_duration == null then "–" else "\($m.http_req_duration.p95 * 100 | round / 100) ms" end) | \(if $m.http_req_duration == null then "–" else "\($m.http_req_duration.p99 * 100 | round / 100) ms" end) |"' "$SUMMARY_JSON"
+          if [ "$(jq '.thresholds | length' "$SUMMARY_JSON")" -gt 0 ]; then
+            echo
+            echo "| | Threshold | Observed |"
+            echo "|---|---|---|"
+            jq -r '.thresholds[] | "| \(if .passed then "✅" else "❌" end) | `\(.metric) \(.expression)` | \(if .noData then "no data" elif .unit == "fraction" then (.observed * 10000 | round / 100 | tostring) + " %" elif .unit == "ms" then (.observed * 100 | round / 100 | tostring) + " ms" elif .unit == "per-second" then (.observed * 100 | round / 100 | tostring) + "/s" else (.observed | tostring) end) |"' "$SUMMARY_JSON"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload the report
+      if: always() && inputs.upload-artifact == 'true' && hashFiles(inputs.summary-json) != ''
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: |
+          ${{ inputs.summary-json }}
+          ${{ inputs.report-html }}
+
+    - name: Fail on a failed test
+      if: steps.run.outputs.exit-code != '0'
+      shell: bash
+      env:
+        CODE: ${{ steps.run.outputs.exit-code }}
+      run: |
+        case "$CODE" in
+          99) echo "::error::LoadTool thresholds failed (exit code 99)" ;;
+          *) echo "::error::LoadTool failed (exit code $CODE)" ;;
+        esac
+        exit "$CODE"
