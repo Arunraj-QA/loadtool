@@ -236,6 +236,50 @@ Rules:
   - during the load phase, it stops the load, and teardown still runs.
   - a second Ctrl+C exits at once and skips teardown.
 
+### Thresholds
+
+Thresholds are pass/fail criteria for the whole test
+([ADR-008](docs/decisions/ADR-008-test-dsl.md); see
+[`examples/thresholds.ts`](examples/thresholds.ts)). If any fails,
+`loadtool run` prints the full summary and then exits with code **99**, as
+k6 does, so a CI job fails.
+
+```typescript
+export const options = {
+  thresholds: {
+    http_req_duration: ["p(95)<200", "p(99)<500"], // milliseconds
+    http_req_failed: ["rate<0.01"],
+    checks: ["rate>0.99"],
+  },
+};
+```
+
+An expression is `<aggregate> <op> <number>`, with `<`, `<=`, `>`, `>=`,
+`==` or `!=`.
+
+| Metric | Aggregates | Meaning |
+|---|---|---|
+| `http_req_duration` | `avg`, `min`, `max`, `med`, `p(N)` | Latency of every request sent, in ms |
+| `http_req_failed` | `rate` | Failed requests ÷ requests (0–1) |
+| `http_reqs` | `count`, `rate` | Requests; `rate` is per second |
+| `checks` | `rate` | Passed checks ÷ checks run (0–1) |
+| `iterations` | `count`, `rate` | Iterations that ran to their end |
+| `dropped_iterations` | `count`, `rate` | Always 0 until arrival-rate scenarios exist |
+
+Rules:
+- **Checked before the test starts.** A typo, an unknown metric or an
+  unsupported aggregate stops the run before setup, with exit code 1.
+- **Evaluated once, at the end**, against the numbers the summary prints.
+- **A threshold with no data fails.** For example, `checks` in a script
+  that never calls `check`. It is shown as "no data".
+- **Percentiles are approximate.** They are within ±0.78 %, and a result
+  that close to its limit is marked `≈`.
+- **Exit code 1 takes precedence.** If the run was interrupted or
+  teardown failed, the exit code is 1, not 99.
+- **Not supported yet:** the object form `{ threshold, abortOnFail }`,
+  thresholds on tagged sub-metrics such as `http_req_duration{status:200}`,
+  and custom metrics. They are errors, not ignored.
+
 How results are counted:
 - A request succeeds when it gets a 2xx or 3xx response. Redirects are not
   followed.

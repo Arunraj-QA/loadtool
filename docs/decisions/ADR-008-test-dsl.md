@@ -201,6 +201,19 @@ thresholds: { metric: ["<aggregate> <op> <number>", ...] }
 value. If any threshold fails, the exit code is **99**, the same as k6, so
 CI recipes carry over.
 
+**Details settled when thresholds were implemented (2026-10-06):**
+
+- `iterations` counts iterations that returned before the test's
+  context ended, script errors included. Iterations cancelled at the end
+  of the graceful stop or by Ctrl+C are not counted.
+- **Exit code precedence.**
+  - An interrupted run or a failed teardown exits 1, even if thresholds
+    also failed: partial metrics should not be reported as a threshold
+    verdict.
+  - 99 means the test ran fully and only thresholds failed.
+- Thresholds are parsed after the other options and before setup, so a
+  bad expression never runs setup or any load.
+
 ### 6. Scenarios and executors
 
 Three executors cover the roadmap:
