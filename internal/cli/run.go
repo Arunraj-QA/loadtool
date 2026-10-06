@@ -25,6 +25,7 @@ func newRunCmd() *cobra.Command {
 		duration    time.Duration
 		envFlags    []string
 		summaryJSON string
+		reportHTML  string
 	)
 
 	cmd := &cobra.Command{
@@ -45,7 +46,7 @@ func newRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTest(cmd, cfg, cli, env, summaryJSON)
+			return runTest(cmd, cfg, cli, env, outputs{summaryJSON: summaryJSON, reportHTML: reportHTML})
 		},
 	}
 
@@ -58,6 +59,8 @@ func newRunCmd() *cobra.Command {
 		"how long iterations still running at the end of --duration may take to finish (0 cancels them at once)")
 	f.StringVar(&summaryJSON, "summary-json", "",
 		"also write the end-of-test summary as JSON to this file (docs/json-summary.md)")
+	f.StringVar(&reportHTML, "report-html", "",
+		"also write a self-contained HTML report with charts to this file")
 	f.StringArrayVarP(&envFlags, "env", "e", nil,
 		"set a variable for the script's __ENV, as KEY=VALUE (repeatable; overrides the process environment)")
 	return cmd
@@ -84,7 +87,12 @@ func scriptEnv(environ, flags []string) (map[string]string, error) {
 
 // runTest runs the test through the runner, prints the console report and
 // turns an interrupted run into an error (exit code 1).
-func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env map[string]string, summaryJSON string) error {
+// outputs are the optional result files; empty paths are not written.
+type outputs struct {
+	summaryJSON, reportHTML string
+}
+
+func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env map[string]string, out outputs) error {
 	ctx := cmd.Context()
 	res, err := runner.Run(ctx, runner.Params{
 		Config:    cfg,
@@ -105,9 +113,14 @@ func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env ma
 	var errs []error
 	// Written whenever there is a result, also for interrupted runs and
 	// failed thresholds; a write failure exits 1 after the summary.
-	if summaryJSON != "" {
-		if err := report.WriteJSONFile(summaryJSON, res, Version); err != nil {
+	if out.summaryJSON != "" {
+		if err := report.WriteJSONFile(out.summaryJSON, res, Version); err != nil {
 			errs = append(errs, fmt.Errorf("--summary-json: %w", err))
+		}
+	}
+	if out.reportHTML != "" {
+		if err := report.WriteHTMLFile(out.reportHTML, res, Version); err != nil {
+			errs = append(errs, fmt.Errorf("--report-html: %w", err))
 		}
 	}
 	if res.Interrupted {

@@ -2,10 +2,7 @@ package report
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/Arunraj-QA/loadtool/internal/config"
@@ -36,6 +33,26 @@ type jsonSummary struct {
 	Metrics    jsonMetrics     `json:"metrics"`
 	Checks     []jsonCheck     `json:"checks"`
 	Thresholds []jsonThreshold `json:"thresholds"`
+	// Series was added to schema version 1 in Phase 1 step 11 (an
+	// additive change).
+	Series []jsonPoint `json:"series"`
+}
+
+// jsonPoint is one second of the time series (ADR-012): requests that
+// completed in the interval ending at AtMs.
+type jsonPoint struct {
+	AtMs          float64    `json:"atMs"`
+	VUs           int        `json:"vus"`
+	HTTPReqs      int        `json:"http_reqs"`
+	HTTPReqFailed int        `json:"http_req_failed"`
+	Duration      *jsonPtDur `json:"http_req_duration"`
+}
+
+type jsonPtDur struct {
+	Avg float64 `json:"avg"`
+	P50 float64 `json:"p50"`
+	P95 float64 `json:"p95"`
+	P99 float64 `json:"p99"`
 }
 
 type jsonTool struct {
@@ -213,6 +230,14 @@ func buildJSON(r Result, version string) jsonSummary {
 		},
 		Checks:     checks,
 		Thresholds: make([]jsonThreshold, 0, len(r.Thresholds)),
+		Series:     make([]jsonPoint, 0, len(r.Series)),
+	}
+	for _, p := range r.Series {
+		jp := jsonPoint{AtMs: ms(p.At), VUs: p.VUs, HTTPReqs: p.Requests, HTTPReqFailed: p.Failed}
+		if p.Requests > 0 {
+			jp.Duration = &jsonPtDur{Avg: ms(p.Mean), P50: ms(p.P50), P95: ms(p.P95), P99: ms(p.P99)}
+		}
+		doc.Series = append(doc.Series, jp)
 	}
 	if s.Sent > 0 {
 		doc.Metrics.HTTPReqDuration = &jsonTrend{Count: s.Sent,
@@ -272,18 +297,5 @@ func unitName(u thresholds.Unit) string {
 // file in the same directory, then renamed, so a reader never sees a
 // partial file and a failed write leaves an existing file untouched.
 func WriteJSONFile(path string, r Result, version string) error {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".loadtool-summary-*.json")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name()) // no-op after a successful rename
-	if err := JSON(tmp, r, version); err != nil {
-		tmp.Close()
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	return os.Rename(tmp.Name(), path)
+	return writeAtomic(path, ".loadtool-summary-*.json", func(w io.Writer) error { return JSON(w, r, version) })
 }

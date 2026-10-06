@@ -46,5 +46,6 @@
     }
   },
   "checks": [],
-  "thresholds": []
+  "thresholds": [],
+  "series": []
 }

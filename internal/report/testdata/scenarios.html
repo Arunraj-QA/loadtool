@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="LoadTool v0.0.0-test">
+<title>LoadTool report: scenarios.ts</title>
+<style>
+:root { --bg:#ffffff; --fg:#1b1f24; --muted:#5b6470; --card:#f4f6f8; --line:#d6dbe1;
+  --c1:#2563eb; --c2:#d97706; --c3:#7c3aed; --good:#15803d; --bad:#dc2626; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#0f1318; --fg:#e6e9ed; --muted:#9aa4b0; --card:#1a2028; --line:#2c3440;
+    --c1:#60a5fa; --c2:#fbbf24; --c3:#c4b5fd; --good:#4ade80; --bad:#f87171; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1040px; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; word-break: break-all; }
+h2 { font-size: 1.1rem; margin: 32px 0 12px; }
+.meta { color: var(--muted); margin: 0; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 600; font-size: .85rem; }
+.badge.ok { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+.badge.fail { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.alert { border-left: 4px solid var(--bad); background: var(--card); padding: 8px 12px; margin: 16px 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
+.card { background: var(--card); border-radius: 8px; padding: 12px 14px; }
+.card .label { color: var(--muted); font-size: .85rem; }
+.card .value { font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.card .note { color: var(--muted); font-size: .8rem; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+th.num, td.num { text-align: right; }
+.pass { color: var(--good); font-weight: 700; }
+.fail { color: var(--bad); font-weight: 700; }
+.err { color: var(--muted); font-size: .85rem; word-break: break-word; }
+.scroll { overflow-x: auto; }
+.charts { display: grid; gap: 16px; }
+.chart { margin: 0; background: var(--card); border-radius: 8px; padding: 12px; }
+.chart figcaption { font-weight: 600; margin-bottom: 4px; }
+.chart .unit { color: var(--muted); font-weight: 400; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { stroke: var(--muted); stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 11px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: .85rem; }
+.legend i { display: inline-block; width: 12px; height: 3px; margin-right: 6px; vertical-align: middle; }
+footer { color: var(--muted); font-size: .8rem; margin-top: 40px; }
+</style>
+</head>
+<body>
+<main>
+<h1>examples/scenarios.ts</h1>
+<p class="meta">
+<span class="badge ok">passed</span>
+ · completed</p>
+
+<p class="alert">1,234 iterations were dropped (no free VU): the target arrival rate was not reached. Raise preAllocatedVUs.</p>
+
+<section class="cards" aria-label="Summary">
+<div class="card"><div class="label">Requests</div><div class="value">5,000</div><div class="note">70.4 req/s</div></div>
+<div class="card"><div class="label">Errors</div><div class="value">0.00%</div><div class="note">0 failed</div></div>
+<div class="card"><div class="label">p95 latency</div><div class="value">13.00ms</div><div class="note">all requests sent</div></div>
+<div class="card"><div class="label">VUs</div><div class="value">81</div><div class="note">for 1m10s (elapsed 71.00s)</div></div>
+</section>
+
+
+
+
+
+<h2>Over time</h2>
+<div class="charts"><figure class="chart"><figcaption>Latency <span class="unit">(ms)</span></figcaption><svg viewBox="0 0 720 240" role="img" aria-label="Latency over time in seconds"><line class="grid" x1="56" x2="704" y1="208.0" y2="208.0"/><text class="tick" x="50" y="212.0" text-anchor="end">0</text><line class="grid" x1="56" x2="704" y1="160.0" y2="160.0"/><text class="tick" x="50" y="164.0" text-anchor="end">5</text><line class="grid" x1="56" x2="704" y1="112.0" y2="112.0"/><text class="tick" x="50" y="116.0" text-anchor="end">10</text><line class="grid" x1="56" x2="704" y1="64.0" y2="64.0"/><text class="tick" x="50" y="68.0" text-anchor="end">15</text><line class="grid" x1="56" x2="704" y1="16.0" y2="16.0"/><text class="tick" x="50" y="20.0" text-anchor="end">20</text><text class="tick" x="56.0" y="230" text-anchor="middle">0s</text><text class="tick" x="185.6" y="230" text-anchor="middle">0.5s</text><text class="tick" x="315.2" y="230" text-anchor="middle">1s</text><text class="tick" x="444.8" y="230" text-anchor="middle">1.5s</text><text class="tick" x="574.4" y="230" text-anchor="middle">2s</text><text class="tick" x="704.0" y="230" text-anchor="middle">2.5s</text><line class="axis" x1="56" x2="704" y1="208" y2="208"/><path d="M315.2 102.4 M704.0 112.0" fill="none" stroke="var(--c1)" stroke-width="2" stroke-linejoin="round"><title>p50</title></path><path d="M315.2 83.2 M704.0 92.8" fill="none" stroke="var(--c2)" stroke-width="2" stroke-linejoin="round"><title>p95</title></path><path d="M315.2 16.0 M704.0 64.0" fill="none" stroke="var(--c3)" stroke-width="2" stroke-linejoin="round"><title>p99</title></path></svg><div class="legend"><span><i style="background:var(--c1)"></i>p50</span><span><i style="background:var(--c2)"></i>p95</span><span><i style="background:var(--c3)"></i>p99</span></div></figure><figure class="chart"><figcaption>Requests per second <span class="unit">(req/s)</span></figcaption><svg viewBox="0 0 720 240" role="img" aria-label="Requests per second over time in seconds"><line class="grid" x1="56" x2="704" y1="208.0" y2="208.0"/><text class="tick" x="50" y="212.0" text-anchor="end">0</text><line class="grid" x1="56" x2="704" y1="160.0" y2="160.0"/><text class="tick" x="50" y="164.0" text-anchor="end">20</text><line class="grid" x1="56" x2="704" y1="112.0" y2="112.0"/><text class="tick" x="50" y="116.0" text-anchor="end">40</text><line class="grid" x1="56" x2="704" y1="64.0" y2="64.0"/><text class="tick" x="50" y="68.0" text-anchor="end">60</text><line class="grid" x1="56" x2="704" y1="16.0" y2="16.0"/><text class="tick" x="50" y="20.0" text-anchor="end">80</text><text class="tick" x="56.0" y="230" text-anchor="middle">0s</text><text class="tick" x="185.6" y="230" text-anchor="middle">0.5s</text><text class="tick" x="315.2" y="230" text-anchor="middle">1s</text><text class="tick" x="444.8" y="230" text-anchor="middle">1.5s</text><text class="tick" x="574.4" y="230" text-anchor="middle">2s</text><text class="tick" x="704.0" y="230" text-anchor="middle">2.5s</text><line class="axis" x1="56" x2="704" y1="208" y2="208"/><path d="M315.2 40.0 L574.4 208.0 L704.0 40.0" fill="none" stroke="var(--c1)" stroke-width="2" stroke-linejoin="round"><title>requests</title></path><path d="M315.2 205.6 L574.4 208.0 L704.0 208.0" fill="none" stroke="var(--bad)" stroke-width="2" stroke-linejoin="round"><title>failed</title></path></svg><div class="legend"><span><i style="background:var(--c1)"></i>requests</span><span><i style="background:var(--bad)"></i>failed</span></div></figure><figure class="chart"><figcaption>Active VUs <span class="unit">(VUs)</span></figcaption><svg viewBox="0 0 720 240" role="img" aria-label="Active VUs over time in seconds"><line class="grid" x1="56" x2="704" y1="208.0" y2="208.0"/><text class="tick" x="50" y="212.0" text-anchor="end">0</text><line class="grid" x1="56" x2="704" y1="144.0" y2="144.0"/><text class="tick" x="50" y="148.0" text-anchor="end">5</text><line class="grid" x1="56" x2="704" y1="80.0" y2="80.0"/><text class="tick" x="50" y="84.0" text-anchor="end">10</text><line class="grid" x1="56" x2="704" y1="16.0" y2="16.0"/><text class="tick" x="50" y="20.0" text-anchor="end">15</text><text class="tick" x="56.0" y="230" text-anchor="middle">0s</text><text class="tick" x="185.6" y="230" text-anchor="middle">0.5s</text><text class="tick" x="315.2" y="230" text-anchor="middle">1s</text><text class="tick" x="444.8" y="230" text-anchor="middle">1.5s</text><text class="tick" x="574.4" y="230" text-anchor="middle">2s</text><text class="tick" x="704.0" y="230" text-anchor="middle">2.5s</text><line class="axis" x1="56" x2="704" y1="208" y2="208"/><path d="M315.2 54.4 L574.4 208.0 L704.0 208.0" fill="none" stroke="var(--c1)" stroke-width="2" stroke-linejoin="round"><title>VUs</title></path></svg><div class="legend"><span><i style="background:var(--c1)"></i>VUs</span></div></figure></div>
+
+<h2>Latency</h2>
+<div class="scroll"><table>
+<thead><tr><th scope="col"></th><th scope="col" class="num">All requests sent</th><th scope="col" class="num">Successful only</th></tr></thead>
+<tbody><tr><th scope="row">min</th><td class="num">9.00ms</td><td class="num">—</td></tr>
+<tr><th scope="row">mean</th><td class="num">11.00ms</td><td class="num">—</td></tr>
+<tr><th scope="row">p50</th><td class="num">11.00ms</td><td class="num">11.00ms</td></tr>
+<tr><th scope="row">p90</th><td class="num">12.00ms</td><td class="num">12.00ms</td></tr>
+<tr><th scope="row">p95</th><td class="num">13.00ms</td><td class="num">13.00ms</td></tr>
+<tr><th scope="row">p99</th><td class="num">20.00ms</td><td class="num">20.00ms</td></tr>
+<tr><th scope="row">max</th><td class="num">30.00ms</td><td class="num">—</td></tr>
+</tbody></table></div>
+<p class="meta">Percentiles are within ±0.78 %; min, mean and max are exact.</p>
+
+
+<h2>Run</h2>
+<div class="scroll"><table><tbody>
+<tr><th scope="row">Script errors</th><td>0</td></tr>
+<tr><th scope="row">Scenarios</th><td>browse: ramping-vus, up to 50 VUs over 30s</td></tr>
+<tr><th scope="row"></th><td>orders: constant-arrival-rate, 20 iterations per 1s for 1m0s, 30 VUs, starting at 10s, exec placeOrder</td></tr>
+</tbody></table></div>
+
+<footer>Generated by LoadTool v0.0.0-test. Self-contained: no scripts or external resources.</footer>
+</main>
+</body>
+</html>

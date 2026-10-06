@@ -78,6 +78,11 @@ var goldenCases = map[string]Result{
 			{Name: "orders", Executor: config.ConstantArrivalRate, Exec: "placeOrder", StartTime: 10 * time.Second, GracefulStop: 30 * time.Second,
 				Rate: 20, TimeUnit: time.Second, Duration: time.Minute, PreAllocatedVUs: 30},
 		},
+		Series: []metrics.Point{
+			{At: time.Second, Requests: 70, Failed: 1, Mean: 11 * time.Millisecond, P50: 11 * time.Millisecond, P95: 13 * time.Millisecond, P99: 20 * time.Millisecond, VUs: 12},
+			{At: 2 * time.Second, Requests: 0, VUs: 0},
+			{At: 2500 * time.Millisecond, Requests: 35, Mean: 10 * time.Millisecond, P50: 10 * time.Millisecond, P95: 12 * time.Millisecond, P99: 15 * time.Millisecond, VUs: 0},
+		},
 		Summary: metrics.Summary{
 			Requests: 5000, Successes: 5000, Sent: 5000, Iterations: 4900, DroppedIterations: 1234,
 			Min: 9 * time.Millisecond, Mean: 11 * time.Millisecond, Max: 30 * time.Millisecond,

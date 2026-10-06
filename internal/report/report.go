@@ -41,6 +41,8 @@ type Result struct {
 	Scenarios []config.Scenario
 	// Started is when the test clock started; zero if unknown.
 	Started time.Time
+	// Series is the per-second time series (ADR-012).
+	Series []metrics.Point
 }
 
 // Console writes the human-readable summary to w.

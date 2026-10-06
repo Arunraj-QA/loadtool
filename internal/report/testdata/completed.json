@@ -61,5 +61,6 @@
     }
   },
   "checks": [],
-  "thresholds": []
+  "thresholds": [],
+  "series": []
 }

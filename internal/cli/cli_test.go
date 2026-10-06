@@ -542,3 +542,30 @@ func TestRunSummaryJSONNotWrittenWithoutResult(t *testing.T) {
 		t.Errorf("summary file exists after a failed start (stat error %v)", err)
 	}
 }
+
+func TestRunReportHTML(t *testing.T) {
+	srv := statusServer(t, http.StatusOK)
+	dir := t.TempDir()
+	out := filepath.Join(dir, "report.html")
+	path := scriptFile(t, `import http from "loadtool/http";
+export const options = { thresholds: { http_reqs: ["count<0"] } };
+export default function () { http.get("`+srv.URL+`"); }`)
+	_, _, err := execute(t, "run", path, "--duration", "100ms", "--report-html", out, "--summary-json", filepath.Join(dir, "s.json"))
+	// Written even though thresholds failed (exit 99).
+	if ExitCode(err) != ExitThresholdsFailed {
+		t.Fatalf("exit code %d (%v)", ExitCode(err), err)
+	}
+	b, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(b)
+	for _, want := range []string{"<!doctype html>", `<span class="badge fail">failed</span>`, "count&lt;0", "Latency"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("report misses %q", want)
+		}
+	}
+	if _, _, err := execute(t, "run", path, "--duration", "50ms", "--report-html", filepath.Join(dir, "missing", "r.html")); ExitCode(err) != 1 || !strings.Contains(err.Error(), "--report-html") {
+		t.Errorf("unwritable report: exit %d (%v), want 1", ExitCode(err), err)
+	}
+}

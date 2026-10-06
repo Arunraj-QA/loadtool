@@ -1,3 +1,4 @@
 # Golden files are compared byte for byte; never convert their line endings.
 *.golden -text
 internal/report/testdata/*.json -text
+internal/report/testdata/*.html -text

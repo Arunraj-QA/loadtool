@@ -88,5 +88,38 @@
     }
   },
   "checks": [],
-  "thresholds": []
+  "thresholds": [],
+  "series": [
+    {
+      "atMs": 1000,
+      "vus": 12,
+      "http_reqs": 70,
+      "http_req_failed": 1,
+      "http_req_duration": {
+        "avg": 11,
+        "p50": 11,
+        "p95": 13,
+        "p99": 20
+      }
+    },
+    {
+      "atMs": 2000,
+      "vus": 0,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 2500,
+      "vus": 0,
+      "http_reqs": 35,
+      "http_req_failed": 0,
+      "http_req_duration": {
+        "avg": 10,
+        "p50": 10,
+        "p95": 12,
+        "p99": 15
+      }
+    }
+  ]
 }
