@@ -179,8 +179,13 @@ func TestTeardownRunsAfterInterrupt(t *testing.T) {
 	if !res.Interrupted || res.TeardownError != "" {
 		t.Errorf("Interrupted=%v TeardownError=%q, want interrupted with a successful teardown", res.Interrupted, res.TeardownError)
 	}
-	if got := srv.log(); got != "/login /work /logout" {
-		t.Errorf("server saw %q, want teardown after the interrupted load phase", got)
+	// Requests the interrupt cancelled may still reach the server after
+	// teardown's (cancellation is client-side), so the server's order
+	// after the first /work is not checked; that teardown starts after
+	// every VU has returned is guaranteed by engine.RunScenarios.
+	got := srv.log()
+	if !strings.HasPrefix(got, "/login /work") || !strings.Contains(got, "/logout") {
+		t.Errorf("server saw %q, want setup, the load phase and then teardown despite the interrupt", got)
 	}
 }
 
