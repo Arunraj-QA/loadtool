@@ -218,3 +218,20 @@ export default function () {}`)
 		}
 	}
 }
+
+// Cancelling the test while setup runs interrupts it even when setup then
+// returns normally (sleep returns early when the test ends), so the
+// runner never starts VUs after Ctrl+C.
+func TestSetupCancelledButReturnedIsInterrupted(t *testing.T) {
+	l := lifecycle(t, compile(t, "test.ts", `import { sleep } from "loadtool";
+export function setup() { sleep(60); return { ok: true }; }
+export default function () {}`))
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(20*time.Millisecond, cancel)
+	for range 20 { // the race between return and interrupt is timing dependent
+		_, err := l.Setup(ctx, http.DefaultClient, time.Minute)
+		if err == nil || !strings.Contains(err.Error(), "setup interrupted") {
+			t.Fatalf("error = %v, want setup interrupted", err)
+		}
+	}
+}

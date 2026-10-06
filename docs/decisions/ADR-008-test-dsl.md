@@ -366,6 +366,12 @@ Mutations to `data` stay inside that VU.
 *Cancellation:*
 
 - Ctrl+C during setup stops setup and ends the test.
+- A phase counts as interrupted when the test was cancelled by the time
+  it returned, even if the function returned normally. `sleep` returns
+  early on cancellation and the interrupt arrives asynchronously, so the
+  JavaScript may finish first. Before this rule (found by a stress run,
+  2026-10-06), such a setup counted as successful and the runner went on
+  to start VUs and teardown after Ctrl+C.
 - After a Ctrl+C that stopped the load phase, teardown runs on a context
   that ignores that cancellation, bounded by `teardownTimeout`. A second
   Ctrl+C ends the process.

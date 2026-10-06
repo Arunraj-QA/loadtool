@@ -136,10 +136,15 @@ func (l *Lifecycle) call(ctx context.Context, client *http.Client, timeout time.
 	vu.ctx, vu.rec, vu.client = nil, nil, nil
 
 	switch {
-	case err == nil:
-		return v, nil
+	// Checked first: if the test was cancelled while the function ran,
+	// it counts as interrupted even if it returned normally. sleep
+	// returns early on cancellation and the interrupt arrives
+	// asynchronously, so the JavaScript can finish first; treating that
+	// as success would start VUs (and later teardown) after Ctrl+C.
 	case ctx.Err() != nil:
 		return nil, fmt.Errorf("%s interrupted: %w", name, context.Cause(ctx))
+	case err == nil:
+		return v, nil
 	case errors.Is(callCtx.Err(), context.DeadlineExceeded):
 		return nil, fmt.Errorf("%s did not finish within %s (%s %s)", name, timeoutOption, timeoutOption, timeout)
 	default:
