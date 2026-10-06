@@ -71,7 +71,7 @@ Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd)
 | HTTP/2 | HTTP | `internal/httpclient` | 6 HTTP/2 | Done (ADR-010): `httpVersion` auto/1.1/2 with h2c through `http.Protocols`; `res.proto` |
 | Sessions | HTTP | `internal/httpclient` (per-VU client and cookie jar; reuse options) | 7 connection reuse, 8 cookies/sessions | Done (ADR-009): per-VU client and lazy cookie jar over the shared transport; `noCookiesReset`, `noConnectionReuse` |
 | JSON Reporter | Console (`report.Result`) | `internal/report` | 9 JSON output | Done (ADR-011): `--summary-json`, schema version 1, `docs/json-summary.md` |
-| HTML Reporter | Console (`report.Result`) | `internal/report` | 10 self-contained HTML report | Planned |
+| HTML Reporter | Console (`report.Result`) | `internal/report` | 10 self-contained HTML report | Done (ADR-012): `--report-html`, per-second series sampled from the shared histograms |
 | CI | CLI | `action.yml`, `.github/workflows/release.yml`, `docs/ci/` | 11 GitHub Action, 12 generic CI recipe | Planned |
 
 Roadmap items 13–15 (documentation, 5–10 examples, preparation for
@@ -94,7 +94,7 @@ Each step is one branch merged into `phase-1-mvp` after CI passes.
 | 8 | Per-VU client and cookie jar, connection-reuse options | Sessions | Done |
 | 9 | HTTP/2 and h2c | HTTP/2 | Done |
 | 10 | Versioned JSON output | JSON Reporter | Done |
-| 11 | Self-contained HTML report with time series | HTML Reporter | Planned |
+| 11 | Self-contained HTML report with time series | HTML Reporter | Done |
 | 12 | Release builds, GitHub Action, generic CI recipe | CI | Planned |
 | 13 | Documentation, 5–10 examples, preparation for external users | — | Planned |
 | 14 | Re-run the benchmark; agree and check the Phase 1 exit criteria | — | Planned |

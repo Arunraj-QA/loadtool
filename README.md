@@ -49,6 +49,7 @@ go build -o bin/loadtool ./cmd/loadtool
 | `--graceful-stop` | `30s` | How long iterations still running when `--duration` ends may take to finish; `0` cancels them at once |
 | `-e, --env` | | Set `KEY=VALUE` in the script's `__ENV` (repeatable; overrides the process environment) |
 | `--summary-json` | | Also write the end-of-test summary as versioned JSON to this file ([format](docs/json-summary.md)) |
+| `--report-html` | | Also write a self-contained HTML report with charts over time to this file |
 
 Press Ctrl+C to stop early. A partial summary is printed and the exit code is 1.
 

@@ -61,6 +61,7 @@ jq '.metrics.http_req_duration.p95' summary.json
 | `metrics.script_errors` | `{count, first}` | Iterations that threw, and the first message |
 | `checks[]` | `{name, passes, fails, rate, firstError}` | Each check, in the order first run |
 | `thresholds[]` | `{metric, expression, passed, noData, observed, unit, approximate}` | Each threshold; `observed` is `null` with no data; `unit` is `ms`, `fraction`, `per-second` or `count` |
+| `series[]` | `{atMs, vus, http_reqs, http_req_failed, http_req_duration}` | The time series, one point per second plus a final, partial one ([ADR-012](decisions/ADR-012-html-report-and-time-series.md)). Counts are of requests that completed in the interval ending at `atMs`; `vus` is the active VUs at `atMs` (from the scenario definitions); `http_req_duration` is `{avg, p50, p95, p99}`, or `null` for an interval without requests. Added in Phase 1 step 11 (additive). |
 
 **Precision.** Latency percentiles are within ±0.78 %, while `min`, `avg`
 and `max` are exact (ADR-004). `approximate: true` marks a percentile
