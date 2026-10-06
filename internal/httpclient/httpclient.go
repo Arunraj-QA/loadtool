@@ -43,6 +43,41 @@ type Options struct {
 	// NoConnectionReuse disables keep-alive: every request opens a new
 	// connection (options.noConnectionReuse, ADR-009).
 	NoConnectionReuse bool
+	// HTTPVersion selects the protocols (ADR-010): HTTPAuto (also the
+	// zero value), HTTP11 or HTTP2.
+	HTTPVersion string
+	// TLSConfig, if set, replaces the default TLS settings; tests use it
+	// to trust a test server's certificate.
+	TLSConfig *tls.Config
+}
+
+// HTTP versions for Options.HTTPVersion and options.httpVersion.
+const (
+	// HTTPAuto uses HTTP/2 over TLS when the server offers it (ALPN) and
+	// HTTP/1.1 otherwise, as k6 does.
+	HTTPAuto = "auto"
+	// HTTP11 always uses HTTP/1.1 (the Phase 0 behaviour).
+	HTTP11 = "1.1"
+	// HTTP2 only uses HTTP/2: over TLS, or h2c (prior knowledge) for
+	// http:// URLs. A TLS server without HTTP/2 fails the request.
+	HTTP2 = "2"
+)
+
+// protocols returns the transport protocols for an HTTP version.
+func protocols(version string) *http.Protocols {
+	var p http.Protocols
+	switch version {
+	case HTTP11:
+		p.SetHTTP1(true)
+	case HTTP2:
+		// Without HTTP1, http:// URLs use unencrypted HTTP/2.
+		p.SetHTTP2(true)
+		p.SetUnencryptedHTTP2(true)
+	default: // HTTPAuto
+		p.SetHTTP1(true)
+		p.SetHTTP2(true)
+	}
+	return &p
 }
 
 // NewWithOptions is New with every setting (see New).
@@ -54,9 +89,10 @@ func NewWithOptions(o Options) *http.Client {
 	t.MaxIdleConns = maxConnsPerHost
 	t.MaxIdleConnsPerHost = maxConnsPerHost
 	t.DisableCompression = true
-	// Phase 0 is HTTP/1.1 only: disable HTTP/2 negotiation over TLS.
-	t.ForceAttemptHTTP2 = false
-	t.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	t.Protocols = protocols(o.HTTPVersion)
+	if o.TLSConfig != nil {
+		t.TLSClientConfig = o.TLSConfig.Clone()
+	}
 
 	return &http.Client{
 		Transport: t,
@@ -89,6 +125,9 @@ type Result struct {
 	Err      error
 	// Header is the response's header, nil if no response was received.
 	Header http.Header
+	// Proto is the protocol of the response, such as "HTTP/1.1" or
+	// "HTTP/2.0"; empty if no response was received.
+	Proto string
 	// Body is the response body when Request.KeepBody is set. It is
 	// non-nil (possibly empty) whenever a body was kept, so callers can
 	// tell an empty body from a discarded one.
@@ -124,6 +163,7 @@ func Do(ctx context.Context, client *http.Client, r Request, rec *metrics.Record
 	if err == nil {
 		res.Status = resp.StatusCode
 		res.Header = resp.Header
+		res.Proto = resp.Proto
 		// Read the body to the end either way, so the connection returns
 		// to the pool and Duration includes the transfer.
 		if r.KeepBody {

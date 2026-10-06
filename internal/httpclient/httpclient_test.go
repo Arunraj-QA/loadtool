@@ -161,26 +161,98 @@ func TestDoDoesNotFollowRedirects(t *testing.T) {
 	}
 }
 
-func TestClientUsesHTTP1OverTLS(t *testing.T) {
-	var proto atomic.Value
+// The protocol used for each httpVersion against each kind of server
+// (ADR-010). "2" never falls back to HTTP/1.1.
+func TestHTTPVersions(t *testing.T) {
+	servers := map[string]func(h http.Handler) *httptest.Server{
+		"tls+h2": func(h http.Handler) *httptest.Server {
+			srv := httptest.NewUnstartedServer(h)
+			srv.EnableHTTP2 = true
+			srv.StartTLS()
+			return srv
+		},
+		"tls-only-http1": func(h http.Handler) *httptest.Server {
+			return httptest.NewTLSServer(h)
+		},
+		"cleartext+h2c": func(h http.Handler) *httptest.Server {
+			srv := httptest.NewUnstartedServer(h)
+			srv.Config.Protocols = new(http.Protocols)
+			srv.Config.Protocols.SetHTTP1(true)
+			srv.Config.Protocols.SetUnencryptedHTTP2(true)
+			srv.Start()
+			return srv
+		},
+		"cleartext-only-http1": httptest.NewServer,
+	}
+	tests := []struct {
+		server, version string
+		want            string // protocol, or "" for a failed request
+	}{
+		{"tls+h2", HTTPAuto, "HTTP/2.0"},
+		{"tls+h2", HTTP11, "HTTP/1.1"},
+		{"tls+h2", HTTP2, "HTTP/2.0"},
+		{"tls-only-http1", HTTPAuto, "HTTP/1.1"},
+		{"tls-only-http1", HTTP2, ""},
+		{"cleartext+h2c", HTTPAuto, "HTTP/1.1"},
+		{"cleartext+h2c", HTTP11, "HTTP/1.1"},
+		{"cleartext+h2c", HTTP2, "HTTP/2.0"},
+		{"cleartext-only-http1", HTTP2, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.server+"/"+tt.version, func(t *testing.T) {
+			var seen atomic.Value
+			srv := servers[tt.server](http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				seen.Store(r.Proto)
+			}))
+			t.Cleanup(srv.Close)
+			o := Options{MaxConnsPerHost: 1, Timeout: 5 * time.Second, HTTPVersion: tt.version}
+			if srv.TLS != nil {
+				o.TLSConfig = srv.Client().Transport.(*http.Transport).TLSClientConfig
+			}
+			rec := &metrics.Recorder{}
+			res := Do(context.Background(), NewWithOptions(o), get(srv.URL), rec)
+			if tt.want == "" {
+				if res.Err == nil {
+					t.Fatalf("request succeeded with %s, want an error: %q must not fall back", res.Proto, tt.version)
+				}
+				return
+			}
+			if res.Err != nil {
+				t.Fatal(res.Err)
+			}
+			if res.Proto != tt.want || seen.Load() != tt.want {
+				t.Errorf("client saw %s, server saw %v, want %s", res.Proto, seen.Load(), tt.want)
+			}
+		})
+	}
+}
+
+// HTTP/2 multiplexes VUs' concurrent requests over one connection.
+func TestHTTP2SharesAConnection(t *testing.T) {
+	var conns atomic.Int64
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		proto.Store(r.Proto)
+		time.Sleep(20 * time.Millisecond) // keep requests in flight together
 	}))
+	srv.Config.ConnState = func(_ net.Conn, s http.ConnState) {
+		if s == http.StateNew {
+			conns.Add(1)
+		}
+	}
 	srv.EnableHTTP2 = true
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
 
-	client := New(1, DefaultTimeout)
-	// Trust the test server's certificate while keeping our HTTP/1.1 settings.
-	client.Transport.(*http.Transport).TLSClientConfig = srv.Client().Transport.(*http.Transport).TLSClientConfig
-
-	rec := &metrics.Recorder{}
-	Do(context.Background(), client, get(srv.URL), rec)
-	if s := summarize(rec); s.Successes != 1 {
-		t.Fatalf("got %+v, want 1 success", s)
+	client := NewWithOptions(Options{MaxConnsPerHost: 10, Timeout: 5 * time.Second,
+		TLSConfig: srv.Client().Transport.(*http.Transport).TLSClientConfig})
+	// One request first, so the HTTP/2 connection exists before the burst.
+	Do(context.Background(), client, get(srv.URL), &metrics.Recorder{})
+	var wg sync.WaitGroup
+	for range 10 {
+		wg.Go(func() { Do(context.Background(), client, get(srv.URL), &metrics.Recorder{}) })
 	}
-	if got := proto.Load(); got != "HTTP/1.1" {
-		t.Errorf("server saw %v, want HTTP/1.1", got)
+	wg.Wait()
+	if n := conns.Load(); n != 1 {
+		t.Errorf("opened %d connections for 11 HTTP/2 requests, want 1", n)
 	}
 }
 
