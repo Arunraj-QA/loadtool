@@ -37,7 +37,19 @@ jobs:
       - name: go test
         run: go test ./...
 
-      # The race detector needs cgo; Linux runners ship with gcc.
+      # The race detector needs cgo; Linux runners ship with gcc. On
+      # failure, the failing tests and race reports are also published as
+      # one annotation: annotations are readable without signing in,
+      # unlike job logs.
       - name: go test -race
         if: runner.os == 'Linux'
-        run: go test -race -count=3 ./...
+        run: |
+          set -o pipefail
+          if ! go test -race -count=3 ./... 2>&1 | tee race.log; then
+            excerpt=$(awk '/WARNING: DATA RACE/ {n=40} n>0 {print; n--; next} /^(--- FAIL|FAIL|panic:)|_test\.go:[0-9]+:/ {print}' race.log | head -n 150)
+            excerpt=${excerpt//'%'/'%25'}
+            excerpt=${excerpt//$'\r'/}
+            excerpt=${excerpt//$'\n'/'%0A'}
+            echo "::error title=go test -race failed::${excerpt}"
+            exit 1
+          fi
