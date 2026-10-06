@@ -56,7 +56,7 @@ Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd)
 | Runner | `internal/runner` | Done. Orchestrates a run: load the script, resolve options, start VUs, run the engine, return the `report.Result`. Extracted from the CLI in Phase 1 step 3, so the CLI only parses flags and prints. Runs the lifecycle: setup once, the load phase, then teardown whenever setup completed (ADR-008). Scenarios and thresholds extend the Runner. |
 | VU | `internal/engine` | Done: goroutine per VU, started before the clock, graceful stop |
 | goja | `internal/script` | Done: one runtime per VU, call-depth limit, interrupts |
-| HTTP | `internal/httpclient` | Done: HTTP/1.1, at most one connection per VU, keep-alive |
+| HTTP | `internal/httpclient` | Done: HTTP/1.1, at most one connection per VU, keep-alive (HTTP/2 added in Phase 1, ADR-010) |
 | Metrics | `internal/metrics` | Done: fixed-size sharded histograms (ADR-004) |
 | Console | `internal/report` (`Console`) | Done: renders from `report.Result` |
 
@@ -68,7 +68,7 @@ Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd)
 | Scenario Engine | VU, Runner | `internal/engine` (executors: constant-vus, ramping-vus, constant-arrival-rate; scenarios) | 5 scenarios, 2 setup/teardown (run order) | Done (ADR-008): `engine.RunScenarios` with constant-vus, ramping-vus and constant-arrival-rate; setup/teardown run order in the Runner (`script.Lifecycle`) |
 | Checks | DSL, Metrics | `check()` in `internal/script`; `checks` metric in `internal/metrics` | 3 checks/assertions | Done (ADR-008) |
 | Thresholds | Metrics, Runner | new `internal/thresholds` | 4 thresholds; exit code | Done (ADR-008): `internal/thresholds`, exit code 99 |
-| HTTP/2 | HTTP | `internal/httpclient` | 6 HTTP/2 | Planned |
+| HTTP/2 | HTTP | `internal/httpclient` | 6 HTTP/2 | Done (ADR-010): `httpVersion` auto/1.1/2 with h2c through `http.Protocols`; `res.proto` |
 | Sessions | HTTP | `internal/httpclient` (per-VU client and cookie jar; reuse options) | 7 connection reuse, 8 cookies/sessions | Done (ADR-009): per-VU client and lazy cookie jar over the shared transport; `noCookiesReset`, `noConnectionReuse` |
 | JSON Reporter | Console (`report.Result`) | `internal/report` | 9 JSON output | Planned |
 | HTML Reporter | Console (`report.Result`) | `internal/report` | 10 self-contained HTML report | Planned |
@@ -92,7 +92,7 @@ Each step is one branch merged into `phase-1-mvp` after CI passes.
 | 6 | Threshold expressions and exit code | Thresholds | Done |
 | 7 | `setup`/`teardown` lifecycle (7a); executors and multiple scenarios (7b) | Scenario Engine | Done |
 | 8 | Per-VU client and cookie jar, connection-reuse options | Sessions | Done |
-| 9 | HTTP/2 and h2c | HTTP/2 | Planned |
+| 9 | HTTP/2 and h2c | HTTP/2 | Done |
 | 10 | Versioned JSON output | JSON Reporter | Planned |
 | 11 | Self-contained HTML report with time series | HTML Reporter | Planned |
 | 12 | Release builds, GitHub Action, generic CI recipe | CI | Planned |
@@ -358,7 +358,7 @@ flowchart LR
 |---|---|---|
 | `MaxConnsPerHost` | VUs | At most one connection per VU. Without it, background dials piled up and a 1,000-VU run crashed with thread exhaustion on Windows. |
 | `MaxIdleConns(PerHost)` | VUs | Every VU keeps its keep-alive connection |
-| HTTP/2 | disabled, including over TLS | Phase 0 is HTTP/1.1 only |
+| HTTP/2 | Phase 0: disabled, including over TLS. Phase 1: `options.httpVersion`, default `"auto"` (HTTP/2 over TLS when offered) | ADR-010 |
 | Redirects | not followed | One iteration = one measured request |
 | `DisableCompression` | true | No implicit `Accept-Encoding: gzip`, matching k6 and JMeter |
 | Timeout | 30 s, including reading the body | — |

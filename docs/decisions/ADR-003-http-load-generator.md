@@ -59,6 +59,8 @@ separate task, so the engine must work before scripts exist.
    - One shared `http.Client` per run, with idle connections per host
      equal to the VU count, so each VU can keep its connection alive.
    - HTTP/2 negotiation is disabled, so HTTPS also uses HTTP/1.1.
+     (Amended in Phase 1 by ADR-010: `httpVersion` defaults to "auto",
+     which negotiates HTTP/2 over TLS; "1.1" keeps this behaviour.)
    - Redirects are not followed, so one iteration is one measured request.
    - The response body is fully drained, so the connection can be reused.
    - Success means no transport error and a status below 400.

@@ -6,7 +6,7 @@ uses one goroutine per virtual user (VU).
 
 > **Status: early development (Phase 1 in progress).** `loadtool run`
 > executes a TypeScript or JavaScript test script with goja, generates
-> HTTP/1.1 load from one goroutine per VU, and prints a summary. The
+> HTTP/1.1 and HTTP/2 load from one goroutine per VU, and prints a summary. The
 > k6-shaped script API is being built out; see
 > [docs/architecture.md](docs/architecture.md) for the plan.
 
@@ -128,6 +128,7 @@ A response has:
 | `json()` | The body parsed as JSON; throws `SyntaxError` on invalid JSON |
 | `timings.duration` | Milliseconds, including reading the body |
 | `url` | The request URL |
+| `proto` | `"HTTP/1.1"` or `"HTTP/2.0"` |
 | `cookies` | Cookies this response set: `{ name: [{ name, value, domain, path, expires, max_age, http_only, secure }] }` |
 
 Bodies are read and kept by default. Set
@@ -276,6 +277,23 @@ Connections:
   request, to measure connection set-up or to test balancers that track
   connections.
 - **Not supported:** k6's `noVUConnectionReuse`.
+
+HTTP versions ([ADR-010](docs/decisions/ADR-010-http2.md); see
+[`examples/http2.ts`](examples/http2.ts)), set with `options.httpVersion`:
+
+| Value | `http://` | `https://` |
+|---|---|---|
+| `"auto"` (default) | HTTP/1.1 | HTTP/2 if the server offers it, else HTTP/1.1 |
+| `"1.1"` | HTTP/1.1 | HTTP/1.1 (Phase 0 behaviour; use it to compare with JMeter) |
+| `"2"` | HTTP/2 without TLS (h2c) | HTTP/2 only |
+
+Notes:
+- **No fallback with `"2"`.** A server without HTTP/2 fails the request
+  instead of silently using HTTP/1.1.
+- **One connection, many requests.** HTTP/2 carries many VUs' requests
+  over few connections.
+- **Checking the protocol.** `res.proto` shows which protocol each response
+  used.
 
 ### Scenarios
 
@@ -444,7 +462,7 @@ internal/report/     Result model and outputs (console summary)
 internal/config/     Run settings and validation
 internal/engine/     Goroutine-per-VU scheduler (protocol-agnostic)
 internal/script/     TypeScript/JavaScript loading and per-VU goja runtimes
-internal/httpclient/ HTTP/1.1 request execution
+internal/httpclient/ HTTP request execution (HTTP/1.1, HTTP/2)
 internal/metrics/    Per-VU recording and percentile aggregation
 examples/            Example test scripts
 benchmarks/          Recorded benchmark results
