@@ -136,8 +136,10 @@ func (s *starts) run(t *testing.T, scenarios ...Scenario) Result {
 }
 
 func TestRampingVUsJoinInOrder(t *testing.T) {
-	// 0 -> 4 VUs over 80ms, then 4 VUs for 80ms: VU i joins at (i+1)*20ms.
-	e := RampingVUs{Stages: []Stage{{80 * time.Millisecond, 4}, {80 * time.Millisecond, 4}}}
+	// 0 -> 4 VUs over 400ms, then 4 VUs for 400ms: VU i joins at
+	// (i+1)*100ms. The windows are wide so a goroutine delayed by a busy
+	// machine (or the race detector) still gets to run in its window.
+	e := RampingVUs{Stages: []Stage{{400 * time.Millisecond, 4}, {400 * time.Millisecond, 4}}}
 	s := newStarts()
 	res := s.run(t, Scenario{Name: "ramp", Executor: e, GracefulStop: time.Second, NewVU: s.newVU(5 * time.Millisecond)})
 	for vu := range 4 {
@@ -145,13 +147,13 @@ func TestRampingVUsJoinInOrder(t *testing.T) {
 		if len(got) == 0 {
 			t.Fatalf("VU %d never ran", vu)
 		}
-		if join := time.Duration(vu+1) * 20 * time.Millisecond; got[0] < join-time.Millisecond {
+		if join := time.Duration(vu+1) * 100 * time.Millisecond; got[0] < join-time.Millisecond {
 			t.Errorf("VU %d started at %v, before it joins at %v", vu, got[0], join)
 		}
 		// A VU checks the stages right before starting, so a start can
 		// trail the end only by scheduling delay; the margin is generous
 		// for slow runners and the race detector.
-		if last := got[len(got)-1]; last >= 160*time.Millisecond+50*time.Millisecond {
+		if last := got[len(got)-1]; last >= 800*time.Millisecond+50*time.Millisecond {
 			t.Errorf("VU %d started an iteration at %v, after the stages end", vu, last)
 		}
 	}
@@ -161,12 +163,12 @@ func TestRampingVUsJoinInOrder(t *testing.T) {
 }
 
 func TestRampingVUsLeaveInOrder(t *testing.T) {
-	// Jump to 4 VUs, then 4 -> 0 over 100ms: VU i leaves after (3-i)*25ms.
-	e := RampingVUs{Stages: []Stage{{0, 4}, {100 * time.Millisecond, 0}}}
+	// Jump to 4 VUs, then 4 -> 0 over 400ms: VU i leaves after (3-i)*100ms.
+	e := RampingVUs{Stages: []Stage{{0, 4}, {400 * time.Millisecond, 0}}}
 	s := newStarts()
 	s.run(t, Scenario{Name: "down", Executor: e, GracefulStop: time.Second, NewVU: s.newVU(2 * time.Millisecond)})
 	for vu := range 4 {
-		leave := time.Duration(3-vu) * 25 * time.Millisecond
+		leave := time.Duration(3-vu) * 100 * time.Millisecond
 		for _, at := range s.byVU[vu] {
 			// The VU checks it is active right before starting, so an
 			// iteration can begin only a moment after it leaves.
@@ -185,7 +187,7 @@ func TestRampingVUsLeaveInOrder(t *testing.T) {
 func TestGracefulRampDownCancelsLongIterations(t *testing.T) {
 	e := RampingVUs{
 		StartVUs:         1,
-		Stages:           []Stage{{50 * time.Millisecond, 1}, {0, 0}, {200 * time.Millisecond, 0}},
+		Stages:           []Stage{{400 * time.Millisecond, 1}, {0, 0}, {200 * time.Millisecond, 0}},
 		GracefulRampDown: 30 * time.Millisecond,
 	}
 	s := newStarts()
@@ -257,17 +259,17 @@ func TestScenariosRunConcurrentlyFromTheirStartTime(t *testing.T) {
 		return func(id int) (IterationFunc, error) { return inner(base + id) }
 	}
 	res := s.run(t,
-		Scenario{Name: "a", Executor: ConstantVUs{VUs: 2, Duration: 100 * time.Millisecond}, GracefulStop: time.Second, NewVU: ids(0)},
-		Scenario{Name: "b", Executor: ConstantVUs{VUs: 1, Duration: 50 * time.Millisecond}, StartTime: 80 * time.Millisecond, GracefulStop: time.Second, NewVU: ids(10)},
+		Scenario{Name: "a", Executor: ConstantVUs{VUs: 2, Duration: 400 * time.Millisecond}, GracefulStop: time.Second, NewVU: ids(0)},
+		Scenario{Name: "b", Executor: ConstantVUs{VUs: 1, Duration: 300 * time.Millisecond}, StartTime: 100 * time.Millisecond, GracefulStop: time.Second, NewVU: ids(10)},
 	)
 	if len(s.byVU[0]) == 0 || len(s.byVU[1]) == 0 || len(s.byVU[10]) == 0 {
 		t.Fatalf("not every VU ran: %v", s.byVU)
 	}
-	if first := s.byVU[10][0]; first < 80*time.Millisecond-time.Millisecond {
-		t.Errorf("scenario b started at %v, before its startTime of 80ms", first)
+	if first := s.byVU[10][0]; first < 100*time.Millisecond-time.Millisecond {
+		t.Errorf("scenario b started at %v, before its startTime of 100ms", first)
 	}
-	if res.Elapsed < 130*time.Millisecond {
-		t.Errorf("Elapsed = %v, want at least 130ms (b ends at 80+50ms)", res.Elapsed)
+	if res.Elapsed < 400*time.Millisecond {
+		t.Errorf("Elapsed = %v, want at least 400ms (b ends at 100+300ms)", res.Elapsed)
 	}
 }
 

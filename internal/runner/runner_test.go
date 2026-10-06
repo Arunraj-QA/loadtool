@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -102,10 +103,18 @@ func TestRunWarnsAboutUnsupportedOptions(t *testing.T) {
 }
 
 func TestRunInterruptedIsNotAnError(t *testing.T) {
-	srv := okServer(t)
-	path := getScript(t, srv.URL, "")
+	// Ctrl+C on the third request: the load phase is surely running and
+	// earlier requests have completed (the cancelled one is not counted).
 	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(100*time.Millisecond, cancel)
+	defer cancel()
+	var seen atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		if seen.Add(1) == 3 {
+			cancel()
+		}
+	}))
+	t.Cleanup(srv.Close)
+	path := getScript(t, srv.URL, "")
 
 	res, err := Run(ctx, Params{
 		Config:    config.Config{Script: path},

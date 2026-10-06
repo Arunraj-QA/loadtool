@@ -123,9 +123,12 @@ func TestRunScriptErrorsDoNotStopTest(t *testing.T) {
 }
 
 func TestRunInterrupted(t *testing.T) {
-	srv := statusServer(t, http.StatusOK)
+	// Ctrl+C on the first request, so the load phase is surely running
+	// (a timer could fire during start-up on a busy machine).
 	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(100*time.Millisecond, cancel)
+	defer cancel()
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { cancel() }))
+	t.Cleanup(srv.Close)
 
 	start := time.Now()
 	out, _, err := executeContext(t, ctx, "run", getScript(t, srv.URL), "--vus", "2", "--duration", "1h")

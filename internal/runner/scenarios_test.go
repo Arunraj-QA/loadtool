@@ -89,7 +89,7 @@ export function order() { http.get("`+srv.URL+`/order?vu=" + __VU); }`, config.O
 func TestStagesShorthandRamps(t *testing.T) {
 	srv := newVUServer(t)
 	res, err := runScript(t, `import http from "loadtool/http";
-export const options = { stages: [{ duration: "100ms", target: 3 }, { duration: "100ms", target: 3 }] };
+export const options = { stages: [{ duration: "300ms", target: 3 }, { duration: "300ms", target: 3 }] };
 export default function () { http.get("`+srv.URL+`/x?vu=" + __VU); }`, config.Overrides{}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ export default function () { http.get("`+srv.URL+`/x?vu=" + __VU); }`, config.Ov
 	if got := srv.vus("/x"); len(got) != 3 {
 		t.Errorf("VUs that ran: %v, want 3 (the stages reach 3)", got)
 	}
-	if res.VUs != 3 || res.Duration != 200*time.Millisecond || len(res.Scenarios) != 1 {
+	if res.VUs != 3 || res.Duration != 600*time.Millisecond || len(res.Scenarios) != 1 {
 		t.Errorf("VUs=%d Duration=%v Scenarios=%q", res.VUs, res.Duration, res.Scenarios)
 	}
 }
@@ -185,7 +185,7 @@ func TestConnectionReuseOption(t *testing.T) {
 			srv.Start()
 			t.Cleanup(srv.Close)
 			res, err := runScript(t, `import http from "loadtool/http";
-export const options = { vus: 2, duration: "100ms", `+tt.option+` };
+export const options = { vus: 2, duration: "300ms", `+tt.option+` };
 export default function () { http.get("`+srv.URL+`"); }`, config.Overrides{}, nil)
 			if err != nil {
 				t.Fatal(err)
