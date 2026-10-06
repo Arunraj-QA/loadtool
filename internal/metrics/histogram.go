@@ -105,8 +105,10 @@ func combine(hs []*histogram) combined {
 // percentile returns the nearest-rank percentile p (0 < p <= 100) as the
 // midpoint of the bucket holding that rank, clamped to the exact min and
 // max. c must not be empty.
-func (c combined) percentile(p int) time.Duration {
-	rank := max((uint64(p)*c.n+99)/100, 1)
+func (c combined) percentile(p float64) time.Duration {
+	// The tolerance absorbs float error: 99.9% of 1000 must be rank 999,
+	// though 99.9*1000/100 computes to slightly more than 999.
+	rank := max(uint64(math.Ceil(p*float64(c.n)/100-1e-9)), 1)
 	var seen uint64
 	for i, n := range c.counts {
 		seen += n

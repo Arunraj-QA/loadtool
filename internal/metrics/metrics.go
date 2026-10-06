@@ -31,6 +31,7 @@ type Recorder struct {
 
 	scriptErrors     int
 	firstScriptError string
+	iterations       int
 
 	// checkNames is shared by a run's recorders; checkIndex caches its
 	// indexes for this recorder, and checks is indexed by them.
@@ -72,6 +73,13 @@ func (r *Recorder) RecordUnsent() {
 	r.unsent++
 }
 
+// RecordIteration counts an iteration that ran to its end, with or without
+// a script error. Iterations cut short by the end of the test are not
+// counted.
+func (r *Recorder) RecordIteration() {
+	r.iterations++
+}
+
 // RecordScriptError counts an iteration that ended with a script error.
 // The first message is kept so the summary can show an example.
 func (r *Recorder) RecordScriptError(msg string) {
@@ -110,6 +118,23 @@ type Summary struct {
 
 	// Checks are the check() results in the order they were first run.
 	Checks []CheckResult
+
+	// Iterations counts iterations that ran to their end.
+	Iterations int
+
+	// latency is the merged histogram of every request sent; nil when
+	// none was. It backs Percentile.
+	latency *combined
+}
+
+// Percentile returns the nearest-rank latency percentile p (0 < p <= 100)
+// over every request sent, within ±0.78 %. ok is false when no request
+// was sent.
+func (s Summary) Percentile(p float64) (d time.Duration, ok bool) {
+	if s.latency == nil || p <= 0 || p > 100 {
+		return 0, false
+	}
+	return s.latency.percentile(p), true
 }
 
 // Merge aggregates recorders into a Summary. The recorders must no longer
@@ -121,6 +146,7 @@ func Merge(recorders []*Recorder) Summary {
 	for _, r := range recorders {
 		s.Failures += r.unsent
 		s.ScriptErrors += r.scriptErrors
+		s.Iterations += r.iterations
 		if s.FirstScriptError == "" {
 			s.FirstScriptError = r.firstScriptError
 		}
@@ -152,6 +178,7 @@ func Merge(recorders []*Recorder) Summary {
 	if all.n == 0 {
 		return s
 	}
+	s.latency = &all
 	s.Min = time.Duration(all.min)
 	s.Max = time.Duration(all.max)
 	s.Mean = time.Duration(all.sum / all.n)

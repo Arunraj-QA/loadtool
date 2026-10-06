@@ -307,3 +307,72 @@ func BenchmarkMerge(b *testing.B) {
 		Merge(recorders)
 	}
 }
+
+func TestSummaryPercentile(t *testing.T) {
+	var r Recorder
+	if _, ok := Merge([]*Recorder{&r}).Percentile(50); ok {
+		t.Fatal("Percentile with no requests sent: ok = true, want false")
+	}
+	// 1..1000 µs: nearest rank p is the value p*10 µs.
+	for i := 1; i <= 1000; i++ {
+		r.Record(time.Duration(i)*time.Microsecond, true)
+	}
+	s := Merge([]*Recorder{&r})
+	for _, tt := range []struct {
+		p    float64
+		want time.Duration
+	}{
+		{50, 500 * time.Microsecond},
+		{99, 990 * time.Microsecond},
+		{99.9, 999 * time.Microsecond},
+		{100, 1000 * time.Microsecond},
+	} {
+		got, ok := s.Percentile(tt.p)
+		if !ok {
+			t.Fatalf("Percentile(%v): ok = false", tt.p)
+		}
+		// Within the histogram's ±0.78 %.
+		if diff := math.Abs(float64(got-tt.want)) / float64(tt.want); diff > 0.0078 {
+			t.Errorf("Percentile(%v) = %v, want %v ±0.78%%", tt.p, got, tt.want)
+		}
+	}
+	if _, ok := s.Percentile(0); ok {
+		t.Error("Percentile(0): ok = true, want false")
+	}
+	if _, ok := s.Percentile(100.5); ok {
+		t.Error("Percentile(100.5): ok = true, want false")
+	}
+}
+
+func TestIterationsAreMerged(t *testing.T) {
+	recs := NewRecorders(3)
+	recs[0].RecordIteration()
+	recs[2].RecordIteration()
+	recs[2].RecordIteration()
+	if got := Merge(recs).Iterations; got != 3 {
+		t.Errorf("Iterations = %d, want 3", got)
+	}
+}
+
+// Values below 128 ns have a bucket each, so ranks can be checked exactly.
+// p(0.017) of 100,000 is rank 17, but 0.017*100000/100 computes to just
+// above 17 in floating point; without a tolerance the rank would be 18.
+func TestPercentileRankIsExact(t *testing.T) {
+	var r Recorder
+	for i := range 100_000 {
+		if i < 17 {
+			r.Record(1, true)
+		} else {
+			r.Record(100, true)
+		}
+	}
+	s := Merge([]*Recorder{&r})
+	for _, tt := range []struct {
+		p    float64
+		want time.Duration
+	}{{0.017, 1}, {0.018, 100}, {100, 100}} {
+		if got, _ := s.Percentile(tt.p); got != tt.want {
+			t.Errorf("Percentile(%v) = %v, want %v", tt.p, got, tt.want)
+		}
+	}
+}
