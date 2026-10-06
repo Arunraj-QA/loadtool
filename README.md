@@ -48,6 +48,7 @@ go build -o bin/loadtool ./cmd/loadtool
 | `-d, --duration` | `10s` | How long VUs keep starting new iterations |
 | `--graceful-stop` | `30s` | How long iterations still running when `--duration` ends may take to finish; `0` cancels them at once |
 | `-e, --env` | | Set `KEY=VALUE` in the script's `__ENV` (repeatable; overrides the process environment) |
+| `--summary-json` | | Also write the end-of-test summary as versioned JSON to this file ([format](docs/json-summary.md)) |
 
 Press Ctrl+C to stop early. A partial summary is printed and the exit code is 1.
 

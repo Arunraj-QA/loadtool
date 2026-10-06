@@ -15,6 +15,7 @@ Significant architecture decisions are recorded here as
 | [ADR-008](ADR-008-test-dsl.md) | Test DSL: responses, checks, thresholds, scenarios, setup/teardown | Accepted |
 | [ADR-009](ADR-009-sessions-and-connection-reuse.md) | Sessions (per-VU cookie jar) and connection reuse | Accepted |
 | [ADR-010](ADR-010-http2.md) | HTTP/2: `httpVersion` auto/1.1/2, h2c, `res.proto` | Accepted |
+| [ADR-011](ADR-011-json-summary.md) | Versioned JSON summary (`--summary-json`) | Accepted |
 
 The numbering was reorganized on 2026-09-24 when the records moved from
 `docs/adr/`. Each record lists its previous path.
