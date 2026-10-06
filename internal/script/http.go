@@ -83,16 +83,34 @@ func (vu *VU) request(method string, url, body, params goja.Value) goja.Value {
 
 var errInitRequest = errors.New("http requests are not allowed in the script's top-level code; make them inside the default function")
 
-// readParams returns the request headers from params and warns, once per
-// run, about keys LoadTool does not support yet.
+// readParams returns the request headers from params, with params.cookies
+// added to the Cookie header, and warns, once per run, about keys
+// LoadTool does not support yet.
 func (vu *VU) readParams(params *goja.Object) http.Header {
 	var h http.Header
+	var cookies goja.Value
 	for _, k := range params.Keys() {
-		if k == "headers" {
+		switch k {
+		case "headers":
 			h = headersFrom(vu.rt, params.Get(k))
-			continue
+		case "cookies":
+			cookies = params.Get(k)
+		default:
+			vu.warn.once(`http params key "` + k + `" is not supported yet and was ignored`)
 		}
-		vu.warn.once(`http params key "` + k + `" is not supported yet and was ignored`)
+	}
+	if isSet(cookies) {
+		if h == nil {
+			h = make(http.Header)
+		}
+		// AddCookie validates names and values and joins them with "; ",
+		// after any Cookie header the script set. The jar's cookies are
+		// added when the request is sent.
+		req := http.Request{Header: h}
+		obj := cookies.ToObject(vu.rt)
+		for _, name := range obj.Keys() {
+			req.AddCookie(&http.Cookie{Name: name, Value: obj.Get(name).String()})
+		}
 	}
 	return h
 }

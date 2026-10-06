@@ -82,7 +82,7 @@ func TestRunResolvesFromScriptAndGetenv(t *testing.T) {
 
 func TestRunWarnsAboutUnsupportedOptions(t *testing.T) {
 	srv := okServer(t)
-	path := getScript(t, srv.URL, `export const options = { duration: "50ms", tags: {}, noConnectionReuse: true };`+"\n")
+	path := getScript(t, srv.URL, `export const options = { duration: "50ms", tags: {}, noVUConnectionReuse: true };`+"\n")
 	var warnings []string
 	_, err := Run(context.Background(), Params{
 		Config: config.Config{Script: path},
@@ -91,7 +91,7 @@ func TestRunWarnsAboutUnsupportedOptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(warnings) != 2 || !strings.Contains(warnings[0], `"noConnectionReuse"`) || !strings.Contains(warnings[1], `"tags"`) {
+	if len(warnings) != 2 || !strings.Contains(warnings[0], `"noVUConnectionReuse"`) || !strings.Contains(warnings[1], `"tags"`) {
 		t.Fatalf("warnings = %q, want one per unsupported option, sorted", warnings)
 	}
 

@@ -19,6 +19,10 @@ type Options struct {
 	// DiscardResponseBodies drops response bodies instead of handing them
 	// to the script (ADR-008).
 	DiscardResponseBodies *bool
+	// NoCookiesReset keeps each VU's cookies across iterations, and
+	// NoConnectionReuse disables keep-alive (ADR-009).
+	NoCookiesReset    *bool
+	NoConnectionReuse *bool
 	// SetupTimeout and TeardownTimeout bound setup() and teardown().
 	SetupTimeout    *Duration
 	TeardownTimeout *Duration
@@ -32,7 +36,7 @@ type Options struct {
 }
 
 // knownOptions lists the keys Options understands.
-var knownOptions = []string{"discardResponseBodies", "duration", "scenarios", "setupTimeout", "stages", "teardownTimeout", "thresholds", "vus"}
+var knownOptions = []string{"discardResponseBodies", "duration", "noConnectionReuse", "noCookiesReset", "scenarios", "setupTimeout", "stages", "teardownTimeout", "thresholds", "vus"}
 
 // Duration accepts a duration string ("30s", "1m30s") or a number of
 // milliseconds, as k6 options do.
@@ -135,12 +139,21 @@ func ParseOptions(raw []byte) (Options, []string, error) {
 		}
 		opts.Thresholds = t
 	}
-	if v, ok := fields["discardResponseBodies"]; ok {
-		var b bool
-		if err := json.Unmarshal(v, &b); err != nil {
-			return opts, nil, fmt.Errorf("options.discardResponseBodies must be true or false, got %s", v)
+	for _, f := range []struct {
+		key string
+		dst **bool
+	}{
+		{"discardResponseBodies", &opts.DiscardResponseBodies},
+		{"noCookiesReset", &opts.NoCookiesReset},
+		{"noConnectionReuse", &opts.NoConnectionReuse},
+	} {
+		if v, ok := fields[f.key]; ok {
+			var b bool
+			if err := json.Unmarshal(v, &b); err != nil {
+				return opts, nil, fmt.Errorf("options.%s must be true or false, got %s", f.key, v)
+			}
+			*f.dst = &b
 		}
-		opts.DiscardResponseBodies = &b
 	}
 	return opts, unknown, nil
 }
@@ -222,7 +235,9 @@ func (c *Config) Resolve(cli Overrides, getenv func(string) (string, bool), scri
 		c.Duration = max(c.Duration, s.StartTime+s.Length())
 	}
 	// Only the script sets these; there are no flags or variables for them.
-	c.DiscardResponseBodies = script.DiscardResponseBodies != nil && *script.DiscardResponseBodies
+	c.DiscardResponseBodies = isTrue(script.DiscardResponseBodies)
+	c.NoCookiesReset = isTrue(script.NoCookiesReset)
+	c.NoConnectionReuse = isTrue(script.NoConnectionReuse)
 	c.SetupTimeout, c.TeardownTimeout = DefaultLifecycleTimeout, DefaultLifecycleTimeout
 	for _, t := range []struct {
 		name string
@@ -239,6 +254,8 @@ func (c *Config) Resolve(cli Overrides, getenv func(string) (string, bool), scri
 	}
 	return nil
 }
+
+func isTrue(b *bool) bool { return b != nil && *b }
 
 func hasEnv(getenv func(string) (string, bool), name string) bool {
 	if getenv == nil {

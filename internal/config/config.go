@@ -22,6 +22,11 @@ type Config struct {
 	// DiscardResponseBodies drops response bodies instead of handing them
 	// to the script.
 	DiscardResponseBodies bool
+	// NoCookiesReset keeps each VU's cookies across iterations instead of
+	// starting every iteration with an empty jar (ADR-009).
+	NoCookiesReset bool
+	// NoConnectionReuse disables keep-alive (ADR-009).
+	NoConnectionReuse bool
 	// SetupTimeout and TeardownTimeout bound the script's setup() and
 	// teardown().
 	SetupTimeout, TeardownTimeout time.Duration

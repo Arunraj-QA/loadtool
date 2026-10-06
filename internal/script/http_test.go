@@ -37,7 +37,7 @@ export default function () {
 	want(res.json().id === 7 && res.json().tags[0] === "x", "json");
 	want(typeof res.timings.duration === "number" && res.timings.duration >= 0, "duration");
 	want(res.headers === res.headers && res.body === res.body, "values are cached");
-	want(Object.keys(res).join(",") === "status,error,headers,body,timings,url", "keys " + Object.keys(res));
+	want(Object.keys(res).join(",") === "status,error,headers,body,timings,url,cookies", "keys " + Object.keys(res));
 	want(JSON.parse(JSON.stringify(res)).status === 201, "stringify");
 
 	res.note = "added";

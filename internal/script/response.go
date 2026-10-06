@@ -2,6 +2,7 @@ package script
 
 import (
 	"maps"
+	"net/http"
 	"slices"
 	"strings"
 
@@ -28,15 +29,15 @@ type response struct {
 	res httpclient.Result
 	url string
 
-	headers, body, timings, json goja.Value // built on first access
-	extra                        map[string]goja.Value
+	headers, body, timings, json, cookies goja.Value // built on first access
+	extra                                 map[string]goja.Value
 }
 
 var _ goja.DynamicObject = (*response)(nil)
 
 // responseKeys are the enumerable properties; json is a method and, like
 // a prototype method, is not listed.
-var responseKeys = []string{"status", "error", "headers", "body", "timings", "url"}
+var responseKeys = []string{"status", "error", "headers", "body", "timings", "url", "cookies"}
 
 func (r *response) Get(key string) goja.Value {
 	if v, ok := r.extra[key]; ok {
@@ -73,6 +74,11 @@ func (r *response) Get(key string) goja.Value {
 			r.timings = t
 		}
 		return r.timings
+	case "cookies":
+		if r.cookies == nil {
+			r.cookies = r.cookiesObject()
+		}
+		return r.cookies
 	case "json":
 		if r.json == nil {
 			r.json = rt.ToValue(r.parseJSON)
@@ -87,6 +93,41 @@ func (r *response) headersObject() goja.Value {
 	// Sorted, so Object.keys(res.headers) is deterministic.
 	for _, name := range slices.Sorted(maps.Keys(r.res.Header)) {
 		_ = o.Set(name, strings.Join(r.res.Header[name], ", "))
+	}
+	return o
+}
+
+// cookiesObject builds res.cookies, the cookies this response set, in k6's
+// shape: { name: [{ name, value, domain, path, expires, max_age,
+// http_only, secure }] }. expires is in milliseconds since the epoch, 0
+// when the cookie has none.
+func (r *response) cookiesObject() goja.Value {
+	rt := r.vu.rt
+	o := rt.NewObject()
+	if r.res.Header == nil {
+		return o
+	}
+	for _, c := range (&http.Response{Header: r.res.Header}).Cookies() {
+		list, _ := o.Get(c.Name).(*goja.Object)
+		if list == nil {
+			list = rt.NewArray()
+			_ = o.Set(c.Name, list)
+		}
+		var expires int64
+		if !c.Expires.IsZero() {
+			expires = c.Expires.UnixMilli()
+		}
+		entry := rt.NewObject()
+		_ = entry.Set("name", c.Name)
+		_ = entry.Set("value", c.Value)
+		_ = entry.Set("domain", c.Domain)
+		_ = entry.Set("path", c.Path)
+		_ = entry.Set("expires", expires)
+		_ = entry.Set("max_age", c.MaxAge)
+		_ = entry.Set("http_only", c.HttpOnly)
+		_ = entry.Set("secure", c.Secure)
+		push, _ := goja.AssertFunction(list.Get("push"))
+		_, _ = push(list, entry)
 	}
 	return o
 }

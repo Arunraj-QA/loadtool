@@ -23,10 +23,26 @@ declare module "loadtool/http" {
     };
     /** The request URL. */
     url: string;
+    /** Cookies this response set, by name. */
+    cookies: Record<string, ResponseCookie[]>;
+  }
+
+  export interface ResponseCookie {
+    name: string;
+    value: string;
+    domain: string;
+    path: string;
+    /** Milliseconds since the epoch; 0 when the cookie has no Expires. */
+    expires: number;
+    max_age: number;
+    http_only: boolean;
+    secure: boolean;
   }
 
   export interface Params {
     headers?: Record<string, string>;
+    /** Cookies to send with this request, in addition to the VU's jar. */
+    cookies?: Record<string, string>;
   }
 
   /** Request body: a string. Use JSON.stringify(...) to send JSON. */

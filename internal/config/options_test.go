@@ -207,3 +207,16 @@ func TestThresholdOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestSessionOptions(t *testing.T) {
+	c := resolveOK(t, `{"noCookiesReset": true, "noConnectionReuse": true}`)
+	if !c.NoCookiesReset || !c.NoConnectionReuse {
+		t.Errorf("NoCookiesReset=%v NoConnectionReuse=%v, want both true", c.NoCookiesReset, c.NoConnectionReuse)
+	}
+	if c := resolveOK(t, `{}`); c.NoCookiesReset || c.NoConnectionReuse {
+		t.Error("defaults must be false")
+	}
+	if _, _, err := ParseOptions([]byte(`{"noCookiesReset": 1}`)); err == nil || !strings.Contains(err.Error(), "options.noCookiesReset must be true or false") {
+		t.Errorf("error = %v", err)
+	}
+}

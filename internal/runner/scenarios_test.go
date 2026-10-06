@@ -2,10 +2,13 @@ package runner
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -161,5 +164,42 @@ export default function () { http.get("`+srv.URL+`/x?vu=" + __VU); }`,
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "replace the script's scenarios") {
 		t.Errorf("warnings = %q", warnings)
+	}
+}
+
+// Keep-alive reuse is the default; options.noConnectionReuse opens one
+// connection per request (ADR-009).
+func TestConnectionReuseOption(t *testing.T) {
+	for _, tt := range []struct {
+		option string
+		reuse  bool
+	}{{"", true}, {"noConnectionReuse: true", false}} {
+		t.Run(fmt.Sprintf("reuse=%v", tt.reuse), func(t *testing.T) {
+			var conns atomic.Int64
+			srv := httptest.NewUnstartedServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+			srv.Config.ConnState = func(_ net.Conn, s http.ConnState) {
+				if s == http.StateNew {
+					conns.Add(1)
+				}
+			}
+			srv.Start()
+			t.Cleanup(srv.Close)
+			res, err := runScript(t, `import http from "loadtool/http";
+export const options = { vus: 2, duration: "100ms", `+tt.option+` };
+export default function () { http.get("`+srv.URL+`"); }`, config.Overrides{}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			n, reqs := conns.Load(), int64(res.Summary.Requests)
+			if reqs < 4 {
+				t.Fatalf("only %d requests", reqs)
+			}
+			if tt.reuse && n > 2 {
+				t.Errorf("%d connections for %d requests by 2 VUs, want at most 2", n, reqs)
+			}
+			if !tt.reuse && n < reqs {
+				t.Errorf("%d connections for %d requests, want one per request", n, reqs)
+			}
+		})
 	}
 }

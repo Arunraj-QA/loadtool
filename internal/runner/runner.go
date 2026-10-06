@@ -104,7 +104,7 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	if err != nil {
 		return report.Result{}, err
 	}
-	prog = prog.WithDiscardResponseBodies(cfg.DiscardResponseBodies)
+	prog = prog.WithDiscardResponseBodies(cfg.DiscardResponseBodies).WithKeepCookies(cfg.NoCookiesReset)
 	if prog, err = prepareExecs(prog, lc, cfg.Scenarios); err != nil {
 		return report.Result{}, err
 	}
@@ -112,9 +112,13 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		p.Warn("--vus/--duration (or LOADTOOL_VUS/LOADTOOL_DURATION) replace the script's scenarios or stages with one constant-vus scenario")
 	}
 
-	// One client for all VUs: http.Client is safe for concurrent use and a
-	// shared transport lets each VU keep its own pooled connection.
-	client := httpclient.New(cfg.VUs, httpclient.DefaultTimeout)
+	// One transport for all VUs, so they share one connection pool; each
+	// VU wraps it in a client with its own cookie jar (ADR-009).
+	client := httpclient.NewWithOptions(httpclient.Options{
+		MaxConnsPerHost:   cfg.VUs,
+		Timeout:           httpclient.DefaultTimeout,
+		NoConnectionReuse: cfg.NoConnectionReuse,
+	})
 	defer client.CloseIdleConnections()
 
 	data, err := lc.Setup(ctx, client, cfg.SetupTimeout)

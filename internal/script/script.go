@@ -27,6 +27,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/evanw/esbuild/pkg/api"
 
+	"github.com/Arunraj-QA/loadtool/internal/httpclient"
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
 )
 
@@ -46,6 +47,9 @@ type Program struct {
 	console *lockedWriter
 	// discardBodies drops response bodies (options.discardResponseBodies).
 	discardBodies bool
+	// keepCookies keeps each VU's cookies across iterations
+	// (options.noCookiesReset, ADR-009).
+	keepCookies bool
 	// setupData is the JSON setup() returned, nil without setup or data.
 	// Read-only once set; each VU parses its own copy.
 	setupData []byte
@@ -59,6 +63,14 @@ type Program struct {
 func (p *Program) WithSetupData(data []byte) *Program {
 	c := *p
 	c.setupData = data
+	return &c
+}
+
+// WithKeepCookies returns a copy of p whose VUs keep their cookies across
+// iterations; by default each iteration starts with an empty jar.
+func (p *Program) WithKeepCookies(keep bool) *Program {
+	c := *p
+	c.keepCookies = keep
 	return &c
 }
 
@@ -337,9 +349,12 @@ type VU struct {
 	exec string
 	// console receives console output; nil discards it.
 	console io.Writer
-	// discardBodies and warn come from the Program.
+	// discardBodies, keepCookies and warn come from the Program.
 	discardBodies bool
+	keepCookies   bool
 	warn          *warner
+	// jar is this VU's cookie jar; client sends through it (ADR-009).
+	jar httpclient.Jar
 	// data is this VU's copy of the setup data, passed to every iteration;
 	// undefined without setup data.
 	data goja.Value
@@ -363,7 +378,12 @@ func (p *Program) NewVUExec(ctx context.Context, id int, exec string, client *ht
 	}
 	rt := goja.New()
 	rt.SetMaxCallStackSize(maxCallStackSize)
-	vu := &VU{rt: rt, client: client, id: int64(id), exec: exec, discardBodies: p.discardBodies, warn: p.warn}
+	vu := &VU{rt: rt, id: int64(id), exec: exec, discardBodies: p.discardBodies, keepCookies: p.keepCookies, warn: p.warn}
+	if client != nil {
+		// Shares client's transport (and connection pool); keeps its own
+		// cookies.
+		vu.client = httpclient.WithJar(client, &vu.jar)
+	}
 	// A nil *lockedWriter must become a nil io.Writer, not a non-nil
 	// interface holding a nil pointer.
 	if p.console != nil {
@@ -431,6 +451,9 @@ func (vu *VU) Iterate(ctx context.Context, rec *metrics.Recorder) {
 		return
 	}
 	vu.ctx, vu.rec = ctx, rec
+	if !vu.keepCookies {
+		vu.jar.Reset() // each iteration is a new session
+	}
 	_ = vu.rt.Set("__ITER", vu.iter)
 	vu.iter++
 	stop := context.AfterFunc(ctx, func() { vu.rt.Interrupt(errStopped) })

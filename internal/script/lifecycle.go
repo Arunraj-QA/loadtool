@@ -9,6 +9,7 @@ import (
 
 	"github.com/dop251/goja"
 
+	"github.com/Arunraj-QA/loadtool/internal/httpclient"
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
 )
 
@@ -126,7 +127,9 @@ func (l *Lifecycle) call(ctx context.Context, client *http.Client, timeout time.
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	vu.ctx, vu.rec, vu.client = callCtx, &metrics.Recorder{}, client
+	// One jar for setup and teardown, so teardown can end setup's session;
+	// it is not shared with the VUs (ADR-009).
+	vu.ctx, vu.rec, vu.client = callCtx, &metrics.Recorder{}, httpclient.WithJar(client, &vu.jar)
 	release := vu.interruptOn(callCtx)
 	v, err := fn(goja.Undefined(), args...)
 	release()
