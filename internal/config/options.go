@@ -22,10 +22,13 @@ type Options struct {
 	// SetupTimeout and TeardownTimeout bound setup() and teardown().
 	SetupTimeout    *Duration
 	TeardownTimeout *Duration
+	// Thresholds maps a metric name to its threshold expressions, as
+	// written; package thresholds parses them.
+	Thresholds map[string][]string
 }
 
 // knownOptions lists the keys Options understands.
-var knownOptions = []string{"discardResponseBodies", "duration", "setupTimeout", "teardownTimeout", "vus"}
+var knownOptions = []string{"discardResponseBodies", "duration", "setupTimeout", "teardownTimeout", "thresholds", "vus"}
 
 // Duration accepts a duration string ("30s", "1m30s") or a number of
 // milliseconds, as k6 options do.
@@ -101,6 +104,13 @@ func ParseOptions(raw []byte) (Options, []string, error) {
 			}
 			*f.dst = &d
 		}
+	}
+	if v, ok := fields["thresholds"]; ok {
+		t, err := parseThresholds(v)
+		if err != nil {
+			return opts, nil, err
+		}
+		opts.Thresholds = t
 	}
 	if v, ok := fields["discardResponseBodies"]; ok {
 		var b bool
@@ -201,4 +211,32 @@ func hasEnv(getenv func(string) (string, bool), name string) bool {
 	}
 	v, ok := getenv(name)
 	return ok && strings.TrimSpace(v) != ""
+}
+
+// parseThresholds reads options.thresholds: an object mapping each metric
+// to an array of expression strings. Only the shape is checked here; the
+// expressions are parsed by package thresholds.
+func parseThresholds(raw json.RawMessage) (map[string][]string, error) {
+	var metrics map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &metrics); err != nil {
+		return nil, fmt.Errorf("options.thresholds must be an object like { http_req_duration: [\"p(95)<500\"] }, got %s", raw)
+	}
+	out := make(map[string][]string, len(metrics))
+	for name, v := range metrics {
+		var items []json.RawMessage
+		if err := json.Unmarshal(v, &items); err != nil {
+			return nil, fmt.Errorf("options.thresholds.%s must be an array of expressions, got %s", name, v)
+		}
+		exprs := make([]string, len(items))
+		for i, item := range items {
+			if err := json.Unmarshal(item, &exprs[i]); err != nil {
+				if bytes.HasPrefix(bytes.TrimSpace(item), []byte("{")) {
+					return nil, fmt.Errorf("options.thresholds.%s: the object form ({ threshold, abortOnFail }) is not supported yet; use an expression string", name)
+				}
+				return nil, fmt.Errorf("options.thresholds.%s: expressions must be strings, got %s", name, item)
+			}
+		}
+		out[name] = exprs
+	}
+	return out, nil
 }

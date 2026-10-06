@@ -82,7 +82,7 @@ func TestRunResolvesFromScriptAndGetenv(t *testing.T) {
 
 func TestRunWarnsAboutUnsupportedOptions(t *testing.T) {
 	srv := okServer(t)
-	path := getScript(t, srv.URL, `export const options = { duration: "50ms", thresholds: {}, tags: {} };`+"\n")
+	path := getScript(t, srv.URL, `export const options = { duration: "50ms", tags: {}, scenarios: {} };`+"\n")
 	var warnings []string
 	_, err := Run(context.Background(), Params{
 		Config: config.Config{Script: path},
@@ -91,7 +91,7 @@ func TestRunWarnsAboutUnsupportedOptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(warnings) != 2 || !strings.Contains(warnings[0], `"tags"`) || !strings.Contains(warnings[1], `"thresholds"`) {
+	if len(warnings) != 2 || !strings.Contains(warnings[0], `"scenarios"`) || !strings.Contains(warnings[1], `"tags"`) {
 		t.Fatalf("warnings = %q, want one per unsupported option, sorted", warnings)
 	}
 

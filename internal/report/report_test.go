@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
+	"github.com/Arunraj-QA/loadtool/internal/thresholds"
 )
 
 // The golden files were captured from the console summary before it moved
@@ -46,6 +47,24 @@ var goldenCases = map[string]Result{
 				{Name: "has products", Passes: 2994, Fails: 6, FirstError: "SyntaxError: Unexpected token <"},
 				{Name: "ünïcode name", Passes: 3000},
 			},
+		},
+	},
+	"thresholds": {
+		Script: "examples/thresholds.ts", VUs: 10, Duration: 30 * time.Second, GracefulStop: 30 * time.Second,
+		Elapsed: 30 * time.Second,
+		Summary: metrics.Summary{
+			Requests: 3000, Successes: 2940, Failures: 60, Sent: 3000, ErrorRate: 0.02,
+			Min: 9 * time.Millisecond, Mean: 11 * time.Millisecond, Max: 30 * time.Millisecond,
+			P50: 11 * time.Millisecond, P90: 12 * time.Millisecond, P95: 13 * time.Millisecond, P99: 20 * time.Millisecond,
+			SuccessP50: 11 * time.Millisecond, SuccessP90: 12 * time.Millisecond, SuccessP95: 13 * time.Millisecond, SuccessP99: 20 * time.Millisecond,
+		},
+		Thresholds: []thresholds.Result{
+			{Threshold: thresholds.Threshold{Metric: "http_req_duration", Expr: "p(95)<500"}, Observed: 13, Unit: thresholds.Milliseconds, Passed: true},
+			{Threshold: thresholds.Threshold{Metric: "http_req_duration", Expr: "p(99)<20.1"}, Observed: 20.05, Unit: thresholds.Milliseconds, Passed: true, Approximate: true},
+			{Threshold: thresholds.Threshold{Metric: "http_req_failed", Expr: "rate<0.01"}, Observed: 0.02, Unit: thresholds.Fraction},
+			{Threshold: thresholds.Threshold{Metric: "http_reqs", Expr: "rate>50"}, Observed: 100, Unit: thresholds.PerSecond, Passed: true},
+			{Threshold: thresholds.Threshold{Metric: "iterations", Expr: "count>1000"}, Observed: 3000, Unit: thresholds.Count, Passed: true},
+			{Threshold: thresholds.Threshold{Metric: "checks", Expr: "rate>0.99"}, NoData: true, Unit: thresholds.Fraction},
 		},
 	},
 	"interrupted-none-sent": {

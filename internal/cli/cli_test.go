@@ -246,7 +246,7 @@ func TestRunGracefulStopCountsInFlightRequests(t *testing.T) {
 func TestRunUsesScriptOptions(t *testing.T) {
 	srv := statusServer(t, http.StatusOK)
 	path := scriptFile(t, `import http from "loadtool/http";
-export const options = { vus: 3, duration: "150ms", thresholds: {} };
+export const options = { vus: 3, duration: "150ms", scenarios: {} };
 export default function (): void { http.get("`+srv.URL+`"); }`)
 
 	out, stderr, err := execute(t, "run", path)
@@ -256,7 +256,7 @@ export default function (): void { http.get("`+srv.URL+`"); }`)
 	if !strings.Contains(out, "VUs:         3") || !strings.Contains(out, "Duration:    150ms") {
 		t.Errorf("script options not applied:\n%s", out)
 	}
-	if !strings.Contains(stderr, `script option "thresholds" is not supported yet`) {
+	if !strings.Contains(stderr, `script option "scenarios" is not supported yet`) {
 		t.Errorf("want a warning for the unsupported option, stderr: %q", stderr)
 	}
 
@@ -365,5 +365,79 @@ export default function () {}`)
 	}
 	if strings.Contains(out, "LoadTool summary") {
 		t.Errorf("summary printed after a failed setup:\n%s", out)
+	}
+}
+
+func TestRunThresholds(t *testing.T) {
+	srv := statusServer(t, http.StatusOK)
+	run := func(t *testing.T, thresholds string) (string, error) {
+		path := scriptFile(t, `import http from "loadtool/http";
+export const options = { thresholds: `+thresholds+` };
+export default function () { http.get("`+srv.URL+`"); }`)
+		out, _, err := execute(t, "run", path, "--duration", "100ms")
+		return out, err
+	}
+
+	t.Run("pass", func(t *testing.T) {
+		out, err := run(t, `{ http_req_failed: ["rate<0.01"], http_reqs: ["count>0"] }`)
+		if err != nil || ExitCode(err) != 0 {
+			t.Fatalf("error = %v, want success", err)
+		}
+		if !strings.Contains(out, "Thresholds:  2 of 2 passed") {
+			t.Errorf("summary:\n%s", out)
+		}
+	})
+	t.Run("fail", func(t *testing.T) {
+		out, err := run(t, `{ http_req_failed: ["rate<0.01"], http_reqs: ["count<0"], checks: ["rate>0.9"] }`)
+		if ExitCode(err) != ExitThresholdsFailed {
+			t.Fatalf("exit code = %d (error %v), want %d", ExitCode(err), err, ExitThresholdsFailed)
+		}
+		if want := "thresholds failed: checks rate>0.9, http_reqs count<0"; err.Error() != want {
+			t.Errorf("error = %q, want %q", err, want)
+		}
+		// The full summary is printed before the failure is reported.
+		for _, want := range []string{"Thresholds:  1 of 3 passed", "✗ checks", "no data", "Latency (all requests sent"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("summary missing %q:\n%s", want, out)
+			}
+		}
+	})
+	t.Run("invalid expression fails before load", func(t *testing.T) {
+		out, err := run(t, `{ http_req_duration: ["p95<500"] }`)
+		if err == nil || ExitCode(err) != 1 || !strings.Contains(err.Error(), `options.thresholds.http_req_duration: "p95<500"`) {
+			t.Fatalf("error = %v (exit %d), want the parse error with exit 1", err, ExitCode(err))
+		}
+		if strings.Contains(out, "LoadTool summary") {
+			t.Errorf("a summary was printed, so load ran:\n%s", out)
+		}
+	})
+}
+
+// An interrupt wins over failed thresholds: exit 1, not 99, because the
+// metrics are partial.
+func TestRunInterruptedWithFailedThresholds(t *testing.T) {
+	// Ctrl+C on the first request, so the load phase is surely running.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { cancel() }))
+	t.Cleanup(srv.Close)
+	path := scriptFile(t, `import http from "loadtool/http";
+export const options = { thresholds: { http_reqs: ["count<0"] } };
+export default function () { http.get("`+srv.URL+`"); }`)
+	_, _, err := executeContext(t, ctx, "run", path, "--duration", "1m")
+	if ExitCode(err) != 1 || !strings.Contains(err.Error(), "test interrupted") {
+		t.Fatalf("error = %v (exit %d), want interrupted with exit 1", err, ExitCode(err))
+	}
+}
+
+func TestExitCode(t *testing.T) {
+	wrapped := fmt.Errorf("context: %w", &ExitError{Code: 99, Err: errors.New("x")})
+	for _, tt := range []struct {
+		err  error
+		want int
+	}{{nil, 0}, {errors.New("boom"), 1}, {&ExitError{Code: 99, Err: errors.New("x")}, 99}, {wrapped, 99}} {
+		if got := ExitCode(tt.err); got != tt.want {
+			t.Errorf("ExitCode(%v) = %d, want %d", tt.err, got, tt.want)
+		}
 	}
 }

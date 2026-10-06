@@ -13,6 +13,7 @@ import (
 	"github.com/Arunraj-QA/loadtool/internal/config"
 	"github.com/Arunraj-QA/loadtool/internal/report"
 	"github.com/Arunraj-QA/loadtool/internal/runner"
+	"github.com/Arunraj-QA/loadtool/internal/thresholds"
 )
 
 func newRunCmd() *cobra.Command {
@@ -105,5 +106,26 @@ func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env ma
 	if res.TeardownError != "" {
 		errs = append(errs, errors.New(res.TeardownError))
 	}
-	return errors.Join(errs...)
+	if len(errs) > 0 {
+		return errors.Join(errs...) // exit 1, even if thresholds also failed
+	}
+	return thresholdsError(res.Thresholds)
+}
+
+// thresholdsError returns an error with exit code 99 naming the failed
+// thresholds, or nil if all passed.
+func thresholdsError(rs []thresholds.Result) error {
+	if !thresholds.Failed(rs) {
+		return nil
+	}
+	var failed []string
+	for _, r := range rs {
+		if !r.Passed {
+			failed = append(failed, r.Metric+" "+r.Expr)
+		}
+	}
+	return &ExitError{
+		Code: ExitThresholdsFailed,
+		Err:  fmt.Errorf("thresholds failed: %s", strings.Join(failed, ", ")),
+	}
 }

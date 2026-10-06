@@ -21,6 +21,7 @@ func main() {
 	if err := cli.NewRootCmd(os.Stdout, os.Stderr).ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		stop()
-		os.Exit(1)
+		// 1 for errors, 99 when only thresholds failed (cli.ExitCode).
+		os.Exit(cli.ExitCode(err))
 	}
 }

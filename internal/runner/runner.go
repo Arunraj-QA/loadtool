@@ -15,6 +15,7 @@ import (
 	"github.com/Arunraj-QA/loadtool/internal/httpclient"
 	"github.com/Arunraj-QA/loadtool/internal/report"
 	"github.com/Arunraj-QA/loadtool/internal/script"
+	"github.com/Arunraj-QA/loadtool/internal/thresholds"
 )
 
 // Params are the inputs of a run.
@@ -44,6 +45,7 @@ type Params struct {
 //  3. setup(), once
 //  4. create the VUs and run the load phase
 //  5. teardown(data), once
+//  6. evaluate thresholds against the load phase's metrics
 //
 // It returns an error, and no result, when the test cannot start: script,
 // options, setup or VU start-up problems. A failed setup ends the test
@@ -96,6 +98,11 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	if err := cfg.Validate(); err != nil {
 		return report.Result{}, err
 	}
+	// Parsed now, so a typo fails before setup or any load.
+	ths, err := thresholds.Parse(opts.Thresholds)
+	if err != nil {
+		return report.Result{}, err
+	}
 	prog = prog.WithDiscardResponseBodies(cfg.DiscardResponseBodies)
 
 	// One client for all VUs: http.Client is safe for concurrent use and a
@@ -136,6 +143,7 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		Elapsed:      res.Elapsed,
 		Interrupted:  interrupted,
 		Summary:      res.Summary,
+		Thresholds:   thresholds.Evaluate(ths, res.Summary, res.Elapsed),
 	}
 	if teardownErr != nil {
 		result.TeardownError = teardownErr.Error()

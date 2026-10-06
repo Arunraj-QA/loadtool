@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
+	"github.com/Arunraj-QA/loadtool/internal/thresholds"
 )
 
 // Result is everything known about a finished run that outputs need.
@@ -31,6 +32,9 @@ type Result struct {
 	// TeardownError is set when the script's teardown() failed. The load
 	// phase's results are still complete.
 	TeardownError string
+	// Thresholds are the evaluated threshold expressions, in the order
+	// the summary lists them.
+	Thresholds []thresholds.Result
 }
 
 // Console writes the human-readable summary to w.
@@ -64,6 +68,7 @@ func Console(w io.Writer, r Result) {
 	}
 	fmt.Fprintln(w)
 	printChecks(w, s.Checks)
+	printThresholds(w, r.Thresholds)
 
 	if s.Sent == 0 {
 		fmt.Fprintf(w, "  Latency:     no requests were sent\n")
@@ -113,6 +118,55 @@ func printChecks(w io.Writer, checks []metrics.CheckResult) {
 		}
 	}
 	fmt.Fprintln(w)
+}
+
+// printThresholds lists each threshold with ✓ or ✗ and the observed value.
+// "≈" marks a percentile within the histogram's ±0.78 % of its limit,
+// where that error could change the outcome.
+func printThresholds(w io.Writer, rs []thresholds.Result) {
+	if len(rs) == 0 {
+		return
+	}
+	passed, mw, ew := 0, 0, 0
+	for _, r := range rs {
+		if r.Passed {
+			passed++
+		}
+		mw = max(mw, len(r.Metric))
+		ew = max(ew, utf8.RuneCountInString(r.Expr))
+	}
+	fmt.Fprintf(w, "  Thresholds:  %d of %d passed\n", passed, len(rs))
+	for _, r := range rs {
+		mark := "✓"
+		if !r.Passed {
+			mark = "✗"
+		}
+		fmt.Fprintf(w, "    %s %-*s  %s%s  %s\n", mark, mw, r.Metric, r.Expr,
+			strings.Repeat(" ", ew-utf8.RuneCountInString(r.Expr)), observed(r))
+	}
+	fmt.Fprintln(w)
+}
+
+func observed(r thresholds.Result) string {
+	if r.NoData {
+		return "no data"
+	}
+	approx := ""
+	if r.Approximate {
+		approx = "≈"
+	}
+	var v string
+	switch r.Unit {
+	case thresholds.Milliseconds:
+		v = fmt.Sprintf("%.2fms", r.Observed)
+	case thresholds.Fraction:
+		v = fmt.Sprintf("%.4f (%.2f%%)", r.Observed, r.Observed*100)
+	case thresholds.PerSecond:
+		v = fmt.Sprintf("%.2f/s", r.Observed)
+	default:
+		v = formatCount(int(r.Observed))
+	}
+	return "observed " + approx + v
 }
 
 // percent formats part/whole with two decimals; 0/0 is shown as "-".

@@ -42,14 +42,14 @@ func TestParseOptions(t *testing.T) {
 		}
 	}
 
-	opts, unknown, err := ParseOptions([]byte(`{"vus": 25, "duration": "45s", "thresholds": {}, "insecureSkipTLSVerify": true}`))
+	opts, unknown, err := ParseOptions([]byte(`{"vus": 25, "duration": "45s", "scenarios": {}, "insecureSkipTLSVerify": true}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if opts.VUs == nil || *opts.VUs != 25 || opts.Duration == nil || time.Duration(*opts.Duration) != 45*time.Second {
 		t.Fatalf("got VUs=%v Duration=%v, want 25 and 45s", opts.VUs, opts.Duration)
 	}
-	if want := []string{"insecureSkipTLSVerify", "thresholds"}; !slices.Equal(unknown, want) {
+	if want := []string{"insecureSkipTLSVerify", "scenarios"}; !slices.Equal(unknown, want) {
 		t.Errorf("unknown = %v, want %v (sorted)", unknown, want)
 	}
 }
@@ -181,5 +181,29 @@ func TestLifecycleTimeouts(t *testing.T) {
 	}
 	if _, err := resolve(`{"setupTimeout": "soon"}`); err == nil || !strings.Contains(err.Error(), "options.setupTimeout") {
 		t.Errorf("invalid duration: error = %v", err)
+	}
+}
+
+func TestThresholdOptions(t *testing.T) {
+	opts, unknown, err := ParseOptions([]byte(`{"thresholds": {"http_req_duration": ["p(95)<500", "avg<200"], "checks": []}}`))
+	if err != nil || len(unknown) != 0 {
+		t.Fatalf("ParseOptions = %v, %v", unknown, err)
+	}
+	if got := opts.Thresholds["http_req_duration"]; !slices.Equal(got, []string{"p(95)<500", "avg<200"}) {
+		t.Errorf("http_req_duration = %q", got)
+	}
+	if got, ok := opts.Thresholds["checks"]; !ok || len(got) != 0 {
+		t.Errorf("checks = %q, %v; want present and empty", got, ok)
+	}
+
+	for _, tt := range []struct{ raw, want string }{
+		{`{"thresholds": ["p(95)<500"]}`, "options.thresholds must be an object"},
+		{`{"thresholds": {"checks": "rate>0.9"}}`, "options.thresholds.checks must be an array of expressions"},
+		{`{"thresholds": {"checks": [{"threshold": "rate>0.9", "abortOnFail": true}]}}`, "object form ({ threshold, abortOnFail }) is not supported yet"},
+		{`{"thresholds": {"checks": [0.9]}}`, "expressions must be strings"},
+	} {
+		if _, _, err := ParseOptions([]byte(tt.raw)); err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("ParseOptions(%s) error = %v, want %q", tt.raw, err, tt.want)
+		}
 	}
 }
