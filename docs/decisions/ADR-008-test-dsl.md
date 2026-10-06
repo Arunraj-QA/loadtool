@@ -257,6 +257,53 @@ Fields every executor accepts:
 - `Run` takes a list of scenarios, starts each at its `startTime`, and
   returns when every scenario has finished its graceful stop.
 
+**Details settled when scenarios were implemented (2026-10-06):**
+
+*Ramping and arrival-rate behaviour:*
+
+- **Activation.** In `ramping-vus`, VU *i* (from 0) is active while the
+  stage line is at least *i*+1.
+  - Activation and deactivation times are computed exactly, in integer
+    microseconds. A property test checks this against the definition.
+  - A pure ramp reaches its last VU only as the stages end, so scripts need
+    a hold stage to run every VU.
+  - A zero-length stage is a jump. Several jumps at one instant leave the
+    last in force.
+- **No controller goroutine.** Each ramping VU sleeps until it next becomes
+  active. Its iteration gets a deadline of removal + `gracefulRampDown`
+  only when a removal falls inside the scenario.
+- **The arrival-rate scheduler** computes start *k* as
+  `start + k·timeUnit/rate`. It hands starts over an unbuffered channel
+  with a non-blocking send, so a start reaches an idle VU or is dropped.
+  Its goroutine is joined like the VUs'.
+
+*Options and precedence:*
+
+- **The `stages` shorthand** starts from `vus` (default 1), as in k6.
+  Combining `stages` with `duration` is an error.
+- **Replacing scenarios.** `LOADTOOL_VUS`/`LOADTOOL_DURATION` replace
+  scenarios as well as typed flags: they rank above script options
+  (ADR-006). The runner warns when that happens.
+- **Fields of another executor** are errors, not ignored.
+- **`maxVUs`** is accepted only when it equals `preAllocatedVUs`.
+- **Scenario order and `__VU`.** Scenarios are ordered by name, and `__VU`
+  numbers follow that order.
+
+*`exec` functions:*
+
+- **How they are bound.** After options are read, the script is compiled
+  once more with an entry that binds only the named `exec` functions. The
+  names are checked against esbuild's export list first. Each VU picks its
+  function through the lazy `exec` built-in, so no per-VU global is added:
+  retained memory per VU went from 4,640 B to 4,661 B, the new field.
+- **`default` is needed only if a scenario runs it.** That is checked in
+  the lifecycle runtime before setup.
+
+*Unchanged:*
+
+- **The start-up error** keeps its 0-based VU index ("initialize VU 3")
+  from Phase 0.
+
 ### 7. Lifecycle
 
 1. **Load:** bundle the script and read its exports.

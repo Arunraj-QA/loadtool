@@ -246,7 +246,7 @@ func TestRunGracefulStopCountsInFlightRequests(t *testing.T) {
 func TestRunUsesScriptOptions(t *testing.T) {
 	srv := statusServer(t, http.StatusOK)
 	path := scriptFile(t, `import http from "loadtool/http";
-export const options = { vus: 3, duration: "150ms", scenarios: {} };
+export const options = { vus: 3, duration: "150ms", tags: {} };
 export default function (): void { http.get("`+srv.URL+`"); }`)
 
 	out, stderr, err := execute(t, "run", path)
@@ -256,7 +256,7 @@ export default function (): void { http.get("`+srv.URL+`"); }`)
 	if !strings.Contains(out, "VUs:         3") || !strings.Contains(out, "Duration:    150ms") {
 		t.Errorf("script options not applied:\n%s", out)
 	}
-	if !strings.Contains(stderr, `script option "scenarios" is not supported yet`) {
+	if !strings.Contains(stderr, `script option "tags" is not supported yet`) {
 		t.Errorf("want a warning for the unsupported option, stderr: %q", stderr)
 	}
 

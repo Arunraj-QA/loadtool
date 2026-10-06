@@ -71,6 +71,10 @@ Notes:
 - `duration` accepts `"30s"` / `"1m30s"`, or a number of milliseconds.
 - Options LoadTool does not support yet produce a warning and are
   ignored, so scripts written for k6 still run.
+- `vus`/`duration` describe one constant-VU scenario. For anything else
+  use [scenarios](#scenarios). A typed `--vus`/`--duration` (or
+  `LOADTOOL_VUS`/`LOADTOOL_DURATION`) replaces the script's scenarios or
+  stages with one constant-VU scenario, with a warning.
 
 ## Writing a test
 
@@ -235,6 +239,70 @@ Rules:
 - **Ctrl+C:**
   - during the load phase, it stops the load, and teardown still runs.
   - a second Ctrl+C exits at once and skips teardown.
+
+### Scenarios
+
+Scenarios describe the workload: how many VUs run, and when they start
+iterations ([ADR-008](docs/decisions/ADR-008-test-dsl.md); see
+[`examples/scenarios.ts`](examples/scenarios.ts)). Several scenarios run
+at the same time.
+
+```typescript
+export const options = {
+  scenarios: {
+    browsers: {
+      executor: "ramping-vus",
+      stages: [{ duration: "1m", target: 50 }, { duration: "5m", target: 50 }, { duration: "1m", target: 0 }],
+      exec: "browse", // the exported function to run; default: default
+    },
+    orders: {
+      executor: "constant-arrival-rate",
+      rate: 20, timeUnit: "1s", duration: "7m",
+      preAllocatedVUs: 40,
+      startTime: "30s",
+      exec: "placeOrder",
+    },
+  },
+};
+```
+
+| Executor | Fields | What it does |
+|---|---|---|
+| `constant-vus` | `vus` (1), `duration` | `vus` VUs run iterations back to back |
+| `ramping-vus` | `startVUs` (1), `stages`, `gracefulRampDown` (`30s`) | The number of active VUs moves linearly through the stages |
+| `constant-arrival-rate` | `rate`, `timeUnit` (`1s`), `duration`, `preAllocatedVUs` | `rate` iterations start per `timeUnit`, however long they take |
+
+Every scenario also accepts `exec`, `startTime` (`0s`) and `gracefulStop`
+(`30s`). Defaults are in brackets.
+
+How they behave:
+- **VUs are created up front.** All VUs of all scenarios are created, and
+  run the top-level code, before the clock starts, so memory is known up
+  front. `__VU` numbers are unique across scenarios, in scenario name order.
+- **`stages`.** `options.stages` on its own is the shorthand for one
+  `ramping-vus` scenario.
+  - VU *n* (from 1) is active while the stage line is at least *n*.
+  - A pure ramp from 0 to 10 therefore reaches the 10th VU only at its
+    very end; add a hold stage to run all of them.
+  - A stage with duration `0s` jumps at once.
+- **Ramping down.** A VU removed by a ramp-down finishes its current
+  iteration, for up to `gracefulRampDown`; after that the iteration is
+  cancelled.
+- **Arrival rate.** Starts follow a fixed schedule, so the rate does not
+  drift.
+  - If no VU is free, a start is **dropped**, not queued. The summary shows
+    "Dropped: N iterations", and the `dropped_iterations` metric counts them.
+  - Raise `preAllocatedVUs` if that happens. `maxVUs` (growing the pool
+    during the test) is not supported yet.
+- **Validation.**
+  - Errors name the scenario and field, and stop the run before setup. This
+    covers a field that does not belong to the executor (such as `rate` on
+    `constant-vus`) and an `exec` that is not exported.
+  - Unknown scenario keys produce a warning.
+  - Options that set both `scenarios` and `vus`/`duration`/`stages` are
+    an error.
+- **`--graceful-stop`** applies to the `vus`/`duration` shorthand only;
+  scenarios use their own `gracefulStop`.
 
 ### Thresholds
 

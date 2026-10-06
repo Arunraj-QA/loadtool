@@ -65,7 +65,7 @@ Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd)
 | Component | Extends | Package | Covers roadmap items | Status |
 |---|---|---|---|---|
 | DSL | goja | `internal/script` (built-in modules `loadtool`, `loadtool/http`; lifecycle exports; `__ENV`, `__VU`, `__ITER`), published `types/loadtool.d.ts` | 1 TypeScript DSL, 2 setup/teardown (script side) | Core done: `options` (ADR-006); built-in modules, relative imports, `__ENV`/`__VU`/`__ITER`, `console`, `sleep`, `group` (ADR-007). Responses and `post`/`put`/`patch`/`del`, `setup`/`teardown` (ADR-008). k6-shaped (ADR-005) |
-| Scenario Engine | VU, Runner | `internal/engine` (executors: constant-vus, ramping-vus, constant-arrival-rate; scenarios) | 5 scenarios, 2 setup/teardown (run order) | Setup/teardown run order done in the Runner (`script.Lifecycle`, ADR-008); executors planned |
+| Scenario Engine | VU, Runner | `internal/engine` (executors: constant-vus, ramping-vus, constant-arrival-rate; scenarios) | 5 scenarios, 2 setup/teardown (run order) | Done (ADR-008): `engine.RunScenarios` with constant-vus, ramping-vus and constant-arrival-rate; setup/teardown run order in the Runner (`script.Lifecycle`) |
 | Checks | DSL, Metrics | `check()` in `internal/script`; `checks` metric in `internal/metrics` | 3 checks/assertions | Done (ADR-008) |
 | Thresholds | Metrics, Runner | new `internal/thresholds` | 4 thresholds; exit code | Done (ADR-008): `internal/thresholds`, exit code 99 |
 | HTTP/2 | HTTP | `internal/httpclient` | 6 HTTP/2 | Planned |
@@ -90,7 +90,7 @@ Each step is one branch merged into `phase-1-mvp` after CI passes.
 | 4 | Built-in modules, local imports, `sleep`/`group`, `__ENV`/`__VU`/`__ITER`, `console`, published types (ADR-007) | DSL | Done |
 | 5 | Response access, `post`/`put`/`patch`/`del` (5a); `check()` and per-check results (5b) | Checks | Done |
 | 6 | Threshold expressions and exit code | Thresholds | Done |
-| 7 | `setup`/`teardown` lifecycle (7a, done); executors and multiple scenarios (7b) | Scenario Engine | 7a done, 7b planned |
+| 7 | `setup`/`teardown` lifecycle (7a); executors and multiple scenarios (7b) | Scenario Engine | Done |
 | 8 | Per-VU client and cookie jar, connection-reuse options | Sessions | Planned |
 | 9 | HTTP/2 and h2c | HTTP/2 | Planned |
 | 10 | Versioned JSON output | JSON Reporter | Planned |
