@@ -112,8 +112,8 @@ global `http` need the import line added; the error message says so.
 
 - `body` is a string. Send JSON with `JSON.stringify(...)` and a
   `Content-Type` header; an object body is an error, not form data.
-- `params` is `{ headers: { name: value } }`. Other keys produce a
-  warning (once per run) and are ignored.
+- `params` is `{ headers: { name: value }, cookies: { name: value } }`.
+  Other keys produce a warning (once per run) and are ignored.
 - Type declarations for editors are in
   [`types/loadtool.d.ts`](types/loadtool.d.ts).
 
@@ -128,6 +128,7 @@ A response has:
 | `json()` | The body parsed as JSON; throws `SyntaxError` on invalid JSON |
 | `timings.duration` | Milliseconds, including reading the body |
 | `url` | The request URL |
+| `cookies` | Cookies this response set: `{ name: [{ name, value, domain, path, expires, max_age, http_only, secure }] }` |
 
 Bodies are read and kept by default. Set
 `export const options = { discardResponseBodies: true }` when a test does
@@ -239,6 +240,42 @@ Rules:
 - **Ctrl+C:**
   - during the load phase, it stops the load, and teardown still runs.
   - a second Ctrl+C exits at once and skips teardown.
+
+### Sessions and connections
+
+Each VU has its own cookie jar
+([ADR-009](docs/decisions/ADR-009-sessions-and-connection-reuse.md); see
+[`examples/sessions.ts`](examples/sessions.ts)).
+
+```typescript
+export default function () {
+  http.post(`${BASE}/login`, JSON.stringify({ user: "load", password: "secret" }),
+    { headers: { "Content-Type": "application/json" } }); // sets a session cookie
+  http.get(`${BASE}/account`); // sent with that cookie
+}
+```
+
+Cookies:
+- **Kept automatically.** Cookies that responses set are stored and sent on
+  later requests to the same site, following their domain, path, expiry
+  and `Secure` rules.
+- **Reset each iteration.** Every iteration starts with an empty jar, so it
+  behaves like a new visitor. Set `options.noCookiesReset: true` to keep
+  one session per VU for the whole test.
+- **Not shared.** VUs never see each other's cookies.
+- **setup and teardown** share one jar, so teardown can log out of setup's
+  session. Neither is visible to the VUs.
+- **Extra cookies.** `params.cookies` adds cookies to one request; reading
+  and editing the jar from the script (k6's `http.cookieJar()`) is not
+  supported yet.
+
+Connections:
+- **Reused by default.** Connections are kept alive and reused, and all VUs
+  share one pool with up to one connection per VU per host.
+- **`options.noConnectionReuse: true`** opens a new connection for every
+  request, to measure connection set-up or to test balancers that track
+  connections.
+- **Not supported:** k6's `noVUConnectionReuse`.
 
 ### Scenarios
 

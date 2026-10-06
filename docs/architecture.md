@@ -69,7 +69,7 @@ Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd)
 | Checks | DSL, Metrics | `check()` in `internal/script`; `checks` metric in `internal/metrics` | 3 checks/assertions | Done (ADR-008) |
 | Thresholds | Metrics, Runner | new `internal/thresholds` | 4 thresholds; exit code | Done (ADR-008): `internal/thresholds`, exit code 99 |
 | HTTP/2 | HTTP | `internal/httpclient` | 6 HTTP/2 | Planned |
-| Sessions | HTTP | `internal/httpclient` (per-VU client and cookie jar; reuse options) | 7 connection reuse, 8 cookies/sessions | Planned |
+| Sessions | HTTP | `internal/httpclient` (per-VU client and cookie jar; reuse options) | 7 connection reuse, 8 cookies/sessions | Done (ADR-009): per-VU client and lazy cookie jar over the shared transport; `noCookiesReset`, `noConnectionReuse` |
 | JSON Reporter | Console (`report.Result`) | `internal/report` | 9 JSON output | Planned |
 | HTML Reporter | Console (`report.Result`) | `internal/report` | 10 self-contained HTML report | Planned |
 | CI | CLI | `action.yml`, `.github/workflows/release.yml`, `docs/ci/` | 11 GitHub Action, 12 generic CI recipe | Planned |
@@ -91,7 +91,7 @@ Each step is one branch merged into `phase-1-mvp` after CI passes.
 | 5 | Response access, `post`/`put`/`patch`/`del` (5a); `check()` and per-check results (5b) | Checks | Done |
 | 6 | Threshold expressions and exit code | Thresholds | Done |
 | 7 | `setup`/`teardown` lifecycle (7a); executors and multiple scenarios (7b) | Scenario Engine | Done |
-| 8 | Per-VU client and cookie jar, connection-reuse options | Sessions | Planned |
+| 8 | Per-VU client and cookie jar, connection-reuse options | Sessions | Done |
 | 9 | HTTP/2 and h2c | HTTP/2 | Planned |
 | 10 | Versioned JSON output | JSON Reporter | Planned |
 | 11 | Self-contained HTML report with time series | HTML Reporter | Planned |
