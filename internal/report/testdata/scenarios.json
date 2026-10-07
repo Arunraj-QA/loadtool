@@ -6,6 +6,11 @@
   },
   "script": "examples/scenarios.ts",
   "status": "completed",
+  "outcome": {
+    "passed": true,
+    "exitCode": 0,
+    "reasons": []
+  },
   "startedAt": "",
   "elapsedMs": 71000,
   "teardownError": "",

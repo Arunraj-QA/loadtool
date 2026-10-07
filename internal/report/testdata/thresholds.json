@@ -6,6 +6,14 @@
   },
   "script": "examples/thresholds.ts",
   "status": "completed",
+  "outcome": {
+    "passed": false,
+    "exitCode": 99,
+    "reasons": [
+      "threshold failed: http_req_failed rate<0.01",
+      "threshold failed: checks rate>0.99"
+    ]
+  },
   "startedAt": "",
   "elapsedMs": 30000,
   "teardownError": "",

@@ -6,6 +6,11 @@
   },
   "script": "examples/checks.ts",
   "status": "completed",
+  "outcome": {
+    "passed": true,
+    "exitCode": 0,
+    "reasons": []
+  },
   "startedAt": "2026-10-06T04:00:00.123Z",
   "elapsedMs": 30000,
   "teardownError": "",
