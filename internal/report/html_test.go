@@ -2,6 +2,9 @@ package report
 
 import (
 	"bytes"
+	"fmt"
+	"html/template"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,7 +30,9 @@ func renderHTML(t *testing.T, r Result) string {
 // resources, for every golden case.
 func TestHTMLIsSelfContained(t *testing.T) {
 	external := regexp.MustCompile(`(?i)<script|<link|<iframe|<img|\bsrc=|\bhref=|url\(|@import|https?://`)
-	for name, r := range goldenCases {
+	cases := maps.Clone(goldenCases)
+	cases["example"] = exampleResult()
+	for name, r := range cases {
 		t.Run(name, func(t *testing.T) {
 			out := renderHTML(t, r)
 			if m := external.FindString(out); m != "" {
@@ -58,15 +63,69 @@ func TestHTMLEscapesScriptText(t *testing.T) {
 	}
 }
 
-func TestHTMLStatusBadge(t *testing.T) {
-	if out := renderHTML(t, goldenCases["completed"]); !strings.Contains(out, `<span class="badge ok">passed</span>`) {
-		t.Error("a clean run should show passed")
+// The badge, exit code and reasons come from Verdict, the same decision
+// as the CLI exit code and the JSON outcome.
+func TestHTMLOutcome(t *testing.T) {
+	teardown := goldenCases["thresholds"]
+	teardown.TeardownError = "teardown: Error: cleanup failed"
+	tests := []struct {
+		name  string
+		r     Result
+		badge string
+	}{
+		{"completed", goldenCases["completed"], `<span class="badge ok">passed</span>`},
+		{"thresholds", goldenCases["thresholds"], `<span class="badge fail">failed</span>`},
+		{"teardown", teardown, `<span class="badge fail">failed</span>`},
+		{"interrupted", goldenCases["interrupted-none-sent"], `<span class="badge fail">interrupted</span>`},
 	}
-	if out := renderHTML(t, goldenCases["thresholds"]); !strings.Contains(out, `<span class="badge fail">failed</span>`) {
-		t.Error("failed thresholds should show failed")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := renderHTML(t, tt.r)
+			v := Verdict(tt.r)
+			if !strings.Contains(out, tt.badge) {
+				t.Errorf("missing badge %s", tt.badge)
+			}
+			if want := fmt.Sprintf("exit code %d</p>", v.ExitCode); !strings.Contains(out, want) {
+				t.Errorf("missing %q", want)
+			}
+			if got := strings.Count(out, "<li>"); got != len(v.Reasons) {
+				t.Errorf("%d reasons shown, want %d", got, len(v.Reasons))
+			}
+			for _, reason := range v.Reasons {
+				if !strings.Contains(out, "<li>"+template.HTMLEscapeString(reason)+"</li>") {
+					t.Errorf("reason %q not shown", reason)
+				}
+			}
+		})
 	}
-	if out := renderHTML(t, goldenCases["interrupted-none-sent"]); !strings.Contains(out, `<span class="badge fail">interrupted</span>`) || !strings.Contains(out, "No requests were sent.") {
+	if !strings.Contains(renderHTML(t, goldenCases["thresholds"]), "<li>threshold failed: http_req_failed rate&lt;0.01</li>") {
+		t.Error("the failed threshold is not listed as a reason")
+	}
+	if !strings.Contains(renderHTML(t, goldenCases["interrupted-none-sent"]), "No requests were sent.") {
 		t.Error("an interrupted run with no requests should say so")
+	}
+}
+
+// The summary cards hold the required numbers.
+func TestHTMLSummaryCards(t *testing.T) {
+	out := renderHTML(t, goldenCases["thresholds"])
+	card := func(label, value string) string {
+		return `<div class="label">` + label + `</div><div class="value">` + value + `</div>`
+	}
+	for _, want := range []string{
+		card("Requests", "3,000"),
+		card("Throughput", "100.0"), // 3,000 requests in 30 s
+		card("Error rate", "2.00%"),
+		card("p95 latency", "13.00ms"),
+		card("VUs", "10"),
+		card("Thresholds", "4 / 6"),
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing card %s", want)
+		}
+	}
+	if !strings.Contains(renderHTML(t, goldenCases["checks"]), card("Checks", "99.93%")) {
+		t.Error("missing the checks card")
 	}
 }
 
@@ -87,6 +146,44 @@ func TestChartGaps(t *testing.T) {
 	}
 	if !strings.Contains(renderHTML(t, goldenCases["completed"]), "Over time") == (len(goldenCases["completed"].Series) > 0) {
 		t.Error("charts shown without a series, or missing with one")
+	}
+}
+
+// The error-rate chart shows failed requests as a percentage of the
+// requests in each second, with a gap where there were none.
+func TestErrorRateChart(t *testing.T) {
+	out := renderHTML(t, goldenCases["scenarios"])
+	i := strings.Index(out, "Error rate <span")
+	if i < 0 {
+		t.Fatal("no error-rate chart")
+	}
+	chart := out[i:]
+	chart = chart[:strings.Index(chart, "</figure>")]
+	paths := regexp.MustCompile(`<path d="([^"]+)"`).FindAllStringSubmatch(chart, -1)
+	if len(paths) != 1 || strings.Count(paths[0][1], "M") != 2 {
+		t.Fatalf("want one line in two segments (a gap at 2s), got %v", paths)
+	}
+	// 1 of 70 requests failed in the first second: 1.43 %, under the
+	// 1.5 top tick; the 2.5s point has none failed, so sits on the axis.
+	if !strings.Contains(chart, `>1.5</text>`) {
+		t.Error("the y axis does not end at 1.5 %")
+	}
+}
+
+// A long run stays a small file: an hour of per-second points is well
+// under a megabyte.
+func TestHTMLSizeForLongRun(t *testing.T) {
+	r := exampleResult()
+	r.Series = nil
+	for i := 1; i <= 3600; i++ {
+		r.Series = append(r.Series, metrics.Point{At: time.Duration(i) * time.Second, Requests: 4000 + i%97, Failed: i % 13,
+			P50: time.Duration(11000+i%300) * time.Microsecond, P95: time.Duration(15000+i%700) * time.Microsecond,
+			P99: time.Duration(20000+i%1500) * time.Microsecond, VUs: 50})
+	}
+	out := renderHTML(t, r)
+	t.Logf("%d points: %d bytes", len(r.Series), len(out))
+	if len(out) > 1<<20 {
+		t.Errorf("report is %d bytes, want under 1 MiB", len(out))
 	}
 }
 
@@ -114,6 +211,11 @@ func TestNiceTicks(t *testing.T) {
 
 func TestHTMLMatchesGolden(t *testing.T) {
 	out := renderHTML(t, goldenCases["scenarios"])
+	if *update {
+		if err := os.WriteFile(filepath.Join("testdata", "scenarios.html"), []byte(out), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	want, err := os.ReadFile(filepath.Join("testdata", "scenarios.html"))
 	if err != nil {
 		t.Fatal(err)
