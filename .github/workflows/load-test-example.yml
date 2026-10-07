@@ -1,0 +1,49 @@
+# An example load-test workflow, ready to copy into your repository.
+#
+# In this repository it runs a deterministic test: examples/thresholds.ts
+# against the demo API in examples/server, which answers every request
+# after 5 ms. No credentials or external services are used.
+#
+# To use it in your repository:
+#   1. Replace `uses: ./` with `uses: Arunraj-QA/loadtool@<ref>`. Once a
+#      release exists, pin it and drop `version: source`.
+#   2. Remove the demo API step, and set BASE_URL to your test
+#      environment.
+#   3. Point `script` at your test and adjust `args`.
+name: Load test (example)
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      # Only for this example: a local target with a fixed response time.
+      - name: Start the demo API
+        run: |
+          go build -o "$RUNNER_TEMP/demo-api" ./examples/server
+          "$RUNNER_TEMP/demo-api" -addr 127.0.0.1:8090 &
+          for _ in $(seq 50); do curl -sf http://127.0.0.1:8090/health && break; sleep 0.1; done
+
+      - name: Load test
+        uses: ./
+        with:
+          version: source            # build from source; no release needed
+          script: examples/thresholds.ts
+          args: --vus 10 --duration 10s
+        env:
+          BASE_URL: http://127.0.0.1:8090

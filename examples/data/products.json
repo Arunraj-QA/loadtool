@@ -1,6 +1,7 @@
 [
-  { "id": 1, "name": "keyboard" },
-  { "id": 2, "name": "mouse" },
-  { "id": 3, "name": "monitor" },
-  { "id": 4, "name": "headset" }
+  { "id": 1, "name": "Espresso beans, 1 kg" },
+  { "id": 2, "name": "Milk frother" },
+  { "id": 3, "name": "Ceramic cup" },
+  { "id": 4, "name": "Hand grinder" },
+  { "id": 5, "name": "Paper filters (100)" }
 ]

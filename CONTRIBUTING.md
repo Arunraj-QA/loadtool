@@ -30,14 +30,22 @@ go test -run '^$' -bench . ./...     # benchmarks
 gofmt -l .                           # must print nothing
 ```
 
-**Examples.** Start the benchmark server, then run
-`scripts/smoke-examples.sh bin/loadtool`. It runs every local example and
-needs `jq`:
+**Examples.** Start the demo API, then run
+`scripts/smoke-examples.sh bin/loadtool`. It runs every example and needs
+`jq`:
 
 ```bash
-go run ./benchmarks/server &
+go run ./examples/server &
 scripts/smoke-examples.sh bin/loadtool
 ```
+
+A new example goes in the smoke script's list and in
+[`examples/README.md`](examples/README.md).
+
+**CI checks locally.** `scripts/ci-local.sh` reproduces the load-test
+checks CI runs: a passing and a failing run through the generic recipe,
+with their exit codes and result files. See
+[Reproduce CI locally](docs/ci/README.md#reproduce-ci-locally).
 
 **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on
 every push:

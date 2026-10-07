@@ -6,6 +6,11 @@
   },
   "script": "examples/basic-http.ts",
   "status": "completed",
+  "outcome": {
+    "passed": true,
+    "exitCode": 0,
+    "reasons": []
+  },
   "startedAt": "",
   "elapsedMs": 5000,
   "teardownError": "",

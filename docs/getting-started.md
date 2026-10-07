@@ -23,14 +23,23 @@ published yet.
 
 ## 2. Start something to test
 
-The repository includes a small, predictable target server: `GET
-/api/test` answers with JSON after 10 ms.
+Never point a load test at a server you do not own. The repository
+includes a small demo API to practise on: a shop with products, orders
+and a login. Every request takes about 5 ms.
 
 ```bash
-go run ./benchmarks/server
+go run ./examples/server
 ```
 
-It listens on `127.0.0.1:8080`. Leave it running in its own terminal.
+It listens on `127.0.0.1:8090`. Leave it running in its own terminal.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/products` | The product list |
+| `GET /api/products/{id}` | One product |
+| `POST /api/orders` | Creates an order from `{"productId": 1, "quantity": 2}` |
+| `POST /api/login` | `{"username": "…", "password": "demo"}`: a token and a session cookie |
+| `GET /api/me` | The logged-in user |
 
 ## 3. Write and run a test
 
@@ -39,10 +48,10 @@ Save this as `first.ts`:
 ```typescript
 import http from "loadtool/http";
 
-const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8080";
+const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8090";
 
 export default function () {
-  http.get(`${BASE_URL}/api/test`);
+  http.get(`${BASE_URL}/api/products`);
 }
 ```
 
@@ -52,9 +61,12 @@ Run it with 10 virtual users for 10 seconds:
 ./bin/loadtool run first.ts --vus 10 --duration 10s
 ```
 
-Each VU calls the default function in a loop. The summary shows
-requests, errors and latency percentiles; [Results](results.md) explains
-each line.
+Each VU (virtual user) calls the default function in a loop. The summary
+shows requests, errors and latency percentiles; [Results](results.md)
+explains each line.
+
+`BASE_URL` comes from the environment, so the same script can test
+another server: `./bin/loadtool run -e BASE_URL=https://staging.example.test first.ts`.
 
 ## 4. Check responses
 
@@ -65,13 +77,13 @@ than that, use `check`:
 import http from "loadtool/http";
 import { check } from "loadtool";
 
-const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8080";
+const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8090";
 
 export default function () {
-  const res = http.get(`${BASE_URL}/api/test`);
+  const res = http.get(`${BASE_URL}/api/products`);
   check(res, {
     "status is 200": (r) => r.status === 200,
-    "status field is ok": (r) => r.json().status === "ok",
+    "has products": (r) => r.json().products.length > 0,
   });
 }
 ```
@@ -102,7 +114,7 @@ That is all a CI job needs ([CI guide](ci/README.md)).
 ## 6. Keep the results
 
 ```bash
-./bin/loadtool run first.ts --summary-json summary.json --report-html report.html
+./bin/loadtool run first.ts --out json=summary.json --report-html report.html
 ```
 
 **The two files:**
@@ -113,9 +125,12 @@ That is all a CI job needs ([CI guide](ci/README.md)).
 
 ## Next
 
+- **Ready-made scripts for every feature:** [Examples](../examples/README.md):
+  POST JSON, logins with tokens or cookies, scenarios, HTTP/2. They all
+  run against the demo API.
 - **More script features:** [Script API](script-api.md), including
   setup/teardown, cookies, imports and HTTP/2.
 - **Workload shapes:** ramping and arrival-rate
   [scenarios](options.md#scenarios).
-- **Ready-made scripts:** [Examples](../examples/README.md).
 - **Coming from k6:** [Differences from k6](k6-differences.md).
+- **Something not working:** [Troubleshooting](troubleshooting.md).

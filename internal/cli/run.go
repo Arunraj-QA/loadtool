@@ -24,6 +24,7 @@ func newRunCmd() *cobra.Command {
 		vus         int
 		duration    time.Duration
 		envFlags    []string
+		outFlags    []string
 		summaryJSON string
 		reportHTML  string
 	)
@@ -46,7 +47,15 @@ func newRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTest(cmd, cfg, cli, env, outputs{summaryJSON: summaryJSON, reportHTML: reportHTML})
+			out, err := parseOutputs(outFlags)
+			if err != nil {
+				return err
+			}
+			if summaryJSON != "" {
+				out.jsonFiles = append(out.jsonFiles, jsonFile{flag: "--summary-json", path: summaryJSON})
+			}
+			out.reportHTML = reportHTML
+			return runTest(cmd, cfg, cli, env, out)
 		},
 	}
 
@@ -57,8 +66,11 @@ func newRunCmd() *cobra.Command {
 		"test duration, e.g. 30s or 5m (overrides "+config.EnvDuration+" and options.duration)")
 	f.DurationVar(&cfg.GracefulStop, "graceful-stop", cfg.GracefulStop,
 		"how long iterations still running at the end of --duration may take to finish (0 cancels them at once)")
+	f.StringArrayVarP(&outFlags, "out", "o", nil,
+		"write the summary as JSON: \"json\" to stdout (the console summary then goes to stderr) "+
+			"or \"json=<file>\" to a file (repeatable; docs/json-summary.md)")
 	f.StringVar(&summaryJSON, "summary-json", "",
-		"also write the end-of-test summary as JSON to this file (docs/json-summary.md)")
+		"same as --out json=<file>")
 	f.StringVar(&reportHTML, "report-html", "",
 		"also write a self-contained HTML report with charts to this file")
 	f.StringArrayVarP(&envFlags, "env", "e", nil,
@@ -87,9 +99,32 @@ func scriptEnv(environ, flags []string) (map[string]string, error) {
 
 // runTest runs the test through the runner, prints the console report and
 // turns an interrupted run into an error (exit code 1).
-// outputs are the optional result files; empty paths are not written.
+// outputs are the optional result outputs; empty means not written.
 type outputs struct {
-	summaryJSON, reportHTML string
+	jsonStdout bool       // --out json
+	jsonFiles  []jsonFile // --out json=<file>, --summary-json
+	reportHTML string
+}
+
+// jsonFile is a JSON summary file and the flag that asked for it, for
+// error messages.
+type jsonFile struct{ flag, path string }
+
+// parseOutputs reads --out values: "json" (stdout) or "json=<file>".
+func parseOutputs(flags []string) (outputs, error) {
+	var out outputs
+	for _, f := range flags {
+		kind, path, hasPath := strings.Cut(f, "=")
+		switch {
+		case kind == "json" && !hasPath:
+			out.jsonStdout = true
+		case kind == "json" && path != "":
+			out.jsonFiles = append(out.jsonFiles, jsonFile{flag: "--out " + f, path: path})
+		default:
+			return outputs{}, fmt.Errorf("--out %q: supported outputs are json (to stdout) and json=<file>", f)
+		}
+	}
+	return out, nil
 }
 
 func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env map[string]string, out outputs) error {
@@ -109,13 +144,24 @@ func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env ma
 	}
 	// The results are printed first, so a failed teardown or an interrupt
 	// never hides them; either still fails the run so automation notices.
-	report.Console(cmd.OutOrStdout(), res)
+	// With JSON on stdout, the console summary moves to stderr so stdout
+	// stays valid JSON.
+	consoleOut := cmd.OutOrStdout()
+	if out.jsonStdout {
+		consoleOut = cmd.ErrOrStderr()
+	}
+	report.Console(consoleOut, res)
 	var errs []error
 	// Written whenever there is a result, also for interrupted runs and
 	// failed thresholds; a write failure exits 1 after the summary.
-	if out.summaryJSON != "" {
-		if err := report.WriteJSONFile(out.summaryJSON, res, Version); err != nil {
-			errs = append(errs, fmt.Errorf("--summary-json: %w", err))
+	if out.jsonStdout {
+		if err := report.JSON(cmd.OutOrStdout(), res, Version); err != nil {
+			errs = append(errs, fmt.Errorf("--out json: %w", err))
+		}
+	}
+	for _, f := range out.jsonFiles {
+		if err := report.WriteJSONFile(f.path, res, Version); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", f.flag, err))
 		}
 	}
 	if out.reportHTML != "" {
@@ -123,11 +169,15 @@ func runTest(cmd *cobra.Command, cfg config.Config, cli config.Overrides, env ma
 			errs = append(errs, fmt.Errorf("--report-html: %w", err))
 		}
 	}
-	if res.Interrupted {
-		errs = append(errs, fmt.Errorf("test interrupted: %w", context.Cause(ctx)))
-	}
-	if res.TeardownError != "" {
-		errs = append(errs, errors.New(res.TeardownError))
+	// report.Verdict decides the exit code, as it decides the JSON
+	// summary's outcome, so the two always agree.
+	if v := report.Verdict(res); v.ExitCode == report.ExitFailed {
+		if res.Interrupted {
+			errs = append(errs, fmt.Errorf("test interrupted: %w", context.Cause(ctx)))
+		}
+		if res.TeardownError != "" {
+			errs = append(errs, errors.New(res.TeardownError))
+		}
 	}
 	if len(errs) > 0 {
 		return errors.Join(errs...) // exit 1, even if thresholds also failed

@@ -1,8 +1,9 @@
 # Results
 
 LoadTool prints a summary at the end of every run. It can also write the
-same result as [JSON](json-summary.md) (`--summary-json`) and as an HTML
-report with charts (`--report-html`).
+same result as [JSON](json-summary.md) (`--out json`) and as an HTML
+report with charts (`--report-html`; see the
+[example report](../examples/reports/example-report.html)).
 
 ```
 LoadTool summary
@@ -98,7 +99,34 @@ second:
 | Value | Meaning |
 |---|---|
 | Requests and failures per second | Requests that completed in that second |
+| Error rate | Failed requests as a percentage of those requests |
 | Latency p50/p95/p99 | Of the requests that completed in that second |
 | Active VUs | VUs the scenarios had active at that moment |
 
-A second without requests is a gap in the latency lines, not a zero.
+A second without requests is a gap in the latency and error-rate lines,
+not a zero.
+
+## The HTML report
+
+`--report-html report.html` writes one file that opens in any browser,
+offline: no server, scripts or external resources.
+
+**What it shows:**
+
+- **The verdict:** passed, failed or interrupted, the exit code, and the
+  reasons (each failed threshold, an interruption, a teardown failure).
+  It is the same decision as the exit code and the JSON `outcome`.
+- **Summary cards:** requests, throughput, error rate, p95 latency, VUs,
+  checks and thresholds passed.
+- **Tables:** every threshold with its observed value, every check with
+  its pass rate, and latency percentiles for all requests and for
+  successful ones.
+- **Charts over time:** latency, requests per second, error rate and
+  active VUs, for runs of about two seconds or more.
+
+**Size.** An hour-long run gives a report of about 300 KB.
+
+**The example report** is rendered from sample data, not a measurement.
+It is regenerated with
+`go test ./internal/report -run ExampleReport -update`, and a test fails
+if it is out of date.

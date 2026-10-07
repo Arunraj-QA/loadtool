@@ -3,9 +3,19 @@
 LoadTool is one static binary, so any CI system can run it. A CI job only
 needs:
 
-1. the binary, from the GitHub releases;
+1. the binary, from a GitHub release or built from source with Go;
 2. `loadtool run` with the outputs you want to keep;
 3. the exit code, which decides whether the job passes.
+
+**Three ways in:**
+
+- **On GitHub:** the [LoadTool Action](#github-actions).
+- **Anywhere else:** the [generic recipe](#the-generic-recipe), one shell
+  script.
+- **On your machine:** the [local reproduction](#reproduce-ci-locally) of
+  the CI checks.
+
+None of them needs credentials or an external service.
 
 ## Exit codes
 
@@ -31,7 +41,7 @@ them, a run that completes exits 0 however slow it was. See
 
 | Flag | File | Use |
 |---|---|---|
-| `--summary-json summary.json` | Versioned JSON ([format](../json-summary.md)) | Parse in the pipeline; compare between runs |
+| `--out json=summary.json` | Versioned JSON ([format](../json-summary.md)) | Parse in the pipeline; compare between runs |
 | `--report-html report.html` | Self-contained HTML with charts | Attach as an artifact for people to read |
 
 Both are written whenever the test produced a result, including when
@@ -40,9 +50,21 @@ rules.
 
 ## GitHub Actions
 
-Use the LoadTool action. It installs a release, runs the test, writes a
-job summary with the key numbers and thresholds, uploads the JSON and
-HTML as an artifact, and fails the job on a failed test.
+Use the LoadTool action. In order, it:
+
+1. installs a release, or builds from source;
+2. runs the test with the [generic recipe](#the-generic-recipe);
+3. writes a job summary with the key numbers and thresholds;
+4. uploads the JSON and HTML as an artifact;
+5. fails the job on a failed test, with one error annotation per reason
+   (such as `threshold failed: http_req_failed rate<0.01`).
+
+**A complete, runnable example:**
+[`.github/workflows/load-test-example.yml`](../../.github/workflows/load-test-example.yml).
+
+- It runs on every push to this repository: a deterministic test against
+  the bundled target server, with no credentials.
+- Its header says what to change when you copy it.
 
 ```yaml
 jobs:
@@ -62,7 +84,7 @@ jobs:
 |---|---|---|
 | `script` | (required) | Test script |
 | `args` | `""` | Extra `loadtool run` arguments, split on spaces |
-| `version` | `latest` | Release to install, such as `v0.1.0` |
+| `version` | `latest` | Release to install, such as `v0.1.0`; `source` builds from the action's checkout with Go (no release needed) |
 | `binary` | `""` | Use this binary instead of installing a release |
 | `summary-json` | `loadtool-summary.json` | JSON summary path (relative to the workspace) |
 | `report-html` | `loadtool-report.html` | HTML report path (relative to the workspace) |
@@ -80,6 +102,70 @@ jobs:
 - **Releases.** The action downloads release archives with `gh` and
   checks them against the release's `checksums.txt`. Pin a version so
   runs are repeatable.
+- **Before the first release,** or to test an unreleased commit, use
+  `version: source` with `uses: Arunraj-QA/loadtool@<commit or branch>`.
+  The action sets up the Go version in its `go.mod`, which also becomes
+  the job's Go for later steps.
+- **What the log shows.** The "Run the test" step prints:
+  - the LoadTool version;
+  - the console summary;
+  - a closing line such as
+    `loadtool-ci: FAILED: thresholds failed (exit code 99)`;
+  - the files written.
+
+## The generic recipe
+
+[`scripts/loadtool-ci.sh`](../../scripts/loadtool-ci.sh) is the CI logic
+in one portable bash script; the Action runs it too. Copy it into your
+repository and call it from any CI system:
+
+```bash
+LOADTOOL=./loadtool scripts/loadtool-ci.sh tests/load/checkout.ts --vus 20 --duration 2m
+```
+
+**It does four things:**
+
+1. Prints the LoadTool version.
+2. Removes result files left by an earlier run.
+3. Writes `loadtool-summary.json` and `loadtool-report.html`.
+4. Ends with a one-line verdict, exiting with LoadTool's exit code: `0`,
+   `99` or `1` (see [Exit codes](#exit-codes)).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LOADTOOL` | `loadtool` | The binary |
+| `SUMMARY_JSON` | `loadtool-summary.json` | JSON summary path |
+| `REPORT_HTML` | `loadtool-report.html` | HTML report path; empty skips it |
+
+Arguments after the script go to `loadtool run`. The script's `__ENV`
+comes from the environment (`BASE_URL=…`) or `-e KEY=VALUE`.
+
+**To adapt it to a CI system:**
+
+1. Get the binary: a release ([Any other CI system](#any-other-ci-system)),
+   or `go build -o loadtool ./cmd/loadtool` from a checkout.
+2. Run the script.
+3. Keep both files with an "always" artifact rule, so they are kept when
+   the test fails.
+
+## Reproduce CI locally
+
+```bash
+scripts/ci-local.sh            # needs Go, bash and curl
+```
+
+It builds LoadTool and the demo API, starts the API on port
+18090, and runs the deterministic example through the generic recipe
+twice:
+
+| Run | Target | Must exit |
+|---|---|---|
+| passing | the local server | `0` |
+| failing | a port nothing listens on, so the error-rate threshold fails | `99` |
+
+For each run it checks the JSON outcome and the HTML report. CI runs the
+same script. It takes about 25 seconds and works on Linux, macOS and
+Windows (Git Bash).
 
 ## Any other CI system
 
@@ -93,7 +179,7 @@ curl -fsSLO https://github.com/Arunraj-QA/loadtool/releases/download/${VERSION}/
 grep " \*\?${NAME}.tar.gz$" checksums.txt | sha256sum -c -
 tar -xzf ${NAME}.tar.gz
 ./${NAME}/loadtool run tests/load/checkout.ts \
-  --summary-json loadtool-summary.json --report-html loadtool-report.html
+  --out json=loadtool-summary.json --report-html loadtool-report.html
 ```
 
 **Archives.** Release archives are named
@@ -125,7 +211,7 @@ load-test:
     - grep " \*\?${NAME}.tar.gz$" checksums.txt | sha256sum -c -
     - tar -xzf ${NAME}.tar.gz && mv ${NAME}/loadtool /usr/local/bin/
   script:
-    - loadtool run tests/load/checkout.ts --summary-json loadtool-summary.json --report-html loadtool-report.html
+    - loadtool run tests/load/checkout.ts --out json=loadtool-summary.json --report-html loadtool-report.html
   artifacts:
     when: always
     paths: [loadtool-summary.json, loadtool-report.html]
@@ -150,7 +236,7 @@ pipeline {
           grep " \\*\\?${NAME}.tar.gz$" checksums.txt | sha256sum -c -
           tar -xzf ${NAME}.tar.gz
           ./${NAME}/loadtool run tests/load/checkout.ts \
-            --summary-json loadtool-summary.json --report-html loadtool-report.html
+            --out json=loadtool-summary.json --report-html loadtool-report.html
         '''
       }
     }
@@ -172,7 +258,7 @@ steps:
       grep " \*\?${NAME}.tar.gz$" checksums.txt | sha256sum -c -
       tar -xzf ${NAME}.tar.gz
       ./${NAME}/loadtool run tests/load/checkout.ts \
-        --summary-json loadtool-summary.json --report-html loadtool-report.html
+        --out json=loadtool-summary.json --report-html loadtool-report.html
     displayName: Load test
     env:
       BASE_URL: https://staging.example.test

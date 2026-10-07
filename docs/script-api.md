@@ -28,7 +28,7 @@ import { check, sleep } from "loadtool";
 export const options = { vus: 10, duration: "30s" };
 
 export default function () {
-  const res = http.get("https://api.example.test/products");
+  const res = http.get("http://127.0.0.1:8090/api/products");
   check(res, { "status is 200": (r) => r.status === 200 });
   sleep(1);
 }
@@ -73,10 +73,12 @@ import { get, post } from "loadtool/http";   // or single functions
 - An object body is a `TypeError`, not silently form-encoded.
 
 ```typescript
-http.post(`${BASE}/orders`, JSON.stringify({ sku: "A1", qty: 2 }), {
+http.post(`${BASE}/api/orders`, JSON.stringify({ productId: 1, quantity: 2 }), {
   headers: { "Content-Type": "application/json" },
 });
 ```
+
+([`examples/post-json.ts`](../examples/post-json.ts) checks the response.)
 
 **`params`** is `{ headers: { name: value }, cookies: { name: value } }`.
 Other keys (such as `timeout` or `tags`) produce one warning per run and
@@ -124,7 +126,7 @@ returns `true` if all passed.
 ```typescript
 const ok = check(res, {
   "status is 200": (r) => r.status === 200,
-  "has items": (r) => r.json().items.length > 0,
+  "has products": (r) => r.json().products.length > 0,
 });
 ```
 
@@ -133,7 +135,7 @@ const ok = check(res, {
 - **A failed check** does not stop the iteration and is not a request
   error.
 - **A condition that throws counts as failed.** For example, `r.json()`
-  on an HTML error page fails "has items". The first message is shown in
+  on an HTML error page fails "has products". The first message is shown in
   the summary.
 - **A condition that is not a function** is a script error.
 - **The summary** lists each check's pass rate. The `checks` threshold
@@ -163,7 +165,7 @@ yet.
 Use `__ENV` for anything that differs between environments:
 
 ```typescript
-const BASE = __ENV.BASE_URL || "http://127.0.0.1:8080";
+const BASE = __ENV.BASE_URL || "http://127.0.0.1:8090";
 ```
 
 ```bash
@@ -188,21 +190,22 @@ They are not properties of `globalThis`.
 ## Lifecycle
 
 A script can export `setup` and `teardown`
-([`examples/lifecycle.ts`](../examples/lifecycle.ts)):
+([`examples/auth-token.ts`](../examples/auth-token.ts)):
 
 ```typescript
 export function setup() {
-  const res = http.post(`${BASE}/login`, JSON.stringify({ user: "load" }),
+  const res = http.post(`${BASE}/api/login`,
+    JSON.stringify({ username: "load-test", password: __ENV.API_PASSWORD }),
     { headers: { "Content-Type": "application/json" } });
   return { token: res.json().token };
 }
 
 export default function (data) {
-  http.get(`${BASE}/orders`, { headers: { Authorization: `Bearer ${data.token}` } });
+  http.get(`${BASE}/api/me`, { headers: { Authorization: `Bearer ${data.token}` } });
 }
 
 export function teardown(data) {
-  http.post(`${BASE}/logout`, data.token);
+  console.log("done");
 }
 ```
 

@@ -6,6 +6,13 @@
   },
   "script": "examples/basic-http.ts",
   "status": "interrupted",
+  "outcome": {
+    "passed": false,
+    "exitCode": 1,
+    "reasons": [
+      "interrupted"
+    ]
+  },
   "startedAt": "",
   "elapsedMs": 2000,
   "teardownError": "",

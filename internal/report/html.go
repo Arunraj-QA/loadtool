@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
-	"github.com/Arunraj-QA/loadtool/internal/thresholds"
 )
 
 // HTML writes r as a self-contained HTML report (ADR-012): one file with
@@ -63,6 +62,8 @@ func replaceFile(from, to string) error {
 type htmlData struct {
 	Title, Script, Status, Version, Started string
 	Interrupted, Failed                     bool
+	ExitCode                                int
+	Reasons                                 []string
 	TeardownError                           string
 	Cards                                   []htmlCard
 	Thresholds                              []htmlThreshold
@@ -111,7 +112,9 @@ func buildHTML(r Result, version string) htmlData {
 		d.Dropped = formatCount(s.DroppedIterations)
 	}
 	d.Protocols = protocolsLine(s.Protocols)
-	d.Failed = r.Interrupted || r.TeardownError != "" || thresholds.Failed(r.Thresholds)
+	// The same verdict as the exit code and the JSON outcome.
+	outcome := Verdict(r)
+	d.Failed, d.ExitCode, d.Reasons = !outcome.Passed, outcome.ExitCode, outcome.Reasons
 
 	var rps float64
 	if secs := r.Elapsed.Seconds(); secs > 0 {
@@ -122,8 +125,9 @@ func buildHTML(r Result, version string) htmlData {
 		p95 = formatDuration(s.P95)
 	}
 	d.Cards = []htmlCard{
-		{"Requests", formatCount(s.Requests), fmt.Sprintf("%.1f req/s", rps)},
-		{"Errors", fmt.Sprintf("%.2f%%", s.ErrorRate*100), formatCount(s.Failures) + " failed"},
+		{"Requests", formatCount(s.Requests), formatCount(s.Iterations) + " iterations"},
+		{"Throughput", fmt.Sprintf("%.1f", rps), "requests per second"},
+		{"Error rate", fmt.Sprintf("%.2f%%", s.ErrorRate*100), formatCount(s.Failures) + " failed"},
 		{"p95 latency", p95, "all requests sent"},
 		{"VUs", formatCount(r.VUs), "for " + r.Duration.String() + " (elapsed " + formatDuration(r.Elapsed) + ")"},
 	}
@@ -172,7 +176,7 @@ func buildHTML(r Result, version string) htmlData {
 	return d
 }
 
-// charts renders the time series as three SVG line charts; a run shorter
+// charts renders the time series as four SVG line charts; a run shorter
 // than two points (about two seconds) gets none, since one point draws
 // no line.
 func charts(series []metrics.Point) []template.HTML {
@@ -182,6 +186,7 @@ func charts(series []metrics.Point) []template.HTML {
 	xs := make([]float64, len(series))
 	p50, p95, p99 := make([]float64, len(series)), make([]float64, len(series)), make([]float64, len(series))
 	reqs, failed, vus := make([]float64, len(series)), make([]float64, len(series)), make([]float64, len(series))
+	errRate := make([]float64, len(series))
 	prev := time.Duration(0)
 	for i, p := range series {
 		xs[i] = p.At.Seconds()
@@ -191,14 +196,16 @@ func charts(series []metrics.Point) []template.HTML {
 			secs = 1
 		}
 		reqs[i], failed[i], vus[i] = float64(p.Requests)/secs, float64(p.Failed)/secs, float64(p.VUs)
-		p50[i], p95[i], p99[i] = math.NaN(), math.NaN(), math.NaN() // a gap: no requests
+		p50[i], p95[i], p99[i], errRate[i] = math.NaN(), math.NaN(), math.NaN(), math.NaN() // a gap: no requests
 		if p.Requests > 0 {
 			p50[i], p95[i], p99[i] = ms(p.P50), ms(p.P95), ms(p.P99)
+			errRate[i] = float64(p.Failed) / float64(p.Requests) * 100
 		}
 	}
 	return []template.HTML{
 		lineChart("Latency", "ms", xs, []line{{"p50", "--c1", p50}, {"p95", "--c2", p95}, {"p99", "--c3", p99}}),
 		lineChart("Requests per second", "req/s", xs, []line{{"requests", "--c1", reqs}, {"failed", "--bad", failed}}),
+		lineChart("Error rate", "% of requests", xs, []line{{"failed", "--bad", errRate}}),
 		lineChart("Active VUs", "VUs", xs, []line{{"VUs", "--c1", vus}}),
 	}
 }
@@ -339,6 +346,7 @@ h2 { font-size: 1.1rem; margin: 32px 0 12px; }
 .badge.ok { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
 .badge.fail { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
 .alert { border-left: 4px solid var(--bad); background: var(--card); padding: 8px 12px; margin: 16px 0; }
+.reasons { list-style: none; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
 .card { background: var(--card); border-radius: 8px; padding: 12px 14px; }
 .card .label { color: var(--muted); font-size: .85rem; }
@@ -370,8 +378,8 @@ footer { color: var(--muted); font-size: .8rem; margin-top: 40px; }
 <h1>{{.Script}}</h1>
 <p class="meta">
 {{if .Failed}}<span class="badge fail">{{if .Interrupted}}interrupted{{else}}failed{{end}}</span>{{else}}<span class="badge ok">passed</span>{{end}}
-{{if .Started}} · started {{.Started}}{{end}} · {{.Status}}</p>
-{{if .TeardownError}}<p class="alert">Teardown failed: {{.TeardownError}}</p>{{end}}
+{{if .Started}} · started {{.Started}}{{end}} · {{.Status}} · exit code {{.ExitCode}}</p>
+{{if .Reasons}}<ul class="alert reasons" aria-label="Why the run failed">{{range .Reasons}}<li>{{.}}</li>{{end}}</ul>{{end}}
 {{if .Dropped}}<p class="alert">{{.Dropped}} iterations were dropped (no free VU): the target arrival rate was not reached. Raise preAllocatedVUs.</p>{{end}}
 
 <section class="cards" aria-label="Summary">

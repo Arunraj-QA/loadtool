@@ -43,17 +43,43 @@ does.
 
 **Results** ([Results](docs/results.md), ADR-011, ADR-012):
 
-- `--summary-json`: a versioned JSON summary.
+- `--out json` (stdout) and `--out json=<file>`: a versioned JSON summary
+  with an `outcome` (passed, exit code, reasons) and a published JSON
+  Schema. `--summary-json <file>` is an alias.
 - `--report-html`: a self-contained HTML report with per-second charts.
+  It shows the run's verdict, exit code and reasons (the same as the JSON
+  `outcome`), a throughput card and an error-rate chart. There is an
+  example report in `examples/reports/`.
 - The console summary shows checks, thresholds, scenarios and dropped
   iterations.
 
 **CI and releases** ([CI](docs/ci/README.md)):
 
-- A GitHub Action (`action.yml`).
+- A GitHub Action (`action.yml`):
+  - `version: source` builds LoadTool from the action's checkout, so it
+    works before any release;
+  - each failure reason becomes an error annotation.
+- An example workflow (`.github/workflows/load-test-example.yml`): a
+  deterministic test that runs in this repository.
+- `scripts/loadtool-ci.sh`, the generic CI recipe the Action also uses.
+- `scripts/ci-local.sh`, which reproduces the CI load-test checks
+  locally.
 - Recipes for GitLab CI, Jenkins and Azure Pipelines.
 - Release builds for Linux, macOS and Windows (amd64, arm64) with
   checksums.
+
+**Examples and documentation** ([Examples](examples/README.md),
+[docs](docs/README.md)):
+
+- A demo API (`examples/server`): products, JSON orders, a login with a
+  bearer token and a session cookie, HTTP/1.1 and h2c.
+- Ten examples, all run in CI against the demo API:
+  - GET and POST JSON;
+  - token and cookie logins;
+  - checks and thresholds;
+  - all three executors;
+  - HTTP/2.
+- A troubleshooting guide and a topic index.
 
 **Fixes found along the way:**
 

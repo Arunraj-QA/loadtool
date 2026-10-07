@@ -1,11 +1,15 @@
 package cli
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/Arunraj-QA/loadtool/internal/report"
+)
 
 // ExitThresholdsFailed is the exit code when the test ran fully but at
 // least one threshold failed. k6 uses the same code, so CI recipes carry
 // over (ADR-008).
-const ExitThresholdsFailed = 99
+const ExitThresholdsFailed = report.ExitThresholdsFailed
 
 // ExitError is an error that asks for a specific process exit code.
 type ExitError struct {

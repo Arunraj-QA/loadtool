@@ -22,6 +22,9 @@ type jsonSummary struct {
 	Script        string   `json:"script"`
 	// Status is "completed" or "interrupted".
 	Status string `json:"status"`
+	// Outcome is the verdict and the exit code (Verdict); added in Phase 1
+	// (additive).
+	Outcome jsonOutcome `json:"outcome"`
 	// StartedAt is when the test clock started, RFC 3339 with
 	// milliseconds, UTC; empty if unknown.
 	StartedAt string  `json:"startedAt"`
@@ -53,6 +56,12 @@ type jsonPtDur struct {
 	P50 float64 `json:"p50"`
 	P95 float64 `json:"p95"`
 	P99 float64 `json:"p99"`
+}
+
+type jsonOutcome struct {
+	Passed   bool     `json:"passed"`
+	ExitCode int      `json:"exitCode"`
+	Reasons  []string `json:"reasons"`
 }
 
 type jsonTool struct {
@@ -225,6 +234,7 @@ func buildJSON(r Result, version string) jsonSummary {
 		Tool:          jsonTool{Name: "loadtool", Version: version},
 		Script:        r.Script,
 		Status:        status,
+		Outcome:       outcomeJSON(Verdict(r)),
 		StartedAt:     startedAt,
 		ElapsedMs:     ms(r.Elapsed),
 		TeardownError: r.TeardownError,
@@ -270,6 +280,14 @@ func buildJSON(r Result, version string) jsonSummary {
 		doc.Thresholds = append(doc.Thresholds, jt)
 	}
 	return doc
+}
+
+func outcomeJSON(o Outcome) jsonOutcome {
+	reasons := o.Reasons
+	if reasons == nil {
+		reasons = []string{} // always an array
+	}
+	return jsonOutcome{Passed: o.Passed, ExitCode: o.ExitCode, Reasons: reasons}
 }
 
 func scenarioJSON(sc config.Scenario) jsonScenario {

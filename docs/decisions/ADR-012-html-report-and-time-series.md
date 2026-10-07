@@ -79,3 +79,18 @@ Phase 1 roadmap item 10 is a self-contained HTML report.
 - **Resolution.** The series has one-second resolution and covers
   requests by completion time. Finer resolution or per-scenario series
   are not part of Phase 1.
+
+## Amendment (2026-10-07): verdict, error rate and example report
+
+- **The verdict comes from `report.Verdict`,** the function behind the
+  exit code and the JSON `outcome`, instead of the report's own copy of
+  the rule. The report shows the exit code and the reasons.
+- **An error-rate chart** (failed requests as a percentage of each
+  second's requests) was added. On the requests-per-second chart, a 1 %
+  error rate is a flat line at the bottom.
+- **Throughput has its own card.**
+- **An example report**, `examples/reports/example-report.html`, is
+  rendered from sample data by a test, which fails if it is out of date.
+- **The report stays small.** A test bounds an hour of per-second points
+  under 1 MiB (about 320 KB today). It remains plain HTML and SVG, with no
+  JavaScript framework.

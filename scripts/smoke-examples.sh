@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# Runs every example that targets the local benchmark server and fails if
-# one exits non-zero, has script errors or fails a check. CI runs it so
-# the examples keep working.
+# Runs every example against the demo API and fails if one exits
+# non-zero, has script errors, sends no requests, has failed requests or
+# fails a check. CI runs it so the examples keep working.
 #
-#   go run ./benchmarks/server &     # the target, on 127.0.0.1:8080
+#   go run ./examples/server &       # the demo API, on 127.0.0.1:8090
 #   scripts/smoke-examples.sh bin/loadtool
 #
-# examples/sessions.ts and examples/http2.ts need servers the benchmark
-# server does not provide (a login, HTTPS) and are only compiled, by
-# TestExamplesLoad.
+# Set BASE_URL if the demo API listens elsewhere.
 set -euo pipefail
 
 loadtool=${1:?usage: smoke-examples.sh <loadtool binary>}
@@ -23,8 +21,11 @@ runs=(
   "basic-http.js|--vus 2 --duration 2s"
   "checks.ts|--vus 2 --duration 2s"
   "thresholds.ts|--vus 2 --duration 2s"
-  "lifecycle.ts|--vus 2 --duration 2s"
+  "post-json.ts|--vus 2 --duration 2s"
+  "auth-token.ts|--vus 2 --duration 2s"
+  "sessions.ts|--vus 2 --duration 2s"
   "data-driven.ts|--vus 2 --duration 2s"
+  "http2.ts|--vus 2 --duration 2s"
   "scenarios.ts|"
 )
 
@@ -47,7 +48,7 @@ for entry in "${runs[@]}"; do
   summary="$out/${script}.json"
   code=0
   # shellcheck disable=SC2086
-  "$loadtool" run "$root/examples/$script" $args --summary-json "$summary" >"$out/${script}.log" 2>&1 || code=$?
+  "$loadtool" run "$root/examples/$script" $args --out "json=$summary" >"$out/${script}.log" 2>&1 || code=$?
   if [ "$code" -ne 0 ]; then
     fail "$script: exit code $code" "$script: exit code $code"$'\n'"$(tail -25 "$out/${script}.log")"
     tail -5 "$out/${script}.log"
@@ -56,6 +57,7 @@ for entry in "${runs[@]}"; do
   problem=$("$jq" -r '
     if .metrics.script_errors.count > 0 then "script errors: \(.metrics.script_errors.first)"
     elif .metrics.http_reqs.count == 0 then "no requests"
+    elif .metrics.http_req_failed.failed > 0 then "failed requests: \(.metrics.http_req_failed.failed)"
     elif .metrics.checks.fails > 0 then "failed checks: \([.checks[] | select(.fails > 0) | .name] | join(", "))"
     else "" end' "$summary")
   if [ -n "$problem" ]; then

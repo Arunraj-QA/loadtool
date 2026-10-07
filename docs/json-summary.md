@@ -1,15 +1,32 @@
 # JSON summary
 
-`loadtool run --summary-json <file>` writes the end-of-test summary as
-JSON, for CI jobs and other tools. It holds the same numbers as the
-console summary: both are rendered from the same result.
+`loadtool run --out json` writes the end-of-test summary as JSON, for CI
+jobs and other tools. It holds the same numbers as the console summary:
+both are rendered from the same result.
 
 ```bash
-loadtool run test.ts --summary-json summary.json
+loadtool run test.ts --out json | jq '.outcome'          # JSON on stdout
+loadtool run test.ts --out json=summary.json            # JSON in a file
 jq '.metrics.http_req_duration.p95' summary.json
 ```
 
-**When the file is written:**
+**The forms:**
+
+- **`--out json`** writes the JSON to stdout. The console summary then
+  goes to stderr, so stdout is valid JSON.
+- **`--out json=<file>`** writes a file and keeps the console summary on
+  stdout. `--summary-json <file>` is the same.
+- **`--out` is repeatable.**
+
+**A machine-readable schema:**
+[`schemas/summary-v1.schema.json`](schemas/summary-v1.schema.json) (JSON
+Schema 2020-12).
+
+- Every object is closed (no other fields) and every field is always
+  present, except the executor-specific fields of a scenario.
+- Tests validate LoadTool's output against it.
+
+**When it is written:**
 
 - **Always when the test produced a result:** completed, interrupted,
   failed thresholds (exit 99) or failed teardown.
@@ -28,6 +45,18 @@ jq '.metrics.http_req_duration.p95' summary.json
 - Removing or renaming a field, or changing its meaning or unit, increases
   the version ([ADR-011](decisions/ADR-011-json-summary.md)).
 
+## Determinism
+
+The same result always gives the same document:
+
+- keys appear in a fixed order;
+- arrays keep a defined order (checks in first-run order, thresholds by
+  metric and then as written, scenarios by name, series by time);
+- absent values are `null`, not omitted.
+
+Only measured values (timings, counts) and `startedAt` differ between
+runs.
+
 ## Units
 
 - **Durations** are milliseconds, as numbers (fields end in `Ms`, plus the
@@ -45,6 +74,9 @@ jq '.metrics.http_req_duration.p95' summary.json
 | `tool.name`, `tool.version` | string | `"loadtool"` and its version (`"dev"` for local builds) |
 | `script` | string | Script path as given on the command line |
 | `status` | string | `"completed"` or `"interrupted"` (Ctrl+C; metrics are partial) |
+| `outcome.passed` | boolean | `true` when the run passed: not interrupted, teardown succeeded, every threshold passed |
+| `outcome.exitCode` | number | The exit code `loadtool run` returns for this result: `0` passed, `99` thresholds failed, `1` interrupted or teardown failed (which win over `99`) |
+| `outcome.reasons` | string[] | Why it did not pass, such as `"threshold failed: http_req_failed rate<0.01"`; empty when it passed |
 | `startedAt` | string | When the test clock started, UTC, RFC 3339 with milliseconds |
 | `elapsedMs` | number | From the clock start until the last VU stopped |
 | `teardownError` | string | The teardown failure, `""` if none |
