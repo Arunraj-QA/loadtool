@@ -10,13 +10,10 @@ import { check, sleep } from "loadtool";
 //   loadtool run examples/post-json.ts --vus 5 --duration 10s
 //
 // Bodies are strings: JSON.stringify the payload and set Content-Type.
+// Response bodies are discarded by default, to save memory; responseType:
+// "text" keeps this request's body so the checks can read it.
 
 const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8090";
-
-// Built once per VU at the top level and reused by every request.
-const JSON_HEADERS = {
-  headers: { "Content-Type": "application/json", Accept: "application/json" },
-};
 
 export const options = {
   thresholds: {
@@ -33,7 +30,10 @@ export default function (): void {
   const res = http.post(
     `${BASE_URL}/api/orders`,
     JSON.stringify({ productId, quantity }),
-    JSON_HEADERS,
+    {
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      responseType: "text", // keep the response body
+    },
   );
 
   check(res, {

@@ -12,7 +12,7 @@ import { check } from "loadtool";
 //
 // Order: top-level code (once per VU) -> setup() -> load phase ->
 // teardown(). Requests and checks in setup and teardown are not counted
-// in the results.
+// in the results, and their response bodies are always kept.
 //
 // Pass real credentials through the environment, never in the script:
 //   loadtool run -e API_USER=... -e API_PASSWORD=... examples/auth-token.ts
@@ -49,6 +49,7 @@ export function setup(): Data {
 export default function (data: Data): void {
   const res = http.get(`${BASE_URL}/api/me`, {
     headers: { Authorization: `Bearer ${data.token}` },
+    responseType: "text", // keep the body for the check (discarded by default)
   });
   check(res, {
     "me: status is 200": (r) => r.status === 200,
