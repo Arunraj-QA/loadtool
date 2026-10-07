@@ -32,6 +32,7 @@ type Recorder struct {
 	scriptErrors     int
 	firstScriptError string
 	iterations       int
+	protocols        Protocols
 
 	// checkNames is shared by a run's recorders; checkIndex caches its
 	// indexes for this recorder, and checks is indexed by them.
@@ -71,6 +72,25 @@ func (r *Recorder) Record(latency time.Duration, ok bool) {
 // latency sample, so it cannot distort the percentiles.
 func (r *Recorder) RecordUnsent() {
 	r.unsent++
+}
+
+// RecordProtocol counts the protocol of a response received, as the
+// response reports it ("HTTP/1.1", "HTTP/2.0").
+func (r *Recorder) RecordProtocol(proto string) {
+	switch proto {
+	case "HTTP/2.0":
+		r.protocols.HTTP2++
+	case "HTTP/1.1", "HTTP/1.0":
+		r.protocols.HTTP1++
+	default:
+		r.protocols.Other++
+	}
+}
+
+// Protocols counts responses by HTTP version (ADR-010), so a run shows
+// whether "auto" really negotiated HTTP/2.
+type Protocols struct {
+	HTTP1, HTTP2, Other int
 }
 
 // RecordIteration counts an iteration that ran to its end, with or without
@@ -121,6 +141,10 @@ type Summary struct {
 
 	// Iterations counts iterations that ran to their end.
 	Iterations int
+	// Protocols counts responses by HTTP version; requests without a
+	// response are not counted.
+	Protocols Protocols
+
 	// DroppedIterations counts arrival-rate starts no VU was free for.
 	// The engine sets it; recorders do not track it.
 	DroppedIterations int
@@ -150,6 +174,9 @@ func Merge(recorders []*Recorder) Summary {
 		s.Failures += r.unsent
 		s.ScriptErrors += r.scriptErrors
 		s.Iterations += r.iterations
+		s.Protocols.HTTP1 += r.protocols.HTTP1
+		s.Protocols.HTTP2 += r.protocols.HTTP2
+		s.Protocols.Other += r.protocols.Other
 		if s.FirstScriptError == "" {
 			s.FirstScriptError = r.firstScriptError
 		}

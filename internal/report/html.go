@@ -72,6 +72,7 @@ type htmlData struct {
 	Scenarios                               []string
 	ScriptErrors, FirstScriptError          string
 	Dropped                                 string
+	Protocols                               string
 }
 
 type htmlCard struct{ Label, Value, Note string }
@@ -109,6 +110,7 @@ func buildHTML(r Result, version string) htmlData {
 	if s.DroppedIterations > 0 {
 		d.Dropped = formatCount(s.DroppedIterations)
 	}
+	d.Protocols = protocolsLine(s.Protocols)
 	d.Failed = r.Interrupted || r.TeardownError != "" || thresholds.Failed(r.Thresholds)
 
 	var rps float64
@@ -401,7 +403,8 @@ footer { color: var(--muted); font-size: .8rem; margin-top: 40px; }
 
 <h2>Run</h2>
 <div class="scroll"><table><tbody>
-<tr><th scope="row">Script errors</th><td>{{.ScriptErrors}}{{if .FirstScriptError}}<div class="err">first: {{.FirstScriptError}}</div>{{end}}</td></tr>
+{{if .Protocols}}<tr><th scope="row">Protocols</th><td>{{.Protocols}}</td></tr>
+{{end}}<tr><th scope="row">Script errors</th><td>{{.ScriptErrors}}{{if .FirstScriptError}}<div class="err">first: {{.FirstScriptError}}</div>{{end}}</td></tr>
 {{range $i, $s := .Scenarios}}<tr><th scope="row">{{if eq $i 0}}Scenarios{{end}}</th><td>{{$s}}</td></tr>
 {{end}}</tbody></table></div>
 

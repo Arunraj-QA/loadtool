@@ -56,7 +56,8 @@ var goldenCases = map[string]Result{
 		Elapsed: 30 * time.Second,
 		Summary: metrics.Summary{
 			Requests: 3000, Successes: 2940, Failures: 60, Sent: 3000, ErrorRate: 0.02,
-			Min: 9 * time.Millisecond, Mean: 11 * time.Millisecond, Max: 30 * time.Millisecond,
+			Protocols: metrics.Protocols{HTTP2: 2900, HTTP1: 100},
+			Min:       9 * time.Millisecond, Mean: 11 * time.Millisecond, Max: 30 * time.Millisecond,
 			P50: 11 * time.Millisecond, P90: 12 * time.Millisecond, P95: 13 * time.Millisecond, P99: 20 * time.Millisecond,
 			SuccessP50: 11 * time.Millisecond, SuccessP90: 12 * time.Millisecond, SuccessP95: 13 * time.Millisecond, SuccessP99: 20 * time.Millisecond,
 		},

@@ -178,6 +178,9 @@ func Do(ctx context.Context, client *http.Client, r Request, rec *metrics.Record
 
 	if ctx.Err() == nil {
 		rec.Record(res.Duration, res.OK())
+		if res.Proto != "" {
+			rec.RecordProtocol(res.Proto)
+		}
 	}
 	return res
 }

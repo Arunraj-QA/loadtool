@@ -43,6 +43,11 @@
     "script_errors": {
       "count": 1,
       "first": "TypeError: x"
+    },
+    "http_protocols": {
+      "http1": 0,
+      "http2": 0,
+      "other": 0
     }
   },
   "checks": [],

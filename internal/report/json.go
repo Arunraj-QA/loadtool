@@ -101,6 +101,15 @@ type jsonMetrics struct {
 	DroppedIterations jsonCounter   `json:"dropped_iterations"`
 	Checks            jsonRate      `json:"checks"`
 	ScriptErrors      jsonScriptErr `json:"script_errors"`
+	// HTTPProtocols counts responses by HTTP version (added in Phase 1,
+	// additive).
+	HTTPProtocols jsonProtocols `json:"http_protocols"`
+}
+
+type jsonProtocols struct {
+	HTTP1 int `json:"http1"`
+	HTTP2 int `json:"http2"`
+	Other int `json:"other"`
 }
 
 type jsonCounter struct {
@@ -227,6 +236,7 @@ func buildJSON(r Result, version string) jsonSummary {
 			DroppedIterations: jsonCounter{Count: s.DroppedIterations, Rate: perSecond(s.DroppedIterations)},
 			Checks:            jsonRate{Rate: fraction(checkPasses, checkTotal), Passes: checkPasses, Fails: checkTotal - checkPasses, Count: checkTotal},
 			ScriptErrors:      jsonScriptErr{Count: s.ScriptErrors, First: s.FirstScriptError},
+			HTTPProtocols:     jsonProtocols{HTTP1: s.Protocols.HTTP1, HTTP2: s.Protocols.HTTP2, Other: s.Protocols.Other},
 		},
 		Checks:     checks,
 		Thresholds: make([]jsonThreshold, 0, len(r.Thresholds)),

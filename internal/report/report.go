@@ -80,6 +80,9 @@ func Console(w io.Writer, r Result) {
 	fmt.Fprintf(w, "  Success:     %s\n", formatCount(s.Successes))
 	fmt.Fprintf(w, "  Errors:      %s (%.2f%%)\n", formatCount(s.Failures), s.ErrorRate*100)
 	fmt.Fprintf(w, "  Script errs: %s\n", formatCount(s.ScriptErrors))
+	if line := protocolsLine(s.Protocols); line != "" {
+		fmt.Fprintf(w, "  Protocols:   %s\n", line)
+	}
 	if s.FirstScriptError != "" {
 		fmt.Fprintf(w, "    first:     %s\n", s.FirstScriptError)
 	}
@@ -112,6 +115,22 @@ func Console(w io.Writer, r Result) {
 	printLatencies(w, []latencyRow{
 		{"p50", s.SuccessP50}, {"p90", s.SuccessP90}, {"p95", s.SuccessP95}, {"p99", s.SuccessP99},
 	})
+}
+
+// protocolsLine describes the HTTP versions responses used, or "" when
+// no response used HTTP/2 (plain HTTP/1.1 runs need no line).
+func protocolsLine(p metrics.Protocols) string {
+	if p.HTTP2 == 0 {
+		return ""
+	}
+	parts := []string{"HTTP/2 " + formatCount(p.HTTP2)}
+	if p.HTTP1 > 0 {
+		parts = append(parts, "HTTP/1.1 "+formatCount(p.HTTP1))
+	}
+	if p.Other > 0 {
+		parts = append(parts, "other "+formatCount(p.Other))
+	}
+	return strings.Join(parts, ", ")
 }
 
 // isShorthand reports whether scenarios are just the vus/duration

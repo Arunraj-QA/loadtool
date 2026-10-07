@@ -58,6 +58,11 @@
     "script_errors": {
       "count": 0,
       "first": ""
+    },
+    "http_protocols": {
+      "http1": 100,
+      "http2": 2900,
+      "other": 0
     }
   },
   "checks": [],

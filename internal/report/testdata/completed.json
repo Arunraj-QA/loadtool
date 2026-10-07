@@ -58,6 +58,11 @@
     "script_errors": {
       "count": 3,
       "first": "Error: boom at default (test.ts:4:9(4))"
+    },
+    "http_protocols": {
+      "http1": 0,
+      "http2": 0,
+      "other": 0
     }
   },
   "checks": [],
