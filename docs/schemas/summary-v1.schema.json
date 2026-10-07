@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Arunraj-QA/loadtool/blob/main/docs/schemas/summary-v1.schema.json",
+  "title": "LoadTool JSON summary, schema version 1",
+  "description": "Written by `loadtool run --out json` (and --out json=<file>). Durations are milliseconds; fractions are 0-1; null means the value does not exist. See docs/json-summary.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "tool", "script", "status", "outcome", "startedAt", "elapsedMs", "teardownError", "config", "metrics", "checks", "thresholds", "series"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "loadtool" },
+        "version": { "type": "string" }
+      }
+    },
+    "script": { "type": "string" },
+    "status": { "enum": ["completed", "interrupted"] },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "exitCode", "reasons"],
+      "properties": {
+        "passed": { "type": "boolean" },
+        "exitCode": { "enum": [0, 1, 99] },
+        "reasons": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "startedAt": { "type": "string" },
+    "elapsedMs": { "type": "number", "minimum": 0 },
+    "teardownError": { "type": "string" },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vus", "durationMs", "scenarios"],
+      "properties": {
+        "vus": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "number", "minimum": 0 },
+        "scenarios": { "type": "array", "items": { "$ref": "#/$defs/scenario" } }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["http_reqs", "http_req_failed", "http_req_duration", "http_req_duration_successful", "iterations", "dropped_iterations", "checks", "script_errors", "http_protocols"],
+      "properties": {
+        "http_reqs": { "$ref": "#/$defs/counter" },
+        "http_req_failed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rate", "failed", "count"],
+          "properties": {
+            "rate": { "$ref": "#/$defs/fractionOrNull" },
+            "failed": { "type": "integer", "minimum": 0 },
+            "count": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "http_req_duration": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["count", "min", "avg", "max", "p50", "p90", "p95", "p99"],
+          "properties": {
+            "count": { "type": "integer", "minimum": 0 },
+            "min": { "type": "number" }, "avg": { "type": "number" }, "max": { "type": "number" },
+            "p50": { "type": "number" }, "p90": { "type": "number" }, "p95": { "type": "number" }, "p99": { "type": "number" }
+          }
+        },
+        "http_req_duration_successful": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["count", "p50", "p90", "p95", "p99"],
+          "properties": {
+            "count": { "type": "integer", "minimum": 0 },
+            "p50": { "type": "number" }, "p90": { "type": "number" }, "p95": { "type": "number" }, "p99": { "type": "number" }
+          }
+        },
+        "iterations": { "$ref": "#/$defs/counter" },
+        "dropped_iterations": { "$ref": "#/$defs/counter" },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rate", "passes", "fails", "count"],
+          "properties": {
+            "rate": { "$ref": "#/$defs/fractionOrNull" },
+            "passes": { "type": "integer", "minimum": 0 },
+            "fails": { "type": "integer", "minimum": 0 },
+            "count": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "script_errors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["count", "first"],
+          "properties": {
+            "count": { "type": "integer", "minimum": 0 },
+            "first": { "type": "string" }
+          }
+        },
+        "http_protocols": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["http1", "http2", "other"],
+          "properties": {
+            "http1": { "type": "integer", "minimum": 0 },
+            "http2": { "type": "integer", "minimum": 0 },
+            "other": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "passes", "fails", "rate", "firstError"],
+        "properties": {
+          "name": { "type": "string" },
+          "passes": { "type": "integer", "minimum": 0 },
+          "fails": { "type": "integer", "minimum": 0 },
+          "rate": { "$ref": "#/$defs/fractionOrNull" },
+          "firstError": { "type": "string" }
+        }
+      }
+    },
+    "thresholds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["metric", "expression", "passed", "noData", "observed", "unit", "approximate"],
+        "properties": {
+          "metric": { "enum": ["http_req_duration", "http_req_failed", "http_reqs", "checks", "iterations", "dropped_iterations"] },
+          "expression": { "type": "string" },
+          "passed": { "type": "boolean" },
+          "noData": { "type": "boolean" },
+          "observed": { "type": ["number", "null"] },
+          "unit": { "enum": ["ms", "fraction", "per-second", "count"] },
+          "approximate": { "type": "boolean" }
+        }
+      }
+    },
+    "series": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["atMs", "vus", "http_reqs", "http_req_failed", "http_req_duration"],
+        "properties": {
+          "atMs": { "type": "number", "minimum": 0 },
+          "vus": { "type": "integer", "minimum": 0 },
+          "http_reqs": { "type": "integer", "minimum": 0 },
+          "http_req_failed": { "type": "integer", "minimum": 0 },
+          "http_req_duration": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["avg", "p50", "p95", "p99"],
+            "properties": {
+              "avg": { "type": "number" }, "p50": { "type": "number" }, "p95": { "type": "number" }, "p99": { "type": "number" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "counter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "rate"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "rate": { "type": "number", "minimum": 0 }
+      }
+    },
+    "fractionOrNull": { "type": ["number", "null"], "minimum": 0 },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "executor", "exec", "startTimeMs", "gracefulStopMs"],
+      "properties": {
+        "name": { "type": "string" },
+        "executor": { "enum": ["constant-vus", "ramping-vus", "constant-arrival-rate"] },
+        "exec": { "type": "string" },
+        "startTimeMs": { "type": "number", "minimum": 0 },
+        "gracefulStopMs": { "type": "number", "minimum": 0 },
+        "vus": { "type": "integer", "minimum": 1 },
+        "durationMs": { "type": "number", "minimum": 0 },
+        "startVUs": { "type": "integer", "minimum": 0 },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["durationMs", "target"],
+            "properties": {
+              "durationMs": { "type": "number", "minimum": 0 },
+              "target": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "gracefulRampDownMs": { "type": "number", "minimum": 0 },
+        "rate": { "type": "integer", "minimum": 1 },
+        "timeUnitMs": { "type": "number", "minimum": 0 },
+        "preAllocatedVUs": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}
