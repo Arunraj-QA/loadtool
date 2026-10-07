@@ -5,15 +5,17 @@ import { check } from "loadtool";
 
 // Thresholds: pass/fail criteria for the whole test.
 //
-// Start the local target, then run:
-//   go run ./benchmarks/server
+// Start the demo API (examples/server), then run:
+//   go run ./examples/server
 //   loadtool run examples/thresholds.ts --vus 10 --duration 10s
 //
 // If any threshold fails, loadtool exits with code 99 (as k6 does), so a
 // CI job fails. Each expression is "<aggregate> <op> <number>"; durations
-// are in milliseconds.
+// are in milliseconds. To see a failure, point it at a port where nothing
+// listens: every request fails, and so does http_req_failed.
+//   loadtool run -e BASE_URL=http://127.0.0.1:1 examples/thresholds.ts
 
-const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8080";
+const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8090";
 
 export const options = {
   thresholds: {
@@ -27,6 +29,6 @@ export const options = {
 };
 
 export default function (): void {
-  const res = http.get(`${BASE_URL}/api/test`);
+  const res = http.get(`${BASE_URL}/api/products`);
   check(res, { "status is 200": (r) => r.status === 200 });
 }

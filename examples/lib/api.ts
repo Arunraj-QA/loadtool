@@ -9,12 +9,13 @@ export interface Product {
   name: string;
 }
 
+// getProduct fetches one product and checks it is the expected one.
 export function getProduct(baseURL: string, product: Product): void {
-  const res = http.get(`${baseURL}/api/test?id=${product.id}`, {
+  const res = http.get(`${baseURL}/api/products/${product.id}`, {
     headers: { Accept: "application/json" },
   });
   check(res, {
     "product: status is 200": (r) => r.status === 200,
-    "product: JSON body": (r) => r.json().status === "ok",
+    "product: expected name": (r) => r.json().name === product.name,
   });
 }

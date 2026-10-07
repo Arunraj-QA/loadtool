@@ -3,47 +3,61 @@
 import http from "loadtool/http";
 import { check } from "loadtool";
 
-// Lifecycle: setup() runs once before the load, teardown() once after.
+// Token authentication with setup and teardown: log in once, then send
+// the token as a bearer header from every VU.
 //
-// Start the local target, then run:
-//   go run ./benchmarks/server
-//   loadtool run examples/lifecycle.ts --vus 10 --duration 10s
+// Start the demo API (examples/server), then run:
+//   go run ./examples/server
+//   loadtool run examples/auth-token.ts --vus 10 --duration 10s
 //
 // Order: top-level code (once per VU) -> setup() -> load phase ->
 // teardown(). Requests and checks in setup and teardown are not counted
 // in the results.
+//
+// Pass real credentials through the environment, never in the script:
+//   loadtool run -e API_USER=... -e API_PASSWORD=... examples/auth-token.ts
 
-const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8080";
+const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8090";
 
 interface Data {
-  startedAt: string;
-  expectedItems: number;
+  token: string;
+  username: string;
 }
 
 // Runs once. Throwing here stops the test before any load is generated,
-// so a target that is down fails fast instead of producing a wall of
-// errors. The return value is passed (as JSON) to every iteration and to
-// teardown.
+// so a target that is down or a wrong password fails fast instead of
+// producing a wall of errors. The return value is passed (as JSON) to
+// every iteration and to teardown.
 export function setup(): Data {
-  const res = http.get(`${BASE_URL}/health`);
-  if (res.status !== 200) {
-    throw new Error(`target is not healthy: status ${res.status} ${res.error}`);
+  const health = http.get(`${BASE_URL}/health`);
+  if (health.status !== 200) {
+    throw new Error(`target is not healthy: status ${health.status} ${health.error}`);
   }
-  const sample = http.get(`${BASE_URL}/api/test`).json();
-  return { startedAt: new Date().toISOString(), expectedItems: sample.items.length };
+  const username = __ENV.API_USER || "load-test";
+  const login = http.post(
+    `${BASE_URL}/api/login`,
+    JSON.stringify({ username, password: __ENV.API_PASSWORD || "demo" }),
+    { headers: { "Content-Type": "application/json" } },
+  );
+  if (login.status !== 200) {
+    throw new Error(`login failed: status ${login.status} ${login.body}`);
+  }
+  return { token: login.json().token, username };
 }
 
 // Runs repeatedly in every VU, with this VU's own copy of the setup data.
 export default function (data: Data): void {
-  const res = http.get(`${BASE_URL}/api/test`);
+  const res = http.get(`${BASE_URL}/api/me`, {
+    headers: { Authorization: `Bearer ${data.token}` },
+  });
   check(res, {
-    "status is 200": (r) => r.status === 200,
-    "item count unchanged": (r) => r.json().items.length === data.expectedItems,
+    "me: status is 200": (r) => r.status === 200,
+    "me: right user": (r) => r.json().username === data.username,
   });
 }
 
 // Runs once after the load phase, also after Ctrl+C; use it to release
 // what setup created. A failure here is reported after the summary.
 export function teardown(data: Data): void {
-  console.log(`test started at ${data.startedAt} is done`);
+  console.log(`done testing as ${data.username}`);
 }

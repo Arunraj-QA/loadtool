@@ -74,11 +74,11 @@ jobs:
           dist/loadtool_v0.0.0-ci_linux_amd64/loadtool --version | grep -q 'v0.0.0-ci'
           unzip -l dist/loadtool_v0.0.0-ci_windows_amd64.zip | grep -q 'loadtool.exe'
 
-      - name: Start the benchmark server
+      - name: Start the demo API
         run: |
-          go build -o bin/benchserver ./benchmarks/server
-          bin/benchserver &
-          for _ in $(seq 50); do curl -sf http://127.0.0.1:8080/health && break; sleep 0.1; done
+          go build -o bin/demo-api ./examples/server
+          bin/demo-api &
+          for _ in $(seq 50); do curl -sf http://127.0.0.1:8090/health && break; sleep 0.1; done
 
       - name: Examples
         run: |

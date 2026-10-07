@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ci-local.sh: reproduce the CI load-test checks on your machine.
 #
-# It builds loadtool and the repository's target server, starts the
-# server, and runs the deterministic example through loadtool-ci.sh, the
+# It builds loadtool and the demo API (examples/server), starts the API,
+# and runs the deterministic example through loadtool-ci.sh, the
 # same script the GitHub Action uses:
 #
-#   1. examples/thresholds.ts against the server: must exit 0
+#   1. examples/thresholds.ts against the demo API: must exit 0
 #   2. the same against a port nothing listens on: must exit 99
 #      (every request fails, so the error-rate threshold fails)
 #
@@ -15,21 +15,21 @@
 # usage: scripts/ci-local.sh [output dir]   (default: a new temp directory)
 #
 # Environment:
-#   PORT  port for the target server (default 18080, so it does not clash
-#         with a server already on 8080)
+#   PORT  port for the demo API (default 18090, so it does not clash with
+#         one already on 8090)
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 out=${1:-$(mktemp -d)}
-port=${PORT:-18080}
+port=${PORT:-18090}
 mkdir -p "$out"
 exe=""
 if [ "$(go env GOOS)" = windows ]; then exe=.exe; fi
 
 echo "== build"
-(cd "$root" && go build -o "$out/loadtool$exe" ./cmd/loadtool && go build -o "$out/server$exe" ./benchmarks/server)
+(cd "$root" && go build -o "$out/loadtool$exe" ./cmd/loadtool && go build -o "$out/server$exe" ./examples/server)
 
-echo "== start the target server on 127.0.0.1:$port"
+echo "== start the demo API on 127.0.0.1:$port"
 "$out/server$exe" -addr "127.0.0.1:$port" >"$out/server.log" 2>&1 &
 server=$!
 trap 'kill "$server" 2>/dev/null || true' EXIT
