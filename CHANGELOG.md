@@ -47,6 +47,9 @@ does.
   with an `outcome` (passed, exit code, reasons) and a published JSON
   Schema. `--summary-json <file>` is an alias.
 - `--report-html`: a self-contained HTML report with per-second charts.
+  It shows the run's verdict, exit code and reasons (the same as the JSON
+  `outcome`), a throughput card and an error-rate chart. There is an
+  example report in `examples/reports/`.
 - The console summary shows checks, thresholds, scenarios and dropped
   iterations.
 

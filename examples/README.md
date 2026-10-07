@@ -26,3 +26,7 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 **Editor support.** Each example starts with a reference to
 [`types/loadtool.d.ts`](../types/loadtool.d.ts), which gives editors
 completion and type hints. LoadTool itself does not type-check.
+
+**Example report.** [`reports/example-report.html`](reports/example-report.html)
+shows what `--report-html` writes: a failed run with an error burst. It
+uses sample data, not a measurement; open the file in a browser.
