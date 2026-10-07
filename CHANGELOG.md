@@ -26,7 +26,8 @@ does.
 - **Sessions:** a cookie jar per VU, reset each iteration
   (`noCookiesReset` keeps it).
 - **HTTP versions:** HTTP/2 over TLS by default (`httpVersion`), and h2c
-  with `httpVersion: "2"`.
+  with `httpVersion: "2"`. Responses are counted by protocol in the
+  summary, the JSON summary and the HTML report.
 
 **Options and workloads** ([Options](docs/options.md), ADR-006, ADR-008):
 

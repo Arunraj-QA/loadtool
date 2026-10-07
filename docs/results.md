@@ -63,6 +63,9 @@ neither do their running requests.
 **Dropped iterations** are arrival-rate starts that found no free VU,
 shown only when there are some.
 
+**Protocols** counts responses by HTTP version. The summary shows it when
+any response used HTTP/2.
+
 ## Latency
 
 The summary shows latency twice:

@@ -280,7 +280,19 @@ directly is not supported yet.
 
 - **No fallback with `"2"`.** A server without HTTP/2 fails the request
   rather than being measured over HTTP/1.1.
-- **`res.proto`** shows the protocol each response used.
+- **Seeing the protocol.**
+  - `res.proto` shows the protocol each response used.
+  - The summary has a `Protocols:` line (for example `HTTP/2 9,000,
+    HTTP/1.1 12`) whenever HTTP/2 was used, so you can tell whether
+    `"auto"` negotiated it.
+- **Extra connections.** HTTP/2 sends many VUs' requests over one
+  connection. When every connection is at the server's stream limit, a
+  new connection is dialled for each waiting request, so pushing a server
+  far past its limit causes a burst of connections (as HTTP/1.1 does at
+  start-up).
+- **Low stream limits.** A server that allows fewer than 100 concurrent
+  streams can refuse the first requests on a new connection; they count
+  as failed requests.
 
 **Connections:**
 
