@@ -187,7 +187,7 @@ export const options = {
 	},
 	thresholds: { http_req_failed: ["rate<0.5"], http_reqs: ["count<0"], checks: ["rate==1"] },
 };
-export default function () { check(http.get("` + srv.URL + `"), { "ok": (r) => r.json().ok === true }); }`
+export default function () { check(http.get("` + srv.URL + `", { responseType: "text" }), { "ok": (r) => r.json().ok === true }); }`
 	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
 		t.Fatal(err)
 	}

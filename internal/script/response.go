@@ -16,7 +16,8 @@ import (
 //	status    number; 0 when no response was received
 //	error     "" or the transport error
 //	headers   { "Content-Type": "..." }, repeated headers joined with ", "
-//	body      string, or null when bodies are discarded or nothing arrived
+//	body      string, or null when the body was discarded (the default,
+//	          ADR-013) or nothing arrived
 //	json()    body parsed as JSON
 //	timings   { duration } in milliseconds
 //	url       the request URL
@@ -30,6 +31,9 @@ type response struct {
 	vu  *VU
 	res httpclient.Result
 	url string
+	// discarded is set when the body was not kept, so reading it can say
+	// why it is null.
+	discarded bool
 
 	headers, body, timings, json, cookies goja.Value // built on first access
 	extra                                 map[string]goja.Value
@@ -68,6 +72,8 @@ func (r *response) Get(key string) goja.Value {
 			r.body = goja.Null()
 			if r.res.Body != nil {
 				r.body = rt.ToValue(string(r.res.Body))
+			} else if r.discarded {
+				r.vu.warn.once("res.body is null: " + discardedHint)
 			}
 		}
 		return r.body
@@ -141,8 +147,8 @@ func (r *response) cookiesObject() goja.Value {
 func (r *response) parseJSON(goja.FunctionCall) goja.Value {
 	rt := r.vu.rt
 	if r.res.Body == nil {
-		if r.vu.discardBodies {
-			panic(rt.NewTypeError("res.json(): the response body was discarded because options.discardResponseBodies is true"))
+		if r.discarded {
+			panic(rt.NewTypeError("res.json(): the body was discarded: " + discardedHint))
 		}
 		panic(rt.NewTypeError("res.json(): no response was received (%s)", r.Get("error").String()))
 	}

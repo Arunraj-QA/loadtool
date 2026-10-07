@@ -247,7 +247,8 @@ func (c *Config) Resolve(cli Overrides, getenv func(string) (string, bool), scri
 		c.Duration = max(c.Duration, s.StartTime+s.Length())
 	}
 	// Only the script sets these; there are no flags or variables for them.
-	c.DiscardResponseBodies = isTrue(script.DiscardResponseBodies)
+	// Bodies are discarded unless the script asks for them (ADR-013).
+	c.DiscardResponseBodies = script.DiscardResponseBodies == nil || *script.DiscardResponseBodies
 	c.NoCookiesReset = isTrue(script.NoCookiesReset)
 	c.NoConnectionReuse = isTrue(script.NoConnectionReuse)
 	c.HTTPVersion = "auto"

@@ -139,7 +139,7 @@ func TestDiscardResponseBodies(t *testing.T) {
 		raw  string
 		want bool
 	}{
-		{`{}`, false},
+		{`{}`, true}, // discarded unless the script asks (ADR-013)
 		{`{"discardResponseBodies": false}`, false},
 		{`{"discardResponseBodies": true}`, true},
 	} {

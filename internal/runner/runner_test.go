@@ -158,22 +158,28 @@ func TestRunStartErrors(t *testing.T) {
 	}
 }
 
-// options.discardResponseBodies reaches the VUs, and warnings raised while
-// the test runs reach Params.Warn.
+// Response bodies are discarded unless options.discardResponseBodies is
+// false or a request sets params.responseType "text" (ADR-013). Reading a
+// discarded body warns once, saying how to keep it, and warnings raised
+// while the test runs reach Params.Warn.
 func TestRunAppliesHTTPOptionsAndWarnings(t *testing.T) {
 	srv := okServer(t)
 	for _, tt := range []struct {
-		discard  string
-		wantBody string
+		name, options, params string
+		wantBody              string
+		wantHint              bool
 	}{
-		{"false", "string"},
-		{"true", "object"}, // typeof null
+		{"default", `{}`, `{ timeout: "1s" }`, "object", true}, // typeof null
+		{"discard=false", `{ discardResponseBodies: false }`, `{ timeout: "1s" }`, "string", false},
+		{"discard=true", `{ discardResponseBodies: true }`, `{ timeout: "1s" }`, "object", true},
+		{"responseType=text", `{}`, `{ timeout: "1s", responseType: "text" }`, "string", false},
+		{"responseType=none", `{ discardResponseBodies: false }`, `{ timeout: "1s", responseType: "none" }`, "object", true},
 	} {
-		t.Run("discard="+tt.discard, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			path := scriptFile(t, `import http from "loadtool/http";
-export const options = { discardResponseBodies: `+tt.discard+` };
+export const options = `+tt.options+`;
 export default function (): void {
-	const res = http.get("`+srv.URL+`", { timeout: "1s" });
+	const res = http.get("`+srv.URL+`", `+tt.params+`);
 	if (typeof res.body !== "`+tt.wantBody+`") throw new Error("typeof body is " + typeof res.body);
 }`)
 			var warnings []string
@@ -188,8 +194,17 @@ export default function (): void {
 			if res.Summary.ScriptErrors != 0 {
 				t.Fatalf("script error: %s", res.Summary.FirstScriptError)
 			}
-			if len(warnings) != 1 || !strings.Contains(warnings[0], `"timeout" is not supported`) {
-				t.Errorf("warnings = %q, want one about timeout", warnings)
+			want := []string{`"timeout" is not supported`}
+			if tt.wantHint {
+				want = append(want, `res.body is null: response bodies are discarded by default`)
+			}
+			if len(warnings) != len(want) {
+				t.Fatalf("warnings = %q, want %d", warnings, len(want))
+			}
+			for i, w := range want {
+				if !strings.Contains(warnings[i], w) {
+					t.Errorf("warning %d = %q, want it to contain %q", i, warnings[i], w)
+				}
 			}
 		})
 	}
