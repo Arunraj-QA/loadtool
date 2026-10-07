@@ -227,10 +227,16 @@ func (e RampingVUs) runIteration(s *scenarioRun, rec *metrics.Recorder, iter Ite
 
 // ConstantArrivalRate starts Rate iterations per TimeUnit for Duration,
 // whatever the VUs' iteration time. One scheduler goroutine computes start
-// k as start + k*TimeUnit/Rate, so the rate does not drift, and hands each
-// start to an idle VU over an unbuffered channel without blocking. If no
-// VU is idle the start is dropped and counted, not queued. If the
+// k as start + k*TimeUnit/Rate, so the rate does not drift. If the
 // scheduler wakes late, the starts that are due go out at once.
+//
+// Idle VUs are counted with tokens in a buffered channel, one per VU,
+// filled before the clock starts. For each start the scheduler takes a
+// token without blocking: if there is none, every VU is busy and the
+// start is dropped and counted, not queued. Otherwise it hands the start
+// over, waiting for a VU to receive it; a VU returns its token when its
+// iteration ends. A VU that has just finished, or has not yet reached its
+// first receive, is therefore idle, and its start is never dropped.
 type ConstantArrivalRate struct {
 	Rate            int
 	TimeUnit        time.Duration
@@ -265,6 +271,10 @@ func (e ConstantArrivalRate) offset(k int64) time.Duration {
 
 func (e ConstantArrivalRate) drive(s *scenarioRun, wg *sync.WaitGroup) {
 	starts := make(chan struct{})
+	idle := make(chan struct{}, len(s.iters))
+	for range s.iters {
+		idle <- struct{}{}
+	}
 	wg.Go(func() {
 		defer close(starts) // idle VUs then return
 		if !waitUntil(s.ctx, s.start) {
@@ -286,9 +296,16 @@ func (e ConstantArrivalRate) drive(s *scenarioRun, wg *sync.WaitGroup) {
 				}
 			}
 			select {
-			case starts <- struct{}{}:
+			case <-idle:
 			default:
-				s.dropped.Add(1)
+				s.dropped.Add(1) // every VU is in an iteration
+				continue
+			}
+			// A VU is idle, so one is at or on its way to the receive.
+			select {
+			case starts <- struct{}{}:
+			case <-s.ctx.Done():
+				return
 			}
 		}
 	})
@@ -302,6 +319,7 @@ func (e ConstantArrivalRate) drive(s *scenarioRun, wg *sync.WaitGroup) {
 						return
 					}
 					s.iterate(s.ctx, rec, iter)
+					idle <- struct{}{} // never blocks: one token per VU
 				case <-s.ctx.Done():
 					return
 				}

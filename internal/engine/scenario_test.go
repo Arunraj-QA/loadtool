@@ -392,3 +392,23 @@ func TestActiveVUsAcrossScenarios(t *testing.T) {
 		}
 	}
 }
+
+// With VUs to spare, an arrival-rate scenario drops nothing. A VU that has
+// just finished an iteration, or has not reached its first wait when the
+// scenario starts, is idle; a start must not be dropped because the VU
+// was not yet waiting (as the first version of the scheduler did, on a
+// busy runner).
+func TestArrivalRateDropsNothingWithIdleVUs(t *testing.T) {
+	// A start every 50 ms for 300 ms (6 starts), no-op iterations, 2 VUs:
+	// the VUs are idle at every start. Starts are spaced widely so that a
+	// scheduler delayed by a loaded machine does not bunch them up.
+	e := ConstantArrivalRate{Rate: 20, TimeUnit: time.Second, Duration: 300 * time.Millisecond, PreAllocatedVUs: 2}
+	noop := func(context.Context, *metrics.Recorder) {}
+	res, err := RunScenarios(context.Background(), []Scenario{{Name: "x", Executor: e, GracefulStop: time.Second, NewVU: shared(noop)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := res.Summary; s.DroppedIterations != 0 || s.Iterations != 6 {
+		t.Errorf("iterations %d, dropped %d; want 6 and 0", s.Iterations, s.DroppedIterations)
+	}
+}
