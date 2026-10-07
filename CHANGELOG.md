@@ -55,7 +55,15 @@ does.
 
 **CI and releases** ([CI](docs/ci/README.md)):
 
-- A GitHub Action (`action.yml`).
+- A GitHub Action (`action.yml`):
+  - `version: source` builds LoadTool from the action's checkout, so it
+    works before any release;
+  - each failure reason becomes an error annotation.
+- An example workflow (`.github/workflows/load-test-example.yml`): a
+  deterministic test that runs in this repository.
+- `scripts/loadtool-ci.sh`, the generic CI recipe the Action also uses.
+- `scripts/ci-local.sh`, which reproduces the CI load-test checks
+  locally.
 - Recipes for GitLab CI, Jenkins and Azure Pipelines.
 - Release builds for Linux, macOS and Windows (amd64, arm64) with
   checksums.

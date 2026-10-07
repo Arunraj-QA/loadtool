@@ -72,7 +72,7 @@ Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd)
 | Sessions | HTTP | `internal/httpclient` (per-VU client and cookie jar; reuse options) | 7 connection reuse, 8 cookies/sessions | Done (ADR-009): per-VU client and lazy cookie jar over the shared transport; `noCookiesReset`, `noConnectionReuse` |
 | JSON Reporter | Console (`report.Result`) | `internal/report` | 9 JSON output | Done (ADR-011): `--out json[=<file>]`, schema version 1, JSON Schema in `docs/schemas/` |
 | HTML Reporter | Console (`report.Result`) | `internal/report` | 10 self-contained HTML report | Done (ADR-012): `--report-html`, per-second series sampled from the shared histograms |
-| CI | CLI | `action.yml`, `.github/workflows/release.yml`, `docs/ci/` | 11 GitHub Action, 12 generic CI recipe | Done: `scripts/release-build.sh`, `release.yml` (tag → GitHub release), composite `action.yml` (self-tested in CI), `docs/ci/` |
+| CI | CLI | `action.yml`, `.github/workflows/release.yml`, `docs/ci/` | 11 GitHub Action, 12 generic CI recipe | Done: `scripts/release-build.sh`, `release.yml` (tag → GitHub release), composite `action.yml` (self-tested in CI, `version: source`), generic recipe `scripts/loadtool-ci.sh`, local reproduction `scripts/ci-local.sh`, example workflow, `docs/ci/` |
 
 Roadmap items 13–15 (documentation, 5–10 examples, preparation for
 external users) are deliverables around these components (`docs/`,

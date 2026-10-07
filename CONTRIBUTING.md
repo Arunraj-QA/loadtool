@@ -39,6 +39,11 @@ go run ./benchmarks/server &
 scripts/smoke-examples.sh bin/loadtool
 ```
 
+**CI checks locally.** `scripts/ci-local.sh` reproduces the load-test
+checks CI runs: a passing and a failing run through the generic recipe,
+with their exit codes and result files. See
+[Reproduce CI locally](docs/ci/README.md#reproduce-ci-locally).
+
 **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on
 every push:
 
