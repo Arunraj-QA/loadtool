@@ -6,6 +6,7 @@ package runner
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -37,6 +38,10 @@ type Params struct {
 	// Warn receives non-fatal problems, such as unsupported script options.
 	// nil discards them.
 	Warn func(msg string)
+	// TLSConfig, if set, replaces the HTTP client's TLS settings. It is not
+	// a user option: tests use it to trust a local test server's
+	// certificate.
+	TLSConfig *tls.Config
 }
 
 // Run executes a test through its lifecycle (ADR-008):
@@ -119,6 +124,7 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		Timeout:           httpclient.DefaultTimeout,
 		NoConnectionReuse: cfg.NoConnectionReuse,
 		HTTPVersion:       cfg.HTTPVersion,
+		TLSConfig:         p.TLSConfig,
 	})
 	defer client.CloseIdleConnections()
 
