@@ -1,0 +1,27 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\loadtool\large-body.ts
+  VUs:         1000
+  Duration:    30s (elapsed 30.34s)
+  Status:      completed
+
+  Requests:    115,540 (3808.3 req/s)
+  Success:     115,023
+  Errors:      517 (0.45%)
+  Script errs: 517
+    first:     Error: status 0 Get "http://127.0.0.1:8080/api/large": context deadline exceeded (Client.Timeout exceeded while awaiting headers) at large_body_default (large-body.ts:14:10(21))
+
+  Latency (all requests sent, failed included):
+    min     681.40µs
+    mean    260.61ms
+    p50     208.67ms
+    p90     246.42ms
+    p95     263.19ms
+    p99     316.67ms
+    max       30.16s
+  Latency (successful requests):
+    p50     208.67ms
+    p90     246.42ms
+    p95     261.10ms
+    p99     308.28ms

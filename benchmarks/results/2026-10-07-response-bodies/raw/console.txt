@@ -1,0 +1,12 @@
+﻿phase0         run1   peak private     34.6 MB  peak WS      2.1 MB  requests   exit 1
+phase1-before  run1   peak private     1968 MB  peak WS   1928.2 MB  requests 73792  exit 0
+new-default    run1   peak private    173.5 MB  peak WS    125.3 MB  requests 137021  exit 0
+new-keep       run1   peak private   1951.5 MB  peak WS   1912.9 MB  requests 71810  exit 0
+phase0         run2   peak private     34.6 MB  peak WS      2.1 MB  requests   exit 1
+phase1-before  run2   peak private   2042.6 MB  peak WS   2003.6 MB  requests 74815  exit 0
+new-default    run2   peak private    172.8 MB  peak WS    124.5 MB  requests 136296  exit 0
+new-keep       run2   peak private   1931.4 MB  peak WS   1894.3 MB  requests 78648  exit 0
+phase0         run3   peak private     34.6 MB  peak WS      2.2 MB  requests   exit 1
+phase1-before  run3   peak private   2045.1 MB  peak WS   2002.9 MB  requests 76042  exit 0
+new-default    run3   peak private    159.4 MB  peak WS    115.9 MB  requests 131753  exit 0
+new-keep       run3   peak private   2047.2 MB  peak WS   2009.5 MB  requests 74938  exit 0

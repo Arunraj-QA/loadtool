@@ -21,15 +21,16 @@ cost is large:
 - **Throughput drops.** Allocating and collecting the bodies about halves
   requests per second.
 
-Measured on 2026-10-07 at 1,000 VUs against 1 MB responses, 30 s per
-run, three runs per case, on AC power. The first session is shown here;
-see `benchmarks/results/2026-10-07-response-bodies/`.
+Measured on 2026-10-07 at 1,000 VUs against 1 MiB responses: 30 s per
+run, three runs per case interleaved in one session, on AC power (see
+`benchmarks/results/2026-10-07-response-bodies/`). Medians, with ranges:
 
 | Build | Peak private | Requests (30 s) |
 |---|---|---|
-| Phase 1 before this change (bodies kept) | 1,968–2,045 MB | 73,792–76,042 |
-| This change, default (discarded) | 159–174 MB | 131,753–137,021 |
-| This change, `discardResponseBodies: false` | 1,931–2,047 MB | 71,810–78,648 |
+| Phase 0 (`3b7b523`, always discarded) | 179 MB (170–192) | 120,703 (109,608–130,686) |
+| Phase 1 before this change (bodies kept) | 1,959 MB (1,807–2,040) | 72,744 (66,112–73,211) |
+| This change, default (discarded) | 176 MB (172–238) | 118,272 (115,540–118,590) |
+| This change, `discardResponseBodies: false` | 2,044 MB (2,043–2,046) | 72,274 (60,159–73,546) |
 
 **The reading code was not the problem.** It already sized the buffer
 from `Content-Length` and converted the body to a string only when the
@@ -64,8 +65,8 @@ script read it. The cost is that of keeping bodies at all.
 - **Scripts that read bodies must opt in.** This differs from k6 and is
   listed in `docs/k6-differences.md`. The warning and the `TypeError`
   make the change visible instead of silent.
-- **Memory no longer grows with response size by default:** the Phase 0
-  behaviour is back.
+- **Memory no longer grows with response size by default.** Peak memory
+  and requests are back within the Phase 0 build's range.
 - **The examples that read bodies opt in:**
   - `checks.ts` keeps all bodies;
   - `post-json.ts`, `auth-token.ts`, `sessions.ts` and `lib/api.ts` keep
