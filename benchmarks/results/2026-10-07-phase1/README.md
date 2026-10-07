@@ -105,7 +105,24 @@ the Phase 1 script sets `discardResponseBodies: true`. Raw rows are in
 |---|---|---|
 | 1. Memory below JMeter at 1,000 VUs | **Met** | LoadTool 183–196 MB vs JMeter 1,367–1,380 MB peak private, every run (section 1) |
 | 2. No regression against Phase 0 | **Met** | Memory lower in every round; requests per second within run-to-run variation (section 2) |
-| 3. Features end to end in CI | **Met** | The CI job "release-and-action" (examples smoke test and GitHub Action self-test) passed on `3798304`, the last `phase-1-mvp` commit before this run, and on this branch (see the commit that adds this file) |
+| 3. Features end to end in CI | **Met after a fix** | See below |
+
+**Criterion 3 in detail:**
+
+- **It passed, then failed.** The CI job "release-and-action" (examples
+  smoke test and GitHub Action self-test) passed on `3798304`, the last
+  `phase-1-mvp` commit before this run. It **failed** on the commit
+  recording these results: `examples/scenarios.ts` dropped 1 of 1,000
+  arrival-rate starts with 10 idle VUs, which failed its
+  `dropped_iterations` threshold.
+- **The cause was an engine bug.** A start was dropped when no VU
+  happened to be waiting at that instant, even though VUs were idle
+  (corrected in ADR-008). It had also caused one earlier unexplained
+  failure of this step.
+- **The fix** passed the smoke test and the self-test in CI. A
+  regression test fails 10 of 10 times on the old code.
+- **Sections 1 and 2 are unaffected.** Their scenario uses constant VUs,
+  not an arrival rate.
 
 **Caveats** (as in Phase 0):
 

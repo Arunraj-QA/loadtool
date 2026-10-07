@@ -61,6 +61,8 @@ does.
   load phase.
 - On Windows, replacing a result file another process briefly holds open
   is retried instead of failing.
+- The arrival-rate executor could drop a start while VUs were idle, if
+  none was waiting at that instant; it counts idle VUs explicitly now.
 
 ### Phase 0: foundations
 

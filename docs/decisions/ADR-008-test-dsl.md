@@ -273,8 +273,18 @@ Fields every executor accepts:
   active. Its iteration gets a deadline of removal + `gracefulRampDown`
   only when a removal falls inside the scenario.
 - **The arrival-rate scheduler** computes start *k* as
-  `start + k·timeUnit/rate`. It hands starts over an unbuffered channel
-  with a non-blocking send, so a start reaches an idle VU or is dropped.
+  `start + k·timeUnit/rate`. Idle VUs are counted with one token each in
+  a buffered channel, filled before the clock starts.
+  - For each start, the scheduler takes a token without blocking. If
+    none is left, every VU is busy and the start is dropped.
+  - Otherwise it hands the start over and waits for a VU to take it. The
+    VU returns its token when its iteration ends.
+  - *Corrected 2026-10-07.* The first version used a non-blocking send on
+    an unbuffered channel. That dropped a start whenever no VU happened to
+    be waiting at that instant: a VU that had just finished an iteration,
+    or had not reached its first wait. On a busy CI runner,
+    `examples/scenarios.ts` dropped 1 of 1,000 starts with 10 idle VUs
+    and failed its `dropped_iterations` threshold.
   Its goroutine is joined like the VUs'.
 
 *Options and precedence:*
