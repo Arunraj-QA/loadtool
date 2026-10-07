@@ -1,0 +1,1 @@
+benchmark server listening on http://127.0.0.1:8080 (GET /api/test delay 10ms, GET /health)
