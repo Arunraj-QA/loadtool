@@ -28,6 +28,18 @@ runs=(
   "scenarios.ts|"
 )
 
+# fail reports a failed example; in GitHub Actions also as an
+# annotation, which (unlike the job log) is readable without signing in.
+fail() {
+  echo "FAIL $1"
+  if [ "${GITHUB_ACTIONS:-}" = true ]; then
+    msg=${2:-$1}
+    msg=${msg//'%'/'%25'}; msg=${msg//$'\r'/}; msg=${msg//$'\n'/'%0A'}
+    echo "::error title=example failed::${msg}"
+  fi
+  failed=1
+}
+
 failed=0
 for entry in "${runs[@]}"; do
   script=${entry%%|*}
@@ -37,7 +49,9 @@ for entry in "${runs[@]}"; do
   # shellcheck disable=SC2086
   "$loadtool" run "$root/examples/$script" $args --summary-json "$summary" >"$out/${script}.log" 2>&1 || code=$?
   if [ "$code" -ne 0 ]; then
-    echo "FAIL $script: exit code $code"; tail -5 "$out/${script}.log"; failed=1; continue
+    fail "$script: exit code $code" "$script: exit code $code"$'\n'"$(tail -25 "$out/${script}.log")"
+    tail -5 "$out/${script}.log"
+    continue
   fi
   problem=$("$jq" -r '
     if .metrics.script_errors.count > 0 then "script errors: \(.metrics.script_errors.first)"
@@ -45,7 +59,7 @@ for entry in "${runs[@]}"; do
     elif .metrics.checks.fails > 0 then "failed checks: \([.checks[] | select(.fails > 0) | .name] | join(", "))"
     else "" end' "$summary")
   if [ -n "$problem" ]; then
-    echo "FAIL $script: $problem"; failed=1
+    fail "$script: $problem"
   else
     echo "ok   $script ($("$jq" -r '.metrics.http_reqs.count' "$summary") requests)"
   fi
