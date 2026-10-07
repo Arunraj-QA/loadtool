@@ -49,8 +49,19 @@ the Phase 0 components that work and extend them (see `docs/architecture.md`).
 
 ### Phase 1 Exit Criteria
 
-To be agreed before the Phase 1 benchmark run. Until then, do not claim
-Phase 1 is complete.
+Agreed on 2026-10-07, before the Phase 1 benchmark run:
+
+1. **Phase 0 still holds:** at 1,000 VUs, LoadTool's memory is lower than
+   JMeter's, measured the same way as on 2026-10-01
+   (`benchmarks/measure.ps1`, same scenario and settings).
+2. **No regression:** at 1,000 VUs, LoadTool's peak memory and requests
+   per second are within run-to-run variation of the Phase 0 build for
+   the same scenario, measured in the same session.
+3. **Phase 1 features work end to end:** every local example passes in CI
+   (`scripts/smoke-examples.sh`), and the GitHub Action self-test passes.
+
+Benchmarks run on AC power with the machine otherwise idle. Do not claim
+Phase 1 is complete until all three are measured and recorded.
 
 ## Phase 0 — Foundations (complete)
 
