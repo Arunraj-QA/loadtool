@@ -263,9 +263,37 @@ export function teardown(data) {
 - `setup` and `teardown` share their own jar, so teardown can log out of
   setup's session.
 
+```
+VU 1 ─ session 1 ─ cookie jar A ─┐
+VU 2 ─ session 2 ─ cookie jar B ─┼─ one shared connection pool
+VU 3 ─ session 3 ─ cookie jar C ─┘
+```
+
+**Cookie rules** (RFC 6265, as implemented by Go's `net/http/cookiejar`):
+
+| Cookie | Sent to |
+|---|---|
+| No `Domain` (host-only) | The host that set it only; not its subdomains or other hosts |
+| `Domain=app.test` | `app.test` and its subdomains |
+| `Path=/admin` | `/admin` and paths below it |
+| `Secure` | `https://` requests only |
+
+**Replacing and deleting:**
+
+- A cookie with the same name, domain and path replaces the earlier one.
+- `Max-Age=0`, a negative `Max-Age` or a past `Expires` deletes it: the
+  usual logout.
+- A cookie without `Max-Age` or `Expires` lasts until the jar is reset.
+- No public-suffix list is used; it matters only for cookies set on
+  domains like `co.uk`, which a test target should not do.
+
 **Script access.** `params.cookies` adds cookies to one request, and
 `res.cookies` shows what a response set. Reading and editing the jar
 directly is not supported yet.
+
+**Headers are per request.** Set them with `params.headers`; there are no
+per-session default headers. For a header on every request, keep a params
+object in a constant and pass it to each call.
 
 ## HTTP versions and connections
 

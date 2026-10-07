@@ -72,3 +72,36 @@ The API follows k6's shape (ADR-005).
   parsing and storage, but only then; no other request pays anything.
 - **Redirects** are still not followed (ADR-003), so cookies set by a
   redirect response are stored and sent only on the script's next request.
+
+## Hardening (2026-10-07)
+
+**Tests added:**
+
+- *Cookie rules*, through the real client and jar (`TestCookieSemantics`,
+  `TestCookieReplaceAndDelete`):
+  - host-only and domain cookies;
+  - path matching;
+  - `Secure` over http;
+  - `Max-Age=0` and past `Expires`;
+  - replacement, and deletion on logout.
+- *End to end through the runner* (`TestRunLoginFlow`): log in, use the
+  session, log out, refused afterwards; with checks and thresholds.
+- *Concurrent isolation*
+  (`TestRunSessionsAreIsolatedAcrossConcurrentVUs`): 50 VUs log in at once
+  and every request is checked, on the server side, to carry its own VU's
+  session. It runs with the jar reset each iteration and with
+  `noCookiesReset`, under the race detector in CI. It also checks that
+  cookies do not prevent connection reuse (at most one connection per
+  VU).
+
+**Mutation checks:**
+
+- Sharing one jar between all VUs makes the isolation test fail with
+  over 10,000 iterations carrying another VU's session.
+- Removing the per-iteration reset makes about 27,000 iterations start
+  logged in.
+
+**Shared-state audit.** Package-level variables in `internal/script` and
+`internal/httpclient` are read-only (errors, property tables, module
+sources). Session state lives only in each VU's `Jar` and client copy.
+
