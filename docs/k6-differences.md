@@ -27,7 +27,8 @@ and `setup`/`teardown` need only the import lines changed.
 |---|---|
 | **Redirects** | Never followed; a 3xx is returned and counts as a success. k6 follows up to 10. |
 | **Request bodies** | Strings only. k6 form-encodes an object; LoadTool throws a `TypeError` (use `JSON.stringify`). |
-| **Request params** | `headers` and `cookies` only. Others (`timeout`, `tags`, `redirects`, `responseType`, …) warn and are ignored. The request timeout is 30 s. |
+| **Response bodies** | **Discarded by default**; k6 keeps them. Set `discardResponseBodies: false`, or `responseType: "text"` per request, to read `res.body` or `res.json()`. |
+| **Request params** | `headers`, `cookies` and `responseType` (`"text"` or `"none"`; not `"binary"`). Others (`timeout`, `tags`, `redirects`, …) warn and are ignored. The request timeout is 30 s. |
 | **Responses** | `status`, `proto`, `error`, `headers`, `body`, `json()`, `timings.duration`, `url`, `cookies`. No `html()`, no `json(selector)`, no detailed timings (`waiting`, `connecting`, …). |
 | **Latency** | `timings.duration` and `http_req_duration` include connecting when a new connection is made; k6's `http_req_duration` excludes it. With keep-alive (the default) this only affects first requests. |
 | **`setup` / `teardown` requests** | Not counted in results or thresholds. k6 counts them. |

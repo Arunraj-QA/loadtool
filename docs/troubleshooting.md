@@ -71,6 +71,10 @@ An iteration threw. The summary shows the count and the first message
 The summary lists each check with its pass rate and the first error, such
 as `first error: SyntaxError: …`.
 
+- **`first error: TypeError: res.json(): the body was discarded`:** the
+  body was not kept, which is the default. Add `responseType: "text"` to
+  that request's params, or set `discardResponseBodies: false` in the
+  options.
 - **A condition that throws counts as a failed check.** `r.json().products`
   on an error page fails the check, not the iteration.
 - **Check the status before the body:** a failed request makes every
@@ -81,6 +85,7 @@ as `first error: SyntaxError: …`.
 | Warning | Meaning |
 |---|---|
 | `script option "insecureSkipTLSVerify" is not supported yet and was ignored` | An option LoadTool does not have, often from a k6 script; see [Differences from k6](k6-differences.md) |
+| `res.body is null: response bodies are discarded by default; …` | The script read a body that was not kept. The warning says how to keep it. |
 | `--vus/--duration (or LOADTOOL_VUS/LOADTOOL_DURATION) replace the script's scenarios or stages with one constant-vus scenario` | Typed `--vus`/`--duration` override the script's workload. Leave them out to run the script's scenarios. |
 
 ## Thresholds fail (exit code 99)
@@ -132,8 +137,8 @@ point LoadTool at extra certificates.
   0.5 ms, so very fast responses (and requests refused at once) show as 0.
 - **No charts in the HTML report:** charts need at least two per-second
   points, so a run of about two seconds or more.
-- **`res.body` is `null`:** `discardResponseBodies: true` is set, or no
-  response arrived.
+- **`res.body` is `null`:** response bodies are discarded by default (a
+  warning says so), or no response arrived. See the next section.
 
 ## Result files are missing
 

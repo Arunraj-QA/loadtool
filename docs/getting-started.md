@@ -80,7 +80,9 @@ import { check } from "loadtool";
 const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8090";
 
 export default function () {
-  const res = http.get(`${BASE_URL}/api/products`);
+  // Response bodies are discarded by default to save memory;
+  // responseType "text" keeps this one so the check can read it.
+  const res = http.get(`${BASE_URL}/api/products`, { responseType: "text" });
   check(res, {
     "status is 200": (r) => r.status === 200,
     "has products": (r) => r.json().products.length > 0,
