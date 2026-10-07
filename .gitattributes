@@ -2,3 +2,4 @@
 *.golden -text
 internal/report/testdata/*.json -text
 internal/report/testdata/*.html -text
+examples/reports/*.html -text

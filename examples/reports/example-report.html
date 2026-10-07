@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="LoadTool (example)">
+<title>LoadTool report: thresholds.ts</title>
+<style>
+:root { --bg:#ffffff; --fg:#1b1f24; --muted:#5b6470; --card:#f4f6f8; --line:#d6dbe1;
+  --c1:#2563eb; --c2:#d97706; --c3:#7c3aed; --good:#15803d; --bad:#dc2626; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#0f1318; --fg:#e6e9ed; --muted:#9aa4b0; --card:#1a2028; --line:#2c3440;
+    --c1:#60a5fa; --c2:#fbbf24; --c3:#c4b5fd; --good:#4ade80; --bad:#f87171; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1040px; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; word-break: break-all; }
+h2 { font-size: 1.1rem; margin: 32px 0 12px; }
+.meta { color: var(--muted); margin: 0; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 600; font-size: .85rem; }
+.badge.ok { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+.badge.fail { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.alert { border-left: 4px solid var(--bad); background: var(--card); padding: 8px 12px; margin: 16px 0; }
+.reasons { list-style: none; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
+.card { background: var(--card); border-radius: 8px; padding: 12px 14px; }
+.card .label { color: var(--muted); font-size: .85rem; }
+.card .value { font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.card .note { color: var(--muted); font-size: .8rem; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+th.num, td.num { text-align: right; }
+.pass { color: var(--good); font-weight: 700; }
+.fail { color: var(--bad); font-weight: 700; }
+.err { color: var(--muted); font-size: .85rem; word-break: break-word; }
+.scroll { overflow-x: auto; }
+.charts { display: grid; gap: 16px; }
+.chart { margin: 0; background: var(--card); border-radius: 8px; padding: 12px; }
+.chart figcaption { font-weight: 600; margin-bottom: 4px; }
+.chart .unit { color: var(--muted); font-weight: 400; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { stroke: var(--muted); stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 11px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: .85rem; }
+.legend i { display: inline-block; width: 12px; height: 3px; margin-right: 6px; vertical-align: middle; }
+footer { color: var(--muted); font-size: .8rem; margin-top: 40px; }
+</style>
+</head>
+<body>
+<main>
+<h1>examples/thresholds.ts</h1>
+<p class="meta">
+<span class="badge fail">failed</span>
+ · started 2026-10-07 09:00:00 UTC · completed · exit code 99</p>
+<ul class="alert reasons" aria-label="Why the run failed"><li>threshold failed: http_req_failed rate&lt;0.01</li></ul>
+
+
+<section class="cards" aria-label="Summary">
+<div class="card"><div class="label">Requests</div><div class="value">168,825</div><div class="note">168,825 iterations</div></div>
+<div class="card"><div class="label">Throughput</div><div class="value">2811.9</div><div class="note">requests per second</div></div>
+<div class="card"><div class="label">Error rate</div><div class="value">1.21%</div><div class="note">2,040 failed</div></div>
+<div class="card"><div class="label">p95 latency</div><div class="value">17.00ms</div><div class="note">all requests sent</div></div>
+<div class="card"><div class="label">VUs</div><div class="value">50</div><div class="note">for 1m0s (elapsed 60.04s)</div></div>
+<div class="card"><div class="label">Checks</div><div class="value">99.40%</div><div class="note">335,610 of 337,650 passed</div></div>
+<div class="card"><div class="label">Thresholds</div><div class="value">2 / 3</div><div class="note">passed</div></div>
+</section>
+
+<h2>Thresholds</h2>
+<div class="scroll"><table>
+<thead><tr><th scope="col">Result</th><th scope="col">Metric</th><th scope="col">Expression</th><th scope="col">Observed</th></tr></thead>
+<tbody><tr><td><span class="pass">✓ pass</span></td><td>http_req_duration</td><td><code>p(95)&lt;200</code></td><td>observed 17.00ms</td></tr>
+<tr><td><span class="fail">✗ fail</span></td><td>http_req_failed</td><td><code>rate&lt;0.01</code></td><td>observed 0.0121 (1.21%)</td></tr>
+<tr><td><span class="pass">✓ pass</span></td><td>checks</td><td><code>rate&gt;0.99</code></td><td>observed 0.9940 (99.40%)</td></tr>
+</tbody></table></div>
+
+<h2>Checks</h2>
+<div class="scroll"><table>
+<thead><tr><th scope="col">Result</th><th scope="col">Check</th><th scope="col" class="num">Passed</th><th scope="col" class="num">Rate</th></tr></thead>
+<tbody><tr><td><span class="fail">✗</span></td><td>status is 200</td><td class="num">166,785 / 168,825</td><td class="num">98.79%</td></tr>
+<tr><td><span class="pass">✓</span></td><td>body has products</td><td class="num">168,825 / 168,825</td><td class="num">100.00%</td></tr>
+</tbody></table></div>
+
+<h2>Over time</h2>
+<div class="charts"><figure class="chart"><figcaption>Latency <span class="unit">(ms)</span></figcaption><svg viewBox="0 0 720 240" role="img" aria-label="Latency over time in seconds"><line class="grid" x1="56" x2="704" y1="208.0" y2="208.0"/><text class="tick" x="50" y="212.0" text-anchor="end">0</text><line class="grid" x1="56" x2="704" y1="160.0" y2="160.0"/><text class="tick" x="50" y="164.0" text-anchor="end">100</text><line class="grid" x1="56" x2="704" y1="112.0" y2="112.0"/><text class="tick" x="50" y="116.0" text-anchor="end">200</text><line class="grid" x1="56" x2="704" y1="64.0" y2="64.0"/><text class="tick" x="50" y="68.0" text-anchor="end">300</text><line class="grid" x1="56" x2="704" y1="16.0" y2="16.0"/><text class="tick" x="50" y="20.0" text-anchor="end">400</text><text class="tick" x="56.0" y="230" text-anchor="middle">0s</text><text class="tick" x="272.0" y="230" text-anchor="middle">20s</text><text class="tick" x="488.0" y="230" text-anchor="middle">40s</text><text class="tick" x="704.0" y="230" text-anchor="middle">60s</text><line class="axis" x1="56" x2="704" y1="208" y2="208"/><path d="M66.8 202.7 L77.6 202.7 L88.4 202.7 L99.2 202.7 L110.0 202.7 L120.8 202.7 L131.6 202.7 L142.4 202.7 L153.2 202.7 L164.0 202.7 L174.8 202.7 L185.6 202.7 L196.4 202.7 L207.2 202.7 L218.0 202.7 L228.8 202.7 L239.6 202.7 L250.4 202.7 L261.2 202.7 L272.0 202.7 L282.8 202.7 L293.6 202.7 L304.4 202.7 L315.2 202.7 L326.0 202.7 L336.8 202.7 L347.6 202.7 L358.4 202.7 L369.2 202.7 L380.0 202.7 L390.8 202.7 L401.6 202.7 L412.4 202.7 L423.2 202.7 L434.0 189.8 L444.8 189.8 L455.6 189.8 L466.4 189.8 L477.2 189.8 L488.0 189.8 L498.8 189.8 L509.6 189.8 L520.4 202.7 L531.2 202.7 L542.0 202.7 L552.8 202.7 L563.6 202.7 L574.4 202.7 L585.2 202.7 L596.0 202.7 L606.8 202.7 L617.6 202.7 L628.4 202.7 L639.2 202.7 L650.0 202.7 L660.8 202.7 L671.6 202.7 L682.4 202.7 L693.2 202.7" fill="none" stroke="var(--c1)" stroke-width="2" stroke-linejoin="round"><title>p50</title></path><path d="M66.8 201.3 L77.6 201.3 L88.4 201.3 L99.2 201.3 L110.0 201.3 L120.8 201.3 L131.6 201.3 L142.4 201.3 L153.2 201.3 L164.0 201.3 L174.8 201.3 L185.6 201.3 L196.4 201.3 L207.2 201.3 L218.0 201.3 L228.8 201.3 L239.6 201.3 L250.4 201.3 L261.2 201.3 L272.0 201.3 L282.8 201.3 L293.6 201.3 L304.4 201.3 L315.2 201.3 L326.0 201.3 L336.8 201.3 L347.6 201.3 L358.4 201.3 L369.2 201.3 L380.0 201.3 L390.8 201.3 L401.6 201.3 L412.4 201.3 L423.2 201.3 L434.0 131.2 L444.8 131.2 L455.6 131.2 L466.4 131.2 L477.2 131.2 L488.0 131.2 L498.8 131.2 L509.6 131.2 L520.4 201.3 L531.2 201.3 L542.0 201.3 L552.8 201.3 L563.6 201.3 L574.4 201.3 L585.2 201.3 L596.0 201.3 L606.8 201.3 L617.6 201.3 L628.4 201.3 L639.2 201.3 L650.0 201.3 L660.8 201.3 L671.6 201.3 L682.4 201.3 L693.2 201.3" fill="none" stroke="var(--c2)" stroke-width="2" stroke-linejoin="round"><title>p95</title></path><path d="M66.8 197.4 L77.6 197.4 L88.4 197.4 L99.2 197.4 L110.0 197.4 L120.8 197.4 L131.6 197.4 L142.4 197.4 L153.2 197.4 L164.0 197.4 L174.8 197.4 L185.6 197.4 L196.4 197.4 L207.2 197.4 L218.0 197.4 L228.8 197.4 L239.6 197.4 L250.4 197.4 L261.2 197.4 L272.0 197.4 L282.8 197.4 L293.6 197.4 L304.4 197.4 L315.2 197.4 L326.0 197.4 L336.8 197.4 L347.6 197.4 L358.4 197.4 L369.2 197.4 L380.0 197.4 L390.8 197.4 L401.6 197.4 L412.4 197.4 L423.2 197.4 L434.0 59.2 L444.8 59.2 L455.6 59.2 L466.4 59.2 L477.2 59.2 L488.0 59.2 L498.8 59.2 L509.6 59.2 L520.4 197.4 L531.2 197.4 L542.0 197.4 L552.8 197.4 L563.6 197.4 L574.4 197.4 L585.2 197.4 L596.0 197.4 L606.8 197.4 L617.6 197.4 L628.4 197.4 L639.2 197.4 L650.0 197.4 L660.8 197.4 L671.6 197.4 L682.4 197.4 L693.2 197.4" fill="none" stroke="var(--c3)" stroke-width="2" stroke-linejoin="round"><title>p99</title></path></svg><div class="legend"><span><i style="background:var(--c1)"></i>p50</span><span><i style="background:var(--c2)"></i>p95</span><span><i style="background:var(--c3)"></i>p99</span></div></figure><figure class="chart"><figcaption>Requests per second <span class="unit">(req/s)</span></figcaption><svg viewBox="0 0 720 240" role="img" aria-label="Requests per second over time in seconds"><line class="grid" x1="56" x2="704" y1="208.0" y2="208.0"/><text class="tick" x="50" y="212.0" text-anchor="end">0</text><line class="grid" x1="56" x2="704" y1="169.6" y2="169.6"/><text class="tick" x="50" y="173.6" text-anchor="end">1000</text><line class="grid" x1="56" x2="704" y1="131.2" y2="131.2"/><text class="tick" x="50" y="135.2" text-anchor="end">2000</text><line class="grid" x1="56" x2="704" y1="92.8" y2="92.8"/><text class="tick" x="50" y="96.8" text-anchor="end">3000</text><line class="grid" x1="56" x2="704" y1="54.4" y2="54.4"/><text class="tick" x="50" y="58.4" text-anchor="end">4000</text><line class="grid" x1="56" x2="704" y1="16.0" y2="16.0"/><text class="tick" x="50" y="20.0" text-anchor="end">5000</text><text class="tick" x="56.0" y="230" text-anchor="middle">0s</text><text class="tick" x="272.0" y="230" text-anchor="middle">20s</text><text class="tick" x="488.0" y="230" text-anchor="middle">40s</text><text class="tick" x="704.0" y="230" text-anchor="middle">60s</text><line class="axis" x1="56" x2="704" y1="208" y2="208"/><path d="M66.8 201.5 L77.6 191.7 L88.4 185.2 L99.2 175.4 L110.0 168.8 L120.8 159.0 L131.6 152.5 L142.4 142.7 L153.2 136.2 L164.0 126.4 L174.8 119.9 L185.6 110.1 L196.4 103.6 L207.2 93.8 L218.0 87.2 L228.8 77.4 L239.6 70.9 L250.4 61.1 L261.2 54.6 L272.0 44.8 L282.8 44.8 L293.6 44.8 L304.4 44.8 L315.2 44.8 L326.0 44.8 L336.8 44.8 L347.6 44.8 L358.4 44.8 L369.2 44.8 L380.0 44.8 L390.8 44.8 L401.6 44.8 L412.4 44.8 L423.2 44.8 L434.0 150.4 L444.8 150.4 L455.6 150.4 L466.4 150.4 L477.2 150.4 L488.0 150.4 L498.8 150.4 L509.6 150.4 L520.4 44.8 L531.2 44.8 L542.0 44.8 L552.8 44.8 L563.6 44.8 L574.4 44.8 L585.2 44.8 L596.0 44.8 L606.8 61.1 L617.6 77.4 L628.4 93.8 L639.2 110.1 L650.0 126.4 L660.8 142.7 L671.6 159.0 L682.4 175.4 L693.2 191.7 L704.0 208.0" fill="none" stroke="var(--c1)" stroke-width="2" stroke-linejoin="round"><title>requests</title></path><path d="M66.8 208.0 L77.6 208.0 L88.4 208.0 L99.2 208.0 L110.0 208.0 L120.8 208.0 L131.6 208.0 L142.4 208.0 L153.2 208.0 L164.0 208.0 L174.8 208.0 L185.6 208.0 L196.4 208.0 L207.2 208.0 L218.0 208.0 L228.8 208.0 L239.6 208.0 L250.4 208.0 L261.2 208.0 L272.0 208.0 L282.8 208.0 L293.6 208.0 L304.4 208.0 L315.2 208.0 L326.0 208.0 L336.8 208.0 L347.6 208.0 L358.4 208.0 L369.2 208.0 L380.0 208.0 L390.8 208.0 L401.6 208.0 L412.4 208.0 L423.2 208.0 L434.0 202.2 L444.8 201.1 L455.6 199.9 L466.4 198.8 L477.2 197.6 L488.0 196.5 L498.8 195.3 L509.6 194.2 L520.4 208.0 L531.2 208.0 L542.0 208.0 L552.8 208.0 L563.6 208.0 L574.4 208.0 L585.2 208.0 L596.0 208.0 L606.8 208.0 L617.6 208.0 L628.4 208.0 L639.2 208.0 L650.0 208.0 L660.8 208.0 L671.6 208.0 L682.4 208.0 L693.2 208.0 L704.0 208.0" fill="none" stroke="var(--bad)" stroke-width="2" stroke-linejoin="round"><title>failed</title></path></svg><div class="legend"><span><i style="background:var(--c1)"></i>requests</span><span><i style="background:var(--bad)"></i>failed</span></div></figure><figure class="chart"><figcaption>Error rate <span class="unit">(% of requests)</span></figcaption><svg viewBox="0 0 720 240" role="img" aria-label="Error rate over time in seconds"><line class="grid" x1="56" x2="704" y1="208.0" y2="208.0"/><text class="tick" x="50" y="212.0" text-anchor="end">0</text><line class="grid" x1="56" x2="704" y1="169.6" y2="169.6"/><text class="tick" x="50" y="173.6" text-anchor="end">5</text><line class="grid" x1="56" x2="704" y1="131.2" y2="131.2"/><text class="tick" x="50" y="135.2" text-anchor="end">10</text><line class="grid" x1="56" x2="704" y1="92.8" y2="92.8"/><text class="tick" x="50" y="96.8" text-anchor="end">15</text><line class="grid" x1="56" x2="704" y1="54.4" y2="54.4"/><text class="tick" x="50" y="58.4" text-anchor="end">20</text><line class="grid" x1="56" x2="704" y1="16.0" y2="16.0"/><text class="tick" x="50" y="20.0" text-anchor="end">25</text><text class="tick" x="56.0" y="230" text-anchor="middle">0s</text><text class="tick" x="272.0" y="230" text-anchor="middle">20s</text><text class="tick" x="488.0" y="230" text-anchor="middle">40s</text><text class="tick" x="704.0" y="230" text-anchor="middle">60s</text><line class="axis" x1="56" x2="704" y1="208" y2="208"/><path d="M66.8 208.0 L77.6 208.0 L88.4 208.0 L99.2 208.0 L110.0 208.0 L120.8 208.0 L131.6 208.0 L142.4 208.0 L153.2 208.0 L164.0 208.0 L174.8 208.0 L185.6 208.0 L196.4 208.0 L207.2 208.0 L218.0 208.0 L228.8 208.0 L239.6 208.0 L250.4 208.0 L261.2 208.0 L272.0 208.0 L282.8 208.0 L293.6 208.0 L304.4 208.0 L315.2 208.0 L326.0 208.0 L336.8 208.0 L347.6 208.0 L358.4 208.0 L369.2 208.0 L380.0 208.0 L390.8 208.0 L401.6 208.0 L412.4 208.0 L423.2 208.0 L434.0 131.2 L444.8 115.8 L455.6 100.5 L466.4 85.1 L477.2 69.8 L488.0 54.4 L498.8 39.0 L509.6 23.7 L520.4 208.0 L531.2 208.0 L542.0 208.0 L552.8 208.0 L563.6 208.0 L574.4 208.0 L585.2 208.0 L596.0 208.0 L606.8 208.0 L617.6 208.0 L628.4 208.0 L639.2 208.0 L650.0 208.0 L660.8 208.0 L671.6 208.0 L682.4 208.0 L693.2 208.0" fill="none" stroke="var(--bad)" stroke-width="2" stroke-linejoin="round"><title>failed</title></path></svg><div class="legend"><span><i style="background:var(--bad)"></i>failed</span></div></figure><figure class="chart"><figcaption>Active VUs <span class="unit">(VUs)</span></figcaption><svg viewBox="0 0 720 240" role="img" aria-label="Active VUs over time in seconds"><line class="grid" x1="56" x2="704" y1="208.0" y2="208.0"/><text class="tick" x="50" y="212.0" text-anchor="end">0</text><line class="grid" x1="56" x2="704" y1="169.6" y2="169.6"/><text class="tick" x="50" y="173.6" text-anchor="end">10</text><line class="grid" x1="56" x2="704" y1="131.2" y2="131.2"/><text class="tick" x="50" y="135.2" text-anchor="end">20</text><line class="grid" x1="56" x2="704" y1="92.8" y2="92.8"/><text class="tick" x="50" y="96.8" text-anchor="end">30</text><line class="grid" x1="56" x2="704" y1="54.4" y2="54.4"/><text class="tick" x="50" y="58.4" text-anchor="end">40</text><line class="grid" x1="56" x2="704" y1="16.0" y2="16.0"/><text class="tick" x="50" y="20.0" text-anchor="end">50</text><text class="tick" x="56.0" y="230" text-anchor="middle">0s</text><text class="tick" x="272.0" y="230" text-anchor="middle">20s</text><text class="tick" x="488.0" y="230" text-anchor="middle">40s</text><text class="tick" x="704.0" y="230" text-anchor="middle">60s</text><line class="axis" x1="56" x2="704" y1="208" y2="208"/><path d="M66.8 200.3 L77.6 188.8 L88.4 181.1 L99.2 169.6 L110.0 161.9 L120.8 150.4 L131.6 142.7 L142.4 131.2 L153.2 123.5 L164.0 112.0 L174.8 104.3 L185.6 92.8 L196.4 85.1 L207.2 73.6 L218.0 65.9 L228.8 54.4 L239.6 46.7 L250.4 35.2 L261.2 27.5 L272.0 16.0 L282.8 16.0 L293.6 16.0 L304.4 16.0 L315.2 16.0 L326.0 16.0 L336.8 16.0 L347.6 16.0 L358.4 16.0 L369.2 16.0 L380.0 16.0 L390.8 16.0 L401.6 16.0 L412.4 16.0 L423.2 16.0 L434.0 16.0 L444.8 16.0 L455.6 16.0 L466.4 16.0 L477.2 16.0 L488.0 16.0 L498.8 16.0 L509.6 16.0 L520.4 16.0 L531.2 16.0 L542.0 16.0 L552.8 16.0 L563.6 16.0 L574.4 16.0 L585.2 16.0 L596.0 16.0 L606.8 35.2 L617.6 54.4 L628.4 73.6 L639.2 92.8 L650.0 112.0 L660.8 131.2 L671.6 150.4 L682.4 169.6 L693.2 188.8 L704.0 208.0" fill="none" stroke="var(--c1)" stroke-width="2" stroke-linejoin="round"><title>VUs</title></path></svg><div class="legend"><span><i style="background:var(--c1)"></i>VUs</span></div></figure></div>
+
+<h2>Latency</h2>
+<div class="scroll"><table>
+<thead><tr><th scope="col"></th><th scope="col" class="num">All requests sent</th><th scope="col" class="num">Successful only</th></tr></thead>
+<tbody><tr><th scope="row">min</th><td class="num">9.00ms</td><td class="num">—</td></tr>
+<tr><th scope="row">mean</th><td class="num">14.00ms</td><td class="num">—</td></tr>
+<tr><th scope="row">p50</th><td class="num">11.00ms</td><td class="num">11.00ms</td></tr>
+<tr><th scope="row">p90</th><td class="num">13.00ms</td><td class="num">13.00ms</td></tr>
+<tr><th scope="row">p95</th><td class="num">17.00ms</td><td class="num">16.00ms</td></tr>
+<tr><th scope="row">p99</th><td class="num">95.00ms</td><td class="num">60.00ms</td></tr>
+<tr><th scope="row">max</th><td class="num">612.00ms</td><td class="num">—</td></tr>
+</tbody></table></div>
+<p class="meta">Percentiles are within ±0.78 %; min, mean and max are exact.</p>
+
+
+<h2>Run</h2>
+<div class="scroll"><table><tbody>
+<tr><th scope="row">Script errors</th><td>0</td></tr>
+<tr><th scope="row">Scenarios</th><td>default: ramping-vus, up to 50 VUs over 1m0s</td></tr>
+</tbody></table></div>
+
+<footer>Generated by LoadTool (example). Self-contained: no scripts or external resources.</footer>
+</main>
+</body>
+</html>
