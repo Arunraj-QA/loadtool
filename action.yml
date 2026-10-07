@@ -14,7 +14,7 @@ inputs:
     required: false
     default: ''
   version:
-    description: LoadTool release to install, such as v0.1.0, or `latest`. Ignored when `binary` is set.
+    description: LoadTool release to install, such as v0.1.0, or `latest`; or `source` to build LoadTool with Go from the action's own checkout (no release needed). Ignored when `binary` is set.
     required: false
     default: latest
   binary:
@@ -52,8 +52,28 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Set up Go (version source)
+      if: inputs.binary == '' && inputs.version == 'source'
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: ${{ github.action_path }}/go.mod
+        cache-dependency-path: ${{ github.action_path }}/go.sum
+
+    - name: Build LoadTool from source
+      if: inputs.binary == '' && inputs.version == 'source'
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        dir="${RUNNER_TEMP}/loadtool-source"
+        version=$(git describe --tags --always --dirty 2>/dev/null || echo source)
+        exe=""; [ "${RUNNER_OS}" = Windows ] && exe=.exe
+        go build -trimpath -ldflags "-X github.com/Arunraj-QA/loadtool/internal/cli.Version=${version}"           -o "${dir}/loadtool${exe}" ./cmd/loadtool
+        echo "$dir" >> "$GITHUB_PATH"
+        echo "Built LoadTool ${version} from source"
+
     - name: Install LoadTool
-      if: inputs.binary == ''
+      if: inputs.binary == '' && inputs.version != 'source'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -70,7 +90,10 @@ runs:
           *) echo "::error::unsupported runner architecture ${RUNNER_ARCH}"; exit 1 ;;
         esac
         if [ "$VERSION" = latest ]; then
-          VERSION=$(gh release view --repo "$REPO" --json tagName --jq .tagName)
+          if ! VERSION=$(gh release view --repo "$REPO" --json tagName --jq .tagName); then
+            echo "::error::no LoadTool release found in ${REPO}; set version to a release, or to 'source' to build it"
+            exit 1
+          fi
         fi
         name="loadtool_${VERSION}_${os}_${arch}"
         ext=tar.gz; [ "$os" = windows ] && ext=zip
@@ -107,13 +130,12 @@ runs:
         REPORT_HTML: ${{ inputs.report-html }}
       run: |
         set -uo pipefail
-        "$LOADTOOL" --version
-        # A file from an earlier run must not pass for this run's result.
-        rm -f "$SUMMARY_JSON" "$REPORT_HTML"
-        # ARGS is split on spaces, like a command line; quote-free values only.
+        # The generic CI recipe: it runs the test, writes both files and
+        # prints the verdict. ARGS is split on spaces, like a command line;
+        # quote-free values only.
         set +e
         # shellcheck disable=SC2086
-        "$LOADTOOL" run "$SCRIPT" --out "json=$SUMMARY_JSON" --report-html "$REPORT_HTML" $ARGS
+        bash "${GITHUB_ACTION_PATH}/scripts/loadtool-ci.sh" "$SCRIPT" $ARGS
         code=$?
         set -e
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"
@@ -158,9 +180,19 @@ runs:
       shell: bash
       env:
         CODE: ${{ steps.run.outputs.exit-code }}
+        SUMMARY_JSON: ${{ inputs.summary-json }}
       run: |
-        case "$CODE" in
-          99) echo "::error::LoadTool thresholds failed (exit code 99)" ;;
-          *) echo "::error::LoadTool failed (exit code $CODE)" ;;
-        esac
+        # One annotation per reason from the JSON outcome, so the run page
+        # says why without opening the log.
+        if [ -f "$SUMMARY_JSON" ] && reasons=$(jq -r '.outcome.reasons[]' "$SUMMARY_JSON" 2>/dev/null) && [ -n "$reasons" ]; then
+          while IFS= read -r reason; do
+            reason=${reason//'%'/'%25'}
+            echo "::error title=LoadTool (exit code ${CODE})::${reason}"
+          done <<< "$reasons"
+        else
+          case "$CODE" in
+            99) echo "::error title=LoadTool::thresholds failed (exit code 99)" ;;
+            *) echo "::error title=LoadTool::the test failed (exit code $CODE); see the Run the test step" ;;
+          esac
+        fi
         exit "$CODE"
