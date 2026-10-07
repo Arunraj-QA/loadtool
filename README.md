@@ -28,9 +28,9 @@ export default function () {
 loadtool run -e BASE_URL=https://staging.example.test test.ts --report-html report.html
 ```
 
-> **Status: early development.** Phase 1 (the core engine) is close to
-> complete, and no release has been published yet. Build from source to
-> try it, and expect changes. See [Project status](#project-status).
+> **Status: early development.** Phase 1 (the core engine) is complete,
+> but no release has been published yet. Build from source to try it, and
+> expect changes. See [Project status](#project-status).
 
 ## Features
 
@@ -119,9 +119,12 @@ LoadTool is built in phases:
 
 - **Phase 0 (complete):** the foundation. A goroutine-per-VU HTTP/1.1
   engine, TypeScript execution, a console summary.
-- **Phase 1 (in progress):** the core engine. Everything under
-  [Features](#features) is done. A benchmark re-run and the Phase 1 exit
-  criteria remain.
+- **Phase 1 (complete):** the core engine, everything under
+  [Features](#features). Its exit criteria were measured on 2026-10-07
+  ([results](benchmarks/results/2026-10-07-phase1/)):
+  - LoadTool still uses less memory than JMeter at 1,000 VUs.
+  - It has not regressed against Phase 0.
+  - Every feature passes end to end in CI.
 
 **Planned for later phases:** distributed execution, more protocols,
 real-time dashboards, browser testing, a test recorder and AI-assisted
@@ -134,12 +137,16 @@ analysis.
 Performance claims are only made from recorded measurements, kept in
 [benchmarks/](benchmarks/README.md).
 
-**The Phase 0 comparison** (2026-10-01) ran with one laptop running both
-the tools and the target server, and JMeter on its default JVM settings.
-At 1,000 VUs, LoadTool's peak private memory was 190–210 MB against
-JMeter's 1,366–1,371 MB on every run. See
-[the full results](benchmarks/results/2026-10-01-phase0-all-tools/),
-including k6.
+**The comparisons** ran with one laptop running both the tools and the
+target server, and JMeter on its default JVM settings.
+
+| Date | Version | LoadTool | JMeter | Results |
+|---|---|---|---|---|
+| 2026-10-01 | Phase 0 | 190–210 MB | 1,366–1,371 MB | [details](benchmarks/results/2026-10-01-phase0-all-tools/) |
+| 2026-10-07 | Phase 1 | 183–196 MB | 1,367–1,380 MB | [details](benchmarks/results/2026-10-07-phase1/) |
+
+Figures are peak private memory at 1,000 VUs, on every run. Both records
+include k6.
 
 ## Contributing
 

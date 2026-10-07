@@ -97,7 +97,7 @@ Each step is one branch merged into `phase-1-mvp` after CI passes.
 | 11 | Self-contained HTML report with time series | HTML Reporter | Done |
 | 12 | Release builds, GitHub Action, generic CI recipe | CI | Done (no release published yet) |
 | 13 | Documentation, 5–10 examples, preparation for external users | — | Done |
-| 14 | Re-run the benchmark; agree and check the Phase 1 exit criteria | — | Planned |
+| 14 | Re-run the benchmark; agree and check the Phase 1 exit criteria | — | Done: all three criteria met ([results](../benchmarks/results/2026-10-07-phase1/)) |
 
 A memory benchmark runs after steps 4, 7 and 8, which add per-VU state.
 Step 4: [`benchmarks/results/2026-10-04-dsl-core-memory/`](../benchmarks/results/2026-10-04-dsl-core-memory/).

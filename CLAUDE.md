@@ -63,6 +63,19 @@ Agreed on 2026-10-07, before the Phase 1 benchmark run:
 Benchmarks run on AC power with the machine otherwise idle. Do not claim
 Phase 1 is complete until all three are measured and recorded.
 
+Status: all three met, measured on 2026-10-07 in
+`benchmarks/results/2026-10-07-phase1/`:
+
+1. At 1,000 VUs LoadTool's peak private memory was 183–196 MB against
+   JMeter's 1,367–1,380 MB on every run.
+2. Against the Phase 0 build in the same session, peak memory was lower
+   (179–192 MB vs 213–229 MB) and requests per second were within
+   run-to-run variation.
+3. The examples smoke test and the Action self-test pass in CI.
+
+Caveats as in Phase 0: one laptop with the server on the same machine,
+and JMeter with its default JVM settings.
+
 ## Phase 0 — Foundations (complete)
 
 ### Phase 0 Goals
