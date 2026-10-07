@@ -154,8 +154,8 @@ comes from the environment (`BASE_URL=…`) or `-e KEY=VALUE`.
 scripts/ci-local.sh            # needs Go, bash and curl
 ```
 
-It builds LoadTool and the target server, starts the server on port
-18080, and runs the deterministic example through the generic recipe
+It builds LoadTool and the demo API, starts the API on port
+18090, and runs the deterministic example through the generic recipe
 twice:
 
 | Run | Target | Must exit |

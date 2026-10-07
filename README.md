@@ -92,7 +92,7 @@ Windows on the [releases page](https://github.com/Arunraj-QA/loadtool/releases).
 ## Quick start
 
 ```bash
-go run ./benchmarks/server &                       # a local test target
+go run ./examples/server &                         # a demo API to test
 ./bin/loadtool run examples/checks.ts --vus 5 --duration 10s
 ```
 
@@ -108,8 +108,9 @@ Then read [Getting started](docs/getting-started.md).
 | [Command line](docs/cli.md) | Flags, exit codes, environment |
 | [Results](docs/results.md) | What the numbers mean |
 | [CI](docs/ci/README.md) | GitHub Action and other CI systems |
+| [Troubleshooting](docs/troubleshooting.md) | Common problems and their messages |
 | [Differences from k6](docs/k6-differences.md) | Porting k6 scripts |
-| [Examples](examples/README.md) | Runnable scripts |
+| [Examples](examples/README.md) | Ten runnable scripts and a demo API |
 
 All documentation: [docs/](docs/README.md).
 

@@ -68,6 +68,19 @@ does.
 - Release builds for Linux, macOS and Windows (amd64, arm64) with
   checksums.
 
+**Examples and documentation** ([Examples](examples/README.md),
+[docs](docs/README.md)):
+
+- A demo API (`examples/server`): products, JSON orders, a login with a
+  bearer token and a session cookie, HTTP/1.1 and h2c.
+- Ten examples, all run in CI against the demo API:
+  - GET and POST JSON;
+  - token and cookie logins;
+  - checks and thresholds;
+  - all three executors;
+  - HTTP/2.
+- A troubleshooting guide and a topic index.
+
 **Fixes found along the way:**
 
 - A setup cancelled with Ctrl+C could count as successful and start the

@@ -10,9 +10,28 @@
 | [Command line](cli.md) | Flags, environment variables, output, exit codes, Ctrl+C |
 | [Results](results.md) | The summary, what is counted, latency and precision, the time series |
 | [JSON summary](json-summary.md) | `--out json` format, schema and versioning |
-| [CI](ci/README.md) | GitHub Action, GitLab CI, Jenkins, Azure Pipelines |
+| [CI](ci/README.md) | GitHub Action, the generic recipe, GitLab CI, Jenkins, Azure Pipelines |
+| [Troubleshooting](troubleshooting.md) | Common problems and the messages LoadTool prints |
 | [Differences from k6](k6-differences.md) | Porting k6 scripts; what differs and what is missing |
-| [Examples](../examples/README.md) | Runnable example scripts |
+| [Examples](../examples/README.md) | Ten runnable scripts and the demo API they run against |
+
+**Find a topic:**
+
+| Topic | Where |
+|---|---|
+| Installation, a first test | [Getting started](getting-started.md) |
+| The test script (DSL) | [Script API](script-api.md#a-test-script) |
+| HTTP requests and responses | [Script API: `loadtool/http`](script-api.md#loadtoolhttp) |
+| Checks | [Script API: `check`](script-api.md#checkvalue-conditions) |
+| Thresholds | [Options: Thresholds](options.md#thresholds) |
+| Scenarios (constant VUs, ramping, arrival rate) | [Options: Scenarios](options.md#scenarios) |
+| Setup and teardown | [Script API: Lifecycle](script-api.md#lifecycle) |
+| Cookies and sessions | [Script API: Cookies and sessions](script-api.md#cookies-and-sessions) |
+| HTTP/2 | [Script API: HTTP versions](script-api.md#http-versions-and-connections) |
+| JSON reports | [JSON summary](json-summary.md) |
+| HTML reports | [Results: The HTML report](results.md#the-html-report) |
+| CI usage | [CI](ci/README.md) |
+| Troubleshooting | [Troubleshooting](troubleshooting.md) |
 
 ## Working on LoadTool
 
