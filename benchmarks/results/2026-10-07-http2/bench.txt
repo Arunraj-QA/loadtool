@@ -1,0 +1,24 @@
+BenchmarkProtocols/http1-cleartext/serial-12         	   27051	    119929 ns/op	         1.000 conns	    6547 B/op	      75 allocs/op
+BenchmarkProtocols/http1-cleartext/serial-12         	   19412	    126271 ns/op	         1.000 conns	    6551 B/op	      75 allocs/op
+BenchmarkProtocols/http1-cleartext/serial-12         	   19017	    119525 ns/op	         1.000 conns	    6551 B/op	      75 allocs/op
+BenchmarkProtocols/http1-cleartext/parallel-12       	  166936	     12522 ns/op	        64.00 conns	    6544 B/op	      73 allocs/op
+BenchmarkProtocols/http1-cleartext/parallel-12       	  171705	     12035 ns/op	        64.00 conns	    6541 B/op	      73 allocs/op
+BenchmarkProtocols/http1-cleartext/parallel-12       	  159330	     12578 ns/op	        64.00 conns	    6543 B/op	      73 allocs/op
+BenchmarkProtocols/h2c/serial-12                     	   13756	    177420 ns/op	         1.000 conns	    9518 B/op	      90 allocs/op
+BenchmarkProtocols/h2c/serial-12                     	   13129	    202274 ns/op	         1.000 conns	    9515 B/op	      90 allocs/op
+BenchmarkProtocols/h2c/serial-12                     	   10000	    201230 ns/op	         1.000 conns	    9513 B/op	      90 allocs/op
+BenchmarkProtocols/h2c/parallel-12                   	   79849	     31077 ns/op	         1.000 conns	    9484 B/op	      89 allocs/op
+BenchmarkProtocols/h2c/parallel-12                   	   70230	     37122 ns/op	         1.000 conns	    9533 B/op	      89 allocs/op
+BenchmarkProtocols/h2c/parallel-12                   	   55707	     44312 ns/op	         1.000 conns	    9568 B/op	      89 allocs/op
+BenchmarkProtocols/http1-tls/serial-12               	   13378	    190782 ns/op	         1.000 conns	    6565 B/op	      75 allocs/op
+BenchmarkProtocols/http1-tls/serial-12               	   10000	    203540 ns/op	         1.000 conns	    6561 B/op	      74 allocs/op
+BenchmarkProtocols/http1-tls/serial-12               	   15508	    221011 ns/op	         1.000 conns	    6554 B/op	      74 allocs/op
+BenchmarkProtocols/http1-tls/parallel-12             	   60505	     35262 ns/op	        64.00 conns	    6729 B/op	      74 allocs/op
+BenchmarkProtocols/http1-tls/parallel-12             	   73950	     31377 ns/op	        64.00 conns	    6690 B/op	      73 allocs/op
+BenchmarkProtocols/http1-tls/parallel-12             	2026/10/07 09:51:59 http: TLS handshake error from 127.0.0.1:58086: read tcp 127.0.0.1:58037->127.0.0.1:58086: use of closed network connection
+BenchmarkProtocols/http2-tls/serial-12               	    8571	    282593 ns/op	         1.000 conns	    8468 B/op	      76 allocs/op
+BenchmarkProtocols/http2-tls/serial-12               	    8846	    270544 ns/op	         1.000 conns	    8460 B/op	      76 allocs/op
+BenchmarkProtocols/http2-tls/serial-12               	    9618	    288070 ns/op	         1.000 conns	    8455 B/op	      76 allocs/op
+BenchmarkProtocols/http2-tls/parallel-12             	   56917	     44919 ns/op	         1.000 conns	    8525 B/op	      75 allocs/op
+BenchmarkProtocols/http2-tls/parallel-12             	   60265	     40651 ns/op	         1.000 conns	    8459 B/op	      75 allocs/op
+BenchmarkProtocols/http2-tls/parallel-12             	   56354	     39429 ns/op	         1.000 conns	    8462 B/op	      75 allocs/op
