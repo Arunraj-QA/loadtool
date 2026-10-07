@@ -113,7 +113,7 @@ runs:
         # ARGS is split on spaces, like a command line; quote-free values only.
         set +e
         # shellcheck disable=SC2086
-        "$LOADTOOL" run "$SCRIPT" --summary-json "$SUMMARY_JSON" --report-html "$REPORT_HTML" $ARGS
+        "$LOADTOOL" run "$SCRIPT" --out "json=$SUMMARY_JSON" --report-html "$REPORT_HTML" $ARGS
         code=$?
         set -e
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"

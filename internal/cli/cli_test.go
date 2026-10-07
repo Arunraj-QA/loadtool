@@ -569,3 +569,69 @@ export default function () { http.get("`+srv.URL+`"); }`)
 		t.Errorf("unwritable report: exit %d (%v), want 1", ExitCode(err), err)
 	}
 }
+
+// --out json writes only JSON to stdout (the console summary goes to
+// stderr), and its outcome matches the process exit code.
+func TestRunOutJSONStdout(t *testing.T) {
+	srv := statusServer(t, http.StatusOK)
+	for _, tt := range []struct {
+		name, thresholds string
+		wantCode         int
+	}{
+		{"passed", `{ http_reqs: ["count>0"] }`, 0},
+		{"threshold failed", `{ http_reqs: ["count<0"] }`, ExitThresholdsFailed},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			path := scriptFile(t, `import http from "loadtool/http";
+export const options = { thresholds: `+tt.thresholds+` };
+export default function () { http.get("`+srv.URL+`"); }`)
+			stdout, stderr, err := execute(t, "run", path, "--duration", "100ms", "--out", "json")
+			if got := ExitCode(err); got != tt.wantCode {
+				t.Fatalf("exit code %d (%v), want %d", got, err, tt.wantCode)
+			}
+			var doc struct {
+				SchemaVersion int `json:"schemaVersion"`
+				Outcome       struct {
+					Passed   bool     `json:"passed"`
+					ExitCode int      `json:"exitCode"`
+					Reasons  []string `json:"reasons"`
+				} `json:"outcome"`
+			}
+			if err := json.Unmarshal([]byte(stdout), &doc); err != nil {
+				t.Fatalf("stdout is not JSON: %v\n%s", err, stdout)
+			}
+			if doc.SchemaVersion != 1 || doc.Outcome.ExitCode != tt.wantCode || doc.Outcome.Passed != (tt.wantCode == 0) {
+				t.Errorf("outcome %+v, want exit code %d", doc.Outcome, tt.wantCode)
+			}
+			if !strings.Contains(stderr, "LoadTool summary") || strings.Contains(stdout, "LoadTool summary") {
+				t.Errorf("the console summary must go to stderr with --out json")
+			}
+		})
+	}
+}
+
+func TestOutFlag(t *testing.T) {
+	dir := t.TempDir()
+	srv := statusServer(t, http.StatusOK)
+	path := scriptFile(t, `import http from "loadtool/http";
+export default function () { http.get("`+srv.URL+`"); }`)
+	a, b := filepath.Join(dir, "a.json"), filepath.Join(dir, "b.json")
+	// --out json=<file> and the --summary-json alias, both written.
+	stdout, _, err := execute(t, "run", path, "--duration", "50ms", "--out", "json="+a, "--summary-json", b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout, "LoadTool summary") {
+		t.Error("without --out json the console summary stays on stdout")
+	}
+	for _, f := range []string{a, b} {
+		if readSummaryJSON(t, f)["schemaVersion"] != 1.0 {
+			t.Errorf("%s is not a summary", f)
+		}
+	}
+	for _, bad := range []string{"csv", "json=", "influxdb=http://x"} {
+		if _, _, err := execute(t, "run", path, "--out", bad); err == nil || !strings.Contains(err.Error(), "supported outputs are json") {
+			t.Errorf("--out %s: error = %v", bad, err)
+		}
+	}
+}

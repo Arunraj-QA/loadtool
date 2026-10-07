@@ -47,7 +47,7 @@ for entry in "${runs[@]}"; do
   summary="$out/${script}.json"
   code=0
   # shellcheck disable=SC2086
-  "$loadtool" run "$root/examples/$script" $args --summary-json "$summary" >"$out/${script}.log" 2>&1 || code=$?
+  "$loadtool" run "$root/examples/$script" $args --out "json=$summary" >"$out/${script}.log" 2>&1 || code=$?
   if [ "$code" -ne 0 ]; then
     fail "$script: exit code $code" "$script: exit code $code"$'\n'"$(tail -25 "$out/${script}.log")"
     tail -5 "$out/${script}.log"
