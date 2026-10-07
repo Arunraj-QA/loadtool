@@ -85,6 +85,9 @@ jobs:
           go build -o bin/loadtool ./cmd/loadtool
           scripts/smoke-examples.sh bin/loadtool
 
+      - name: Local CI reproduction
+        run: scripts/ci-local.sh
+
       - name: Action, passing test
         id: pass
         uses: ./
