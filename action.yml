@@ -57,7 +57,9 @@ runs:
       uses: actions/setup-go@v6
       with:
         go-version-file: ${{ github.action_path }}/go.mod
-        cache-dependency-path: ${{ github.action_path }}/go.sum
+        # The cache keys on the caller's go.sum, which may not exist; a
+        # one-off build is quick without it.
+        cache: false
 
     - name: Build LoadTool from source
       if: inputs.binary == '' && inputs.version == 'source'
