@@ -43,7 +43,9 @@ does.
 
 **Results** ([Results](docs/results.md), ADR-011, ADR-012):
 
-- `--summary-json`: a versioned JSON summary.
+- `--out json` (stdout) and `--out json=<file>`: a versioned JSON summary
+  with an `outcome` (passed, exit code, reasons) and a published JSON
+  Schema. `--summary-json <file>` is an alias.
 - `--report-html`: a self-contained HTML report with per-second charts.
 - The console summary shows checks, thresholds, scenarios and dropped
   iterations.

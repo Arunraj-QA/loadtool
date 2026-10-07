@@ -102,7 +102,7 @@ That is all a CI job needs ([CI guide](ci/README.md)).
 ## 6. Keep the results
 
 ```bash
-./bin/loadtool run first.ts --summary-json summary.json --report-html report.html
+./bin/loadtool run first.ts --out json=summary.json --report-html report.html
 ```
 
 **The two files:**

@@ -9,7 +9,7 @@
 | [Options](options.md) | Every option, where settings come from, scenarios and executors, thresholds |
 | [Command line](cli.md) | Flags, environment variables, output, exit codes, Ctrl+C |
 | [Results](results.md) | The summary, what is counted, latency and precision, the time series |
-| [JSON summary](json-summary.md) | `--summary-json` format and versioning |
+| [JSON summary](json-summary.md) | `--out json` format, schema and versioning |
 | [CI](ci/README.md) | GitHub Action, GitLab CI, Jenkins, Azure Pipelines |
 | [Differences from k6](k6-differences.md) | Porting k6 scripts; what differs and what is missing |
 | [Examples](../examples/README.md) | Runnable example scripts |

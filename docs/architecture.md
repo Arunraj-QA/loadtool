@@ -70,7 +70,7 @@ Source: [diagrams/architecture-by-phase.mmd](diagrams/architecture-by-phase.mmd)
 | Thresholds | Metrics, Runner | new `internal/thresholds` | 4 thresholds; exit code | Done (ADR-008): `internal/thresholds`, exit code 99 |
 | HTTP/2 | HTTP | `internal/httpclient` | 6 HTTP/2 | Done (ADR-010): `httpVersion` auto/1.1/2 with h2c through `http.Protocols`; `res.proto` |
 | Sessions | HTTP | `internal/httpclient` (per-VU client and cookie jar; reuse options) | 7 connection reuse, 8 cookies/sessions | Done (ADR-009): per-VU client and lazy cookie jar over the shared transport; `noCookiesReset`, `noConnectionReuse` |
-| JSON Reporter | Console (`report.Result`) | `internal/report` | 9 JSON output | Done (ADR-011): `--summary-json`, schema version 1, `docs/json-summary.md` |
+| JSON Reporter | Console (`report.Result`) | `internal/report` | 9 JSON output | Done (ADR-011): `--out json[=<file>]`, schema version 1, JSON Schema in `docs/schemas/` |
 | HTML Reporter | Console (`report.Result`) | `internal/report` | 10 self-contained HTML report | Done (ADR-012): `--report-html`, per-second series sampled from the shared histograms |
 | CI | CLI | `action.yml`, `.github/workflows/release.yml`, `docs/ci/` | 11 GitHub Action, 12 generic CI recipe | Done: `scripts/release-build.sh`, `release.yml` (tag → GitHub release), composite `action.yml` (self-tested in CI), `docs/ci/` |
 

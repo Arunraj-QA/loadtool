@@ -1,7 +1,7 @@
 # Results
 
 LoadTool prints a summary at the end of every run. It can also write the
-same result as [JSON](json-summary.md) (`--summary-json`) and as an HTML
+same result as [JSON](json-summary.md) (`--out json`) and as an HTML
 report with charts (`--report-html`).
 
 ```

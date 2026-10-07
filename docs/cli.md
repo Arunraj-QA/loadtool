@@ -14,7 +14,8 @@ loadtool --help
 | `-d, --duration` | `10s` | How long VUs start iterations. Overrides the script and `LOADTOOL_DURATION`, and replaces the script's scenarios. |
 | `--graceful-stop` | `30s` | How long running iterations may finish after the duration; `0` cancels them at once. Applies to the `vus`/`duration` shorthand. |
 | `-e, --env` | | `KEY=VALUE` for the script's `__ENV`; repeatable; overrides the process environment |
-| `--summary-json` | | Also write the summary as JSON to this file ([format](json-summary.md)) |
+| `-o, --out` | | `json`: write the summary as JSON to stdout (the console summary goes to stderr). `json=<file>`: write it to a file. Repeatable. ([format](json-summary.md)) |
+| `--summary-json` | | Same as `--out json=<file>` |
 | `--report-html` | | Also write a self-contained HTML report with charts to this file |
 
 **`--vus` and `--duration`** count only when typed: the defaults shown
@@ -35,7 +36,10 @@ apply when nothing else sets a value (see
 | stdout | The summary (see [Results](results.md)) |
 | stderr | Script `console` output, warnings, errors |
 
-**Result files.** `--summary-json` and `--report-html` are written
+**With `--out json`**, stdout holds only the JSON and the summary moves
+to stderr, so `loadtool run test.ts --out json | jq .outcome` works.
+
+**Result files.** `--out json=<file>` and `--report-html` are written
 whenever the test produced a result, also when thresholds fail. They are
 written atomically: a reader never sees half a file.
 

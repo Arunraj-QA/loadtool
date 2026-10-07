@@ -31,7 +31,7 @@ them, a run that completes exits 0 however slow it was. See
 
 | Flag | File | Use |
 |---|---|---|
-| `--summary-json summary.json` | Versioned JSON ([format](../json-summary.md)) | Parse in the pipeline; compare between runs |
+| `--out json=summary.json` | Versioned JSON ([format](../json-summary.md)) | Parse in the pipeline; compare between runs |
 | `--report-html report.html` | Self-contained HTML with charts | Attach as an artifact for people to read |
 
 Both are written whenever the test produced a result, including when
@@ -93,7 +93,7 @@ curl -fsSLO https://github.com/Arunraj-QA/loadtool/releases/download/${VERSION}/
 grep " \*\?${NAME}.tar.gz$" checksums.txt | sha256sum -c -
 tar -xzf ${NAME}.tar.gz
 ./${NAME}/loadtool run tests/load/checkout.ts \
-  --summary-json loadtool-summary.json --report-html loadtool-report.html
+  --out json=loadtool-summary.json --report-html loadtool-report.html
 ```
 
 **Archives.** Release archives are named
@@ -125,7 +125,7 @@ load-test:
     - grep " \*\?${NAME}.tar.gz$" checksums.txt | sha256sum -c -
     - tar -xzf ${NAME}.tar.gz && mv ${NAME}/loadtool /usr/local/bin/
   script:
-    - loadtool run tests/load/checkout.ts --summary-json loadtool-summary.json --report-html loadtool-report.html
+    - loadtool run tests/load/checkout.ts --out json=loadtool-summary.json --report-html loadtool-report.html
   artifacts:
     when: always
     paths: [loadtool-summary.json, loadtool-report.html]
@@ -150,7 +150,7 @@ pipeline {
           grep " \\*\\?${NAME}.tar.gz$" checksums.txt | sha256sum -c -
           tar -xzf ${NAME}.tar.gz
           ./${NAME}/loadtool run tests/load/checkout.ts \
-            --summary-json loadtool-summary.json --report-html loadtool-report.html
+            --out json=loadtool-summary.json --report-html loadtool-report.html
         '''
       }
     }
@@ -172,7 +172,7 @@ steps:
       grep " \*\?${NAME}.tar.gz$" checksums.txt | sha256sum -c -
       tar -xzf ${NAME}.tar.gz
       ./${NAME}/loadtool run tests/load/checkout.ts \
-        --summary-json loadtool-summary.json --report-html loadtool-report.html
+        --out json=loadtool-summary.json --report-html loadtool-report.html
     displayName: Load test
     env:
       BASE_URL: https://staging.example.test

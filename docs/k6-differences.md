@@ -14,7 +14,8 @@ behaviour differs on purpose.
 | `import { check, sleep, group } from "k6"` | `import { check, sleep, group } from "loadtool"` |
 | `k6 run script.js` | `loadtool run script.js` |
 | `k6 run -e KEY=value` | `loadtool run -e KEY=value` |
-| `--summary-export file.json` | `--summary-json file.json` (a different format: [JSON summary](json-summary.md)) |
+| `--summary-export file.json` | `--out json=file.json` (a different format: [JSON summary](json-summary.md)) |
+| `--out json=file` (every data point, streamed) | `--out json=file` writes the **end-of-test summary**; there is no streaming output |
 
 Most scripts that use `http.get/post/put/patch/del/request`, `check`,
 `sleep`, `options` with `vus`/`duration`/`stages`/`scenarios`/`thresholds`,
