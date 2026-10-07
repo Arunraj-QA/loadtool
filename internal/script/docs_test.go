@@ -15,11 +15,16 @@ import (
 // so the docs cannot show an API that does not exist. Fragments, such as
 // an options object on its own, are skipped.
 func TestDocSnippetsLoad(t *testing.T) {
-	docs, err := filepath.Glob(filepath.Join("..", "..", "docs", "*.md"))
+	dir := filepath.Join("..", "..", "docs")
+	if d := os.Getenv("LOADTOOL_DOCS_DIR"); d != "" {
+		dir = d // lets a test run over a CRLF copy of the docs
+	}
+	docs, err := filepath.Glob(filepath.Join(dir, "*.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	block := regexp.MustCompile("(?s)```typescript\n(.*?)```")
+	// Windows checkouts may have CRLF line endings.
+	block := regexp.MustCompile("(?s)```typescript\r?\n(.*?)```")
 	var loaded int
 	for _, doc := range docs {
 		b, err := os.ReadFile(doc)
