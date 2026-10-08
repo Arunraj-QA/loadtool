@@ -186,7 +186,9 @@ matter:
 | `internal/httpclient` | Tuned HTTP/1.1 client; sends one request, times it, records it | `New`, `Do` | 112 / 328 |
 | `internal/metrics` | Latency histograms, counters, merging into a summary | `NewRecorders`, `Recorder`, `Merge`, `Summary` | 269 / 308 |
 | `benchmarks/server` | Deterministic benchmark target (standard library only) | `GET /api/test`, `GET /health` | 113 / 184 |
-| `examples/server` | Demo API the examples run against (standard library only) | products, orders, login, `/api/me`; HTTP/1.1 and h2c | 290 / 156 |
+| `examples/server` | Demo API the examples run against (standard library and `coder/websocket`) | products, orders, login, `/api/me`, `/ws/echo`; HTTP/1.1 and h2c | 321 / 184 |
+| `internal/protocol` | Protocol module interfaces, error codes, recording helper, `protocoltest` harness (Phase 2, ADR-018) | `Module`, `Run`, `Instance`, `VU`, `Record`, `Classify` | 423 / 161 |
+| `internal/protocols/ws` | WebSocket module (Phase 2, ADR-019) | `ws.connect`, socket handlers and timers | 709 / 454 |
 
 External modules: `spf13/cobra` (CLI), `dop251/goja` (JavaScript engine)
 and `evanw/esbuild` (TypeScript transpiling). Everything else is the Go

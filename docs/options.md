@@ -163,6 +163,7 @@ An expression is `<aggregate> <op> <number>`, with `<`, `<=`, `>`, `>=`,
 | `checks` | `rate` | Passed checks ÷ checks run (0–1) |
 | `iterations` | `count`, `rate` | Iterations that ran to their end |
 | `dropped_iterations` | `count`, `rate` | Arrival-rate starts that found no free VU |
+| `ws_*` | by kind: trend `avg`, `min`, `max`, `med`, `p(N)`; counter `count`, `rate`; rate `rate` | WebSocket metrics, in scripts that import `loadtool/ws` ([list](script-api.md#loadtoolws)) |
 
 **Rules:**
 

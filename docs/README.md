@@ -5,7 +5,7 @@
 | Page | What it covers |
 |---|---|
 | [Getting started](getting-started.md) | Install, a first test, checks, thresholds, result files |
-| [Script API](script-api.md) | `loadtool/http`, responses, `check`/`sleep`/`group`, globals, imports, setup/teardown, cookies, HTTP/2 |
+| [Script API](script-api.md) | `loadtool/http`, responses, `check`/`sleep`/`group`, globals, imports, setup/teardown, cookies, HTTP/2, WebSocket |
 | [Options](options.md) | Every option, where settings come from, scenarios and executors, thresholds |
 | [Command line](cli.md) | Flags, environment variables, output, exit codes, Ctrl+C |
 | [Results](results.md) | The summary, what is counted, latency and precision, the time series |
@@ -28,6 +28,7 @@
 | Setup and teardown | [Script API: Lifecycle](script-api.md#lifecycle) |
 | Cookies and sessions | [Script API: Cookies and sessions](script-api.md#cookies-and-sessions) |
 | HTTP/2 | [Script API: HTTP versions](script-api.md#http-versions-and-connections) |
+| WebSocket | [Script API: `loadtool/ws`](script-api.md#loadtoolws) |
 | JSON reports | [JSON summary](json-summary.md) |
 | HTML reports | [Results: The HTML report](results.md#the-html-report) |
 | CI usage | [CI](ci/README.md) |

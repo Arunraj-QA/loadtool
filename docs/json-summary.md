@@ -99,8 +99,8 @@ runs.
 
 **Protocol metric families** (Phase 2,
 [ADR-015](decisions/ADR-015-metric-families.md)) are additional keys in
-`metrics`. They are written by protocol modules, and no released module
-writes them yet.
+`metrics`, written by protocol modules: the WebSocket module's
+`ws_*` metrics ([Script API](script-api.md#loadtoolws)).
 
 - **Where they appear:** after the keys above, in a fixed order, and
   only when they recorded something. A run without them writes exactly
@@ -115,8 +115,8 @@ writes them yet.
 | `counter` | `count`, `rate` (per second) |
 | `rate` | `rate`, `trues`, `count`: the fraction of true samples. For a `*_failed` family, true means failed, so `rate` is the error rate, like `http_req_failed` |
 
-Thresholds can name a family (`thresholds[].metric`) once the module
-that records it exists.
+Thresholds can name a family (`thresholds[].metric`) of a module the
+script imports.
 
 **Precision.** Latency percentiles are within ±0.78 %, while `min`, `avg`
 and `max` are exact (ADR-004). `approximate: true` marks a percentile

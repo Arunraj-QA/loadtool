@@ -39,6 +39,7 @@ and `setup`/`teardown` need only the import lines changed.
 | **Ramping** | VU *n* is active while the stage line is at least *n*: a pure ramp to 10 reaches the 10th VU only at its end. |
 | **Options** | Unknown options warn and are ignored. Options combining `scenarios` with `vus`/`duration`/`stages` are an error. |
 | **HTTP/2** | Negotiated over TLS by default, as in k6. `httpVersion: "2"` also speaks h2c (HTTP/2 without TLS), which k6 does not. |
+| **WebSocket** | `loadtool/ws` follows `k6/ws`: `connect(url, params, fn)`, `on`, `send`, `sendBinary`, `close`, `setTimeout`, `setInterval`. Differences: `send(…, { reply: true })` times a reply (`ws_msg_latency`); `connect` returns `error_code`; no `ping`/`pong` events or `ws_ping` metric; no subprotocols; `params` takes `headers` only. |
 | **Percentiles** | From a histogram, within ±0.78 %. |
 
 ## Not supported (yet)
@@ -62,7 +63,8 @@ and `setup`/`teardown` need only the import lines changed.
 
 **Runtime and modules:**
 
-- Other protocols (WebSocket, gRPC) and browser testing.
+- Other protocols (gRPC, and k6's experimental WebSocket API) and browser
+  testing.
 - npm packages and remote (URL) modules.
 - `--out` streaming outputs and k6 Cloud.
 - `insecureSkipTLSVerify` and other TLS options.

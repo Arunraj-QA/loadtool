@@ -19,7 +19,7 @@ result files are written.
 
 | Message (start) | Cause | Fix |
 |---|---|---|
-| `load script: …: cannot import "axios": only built-in modules (…) and relative paths …` | npm packages and URLs cannot be imported | Use `loadtool`, `loadtool/http` and your own files (`./lib/api.ts`) |
+| `load script: …: cannot import "axios": only built-in modules (…) and relative paths …` | npm packages and URLs cannot be imported | Use `loadtool`, `loadtool/http`, `loadtool/ws` and your own files (`./lib/api.ts`) |
 | `script init: … http requests are not allowed in the script's top-level code` | A request outside a function | Move it into the default function, or into `setup()` to run it once |
 | `options.thresholds: unknown metric "http_req_duraton"; supported metrics are …` | A typo in a metric name | Use a name from the list in the message |
 | `options.thresholds.http_req_duration: "p95<200": expected "<aggregate> <op> <number>"` | A malformed expression | Write `p(95)<200`; see [Thresholds](options.md#thresholds) |
@@ -108,6 +108,17 @@ A `constant-arrival-rate` scenario had no free VU when an iteration was
 due, so the start was dropped and the rate was not reached. Raise the
 scenario's `preAllocatedVUs`. `dropped_iterations: ["count==0"]` makes
 this fail the test.
+
+## WebSocket
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `res.status` is 404 (or another HTTP status) and `error_code` is `server` | The server refused the upgrade at that path | Check the WebSocket path, such as `/ws/echo` |
+| `error_code` `invalid` | The URL is not `ws://` or `wss://` | Use `ws://` (or `wss://` for TLS) |
+| `ws.connect` never returns | Nothing closes the session | Close it in a handler, or add a guard: `socket.setTimeout(() => socket.close(), 5000)` |
+| `ws_msg_latency` has no samples | No send was marked `{ reply: true }` | Mark the sends whose replies you want timed |
+| `on("error")` with `closed`, close code 1006 | The server dropped the connection without a close frame | Check the server's logs and limits |
+| `thresholds … unknown metric "ws_…"` | The script does not import `loadtool/ws` | WebSocket metrics exist only in scripts that import it |
 
 ## Logins and sessions
 

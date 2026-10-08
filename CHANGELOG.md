@@ -6,6 +6,21 @@ does.
 
 ## Unreleased
 
+### Phase 2: protocol breadth (in progress)
+
+- **WebSocket** (`loadtool/ws`, ADR-019):
+  - connect, send, receive and close, with handlers and timers in the
+    session;
+  - per-message reply latency (`send(…, { reply: true })`);
+  - `ws_*` metrics in the summary, the JSON and HTML reports and
+    thresholds.
+  - It can be mixed with HTTP in one iteration
+    (`examples/websocket.ts`), and the demo API has a `/ws/echo`
+    endpoint.
+- **Protocol modules** (ADR-014 to ADR-018): a common interface and
+  lifecycle for protocols, with metric families (ADR-015) and
+  normalized error codes (ADR-016).
+
 ### Phase 1: core engine
 
 **Script API**
