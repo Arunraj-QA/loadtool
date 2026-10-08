@@ -11,10 +11,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/Arunraj-QA/loadtool/internal/config"
 	"github.com/Arunraj-QA/loadtool/internal/engine"
 	"github.com/Arunraj-QA/loadtool/internal/httpclient"
+	"github.com/Arunraj-QA/loadtool/internal/protocol"
 	"github.com/Arunraj-QA/loadtool/internal/report"
 	"github.com/Arunraj-QA/loadtool/internal/script"
 	"github.com/Arunraj-QA/loadtool/internal/thresholds"
@@ -72,7 +74,7 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	if cfg.Script == "" {
 		return report.Result{}, cfg.Validate()
 	}
-	prog, err := script.Load(cfg.Script)
+	prog, err := script.Load(cfg.Script, modules...)
 	if err != nil {
 		return report.Result{}, fmt.Errorf("load script: %w", err)
 	}
@@ -105,7 +107,14 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		return report.Result{}, err
 	}
 	// Parsed now, so a typo fails before setup or any load.
-	ths, err := thresholds.Parse(opts.Thresholds)
+	// Protocol modules the script imports start before thresholds are
+	// parsed, so thresholds can name their metric families (ADR-015).
+	families, err := prog.StartModules(protocol.RunEnv{TLS: p.TLSConfig, Warn: p.Warn, MaxVUs: cfg.VUs})
+	if err != nil {
+		return report.Result{}, err
+	}
+	defer closeAndWarn(p.Warn, "protocol modules", prog.CloseModules)
+	ths, err := thresholds.Parse(opts.Thresholds, families...)
 	if err != nil {
 		return report.Result{}, err
 	}
@@ -128,16 +137,25 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	})
 	defer client.CloseIdleConnections()
 
+	// The lifecycle runtime's module instances close after teardown
+	// (deferred calls run last-in first-out, so before the modules).
+	defer closeAndWarn(p.Warn, "setup/teardown", lc.Close)
 	data, err := lc.Setup(ctx, client, cfg.SetupTimeout)
 	if err != nil {
 		return report.Result{}, err
 	}
 	prog = prog.WithSetupData(data)
 
-	res, runErr := engine.RunScenarios(ctx, engineScenarios(ctx, prog, client, cfg.Scenarios))
+	var vus []*script.VU
+	res, runErr := engine.RunScenarios(ctx, engineScenarios(ctx, prog, client, cfg.Scenarios, &vus))
 	// Read before teardown: a Ctrl+C during teardown does not make the
 	// load phase interrupted.
 	interrupted := ctx.Err() != nil
+	// Every VU goroutine has ended: close the VUs' module instances.
+	for _, vu := range vus {
+		closeAndWarn(p.Warn, fmt.Sprintf("VU %d", vu.ID()), vu.Close)
+	}
+	res.Summary.Families = prog.ModuleFamilies()
 
 	teardownErr := lc.Teardown(teardownContext(ctx), client, cfg.TeardownTimeout, data)
 	if runErr != nil {
@@ -193,7 +211,10 @@ func prepareExecs(prog *script.Program, lc *script.Lifecycle, scenarios []config
 
 // engineScenarios turns the resolved scenarios into engine scenarios. VUs
 // are numbered from 1 across all scenarios, in order, as __VU.
-func engineScenarios(ctx context.Context, prog *script.Program, client *http.Client, scenarios []config.Scenario) []engine.Scenario {
+// engineScenarios builds the engine's scenarios. Every VU created is
+// appended to vus (VUs are created one at a time, before the clock
+// starts), so the runner can close them after the run.
+func engineScenarios(ctx context.Context, prog *script.Program, client *http.Client, scenarios []config.Scenario, vus *[]*script.VU) []engine.Scenario {
 	out := make([]engine.Scenario, len(scenarios))
 	firstVU := 1
 	for i, s := range scenarios {
@@ -210,6 +231,7 @@ func engineScenarios(ctx context.Context, prog *script.Program, client *http.Cli
 				if err != nil {
 					return nil, err
 				}
+				*vus = append(*vus, vu)
 				return vu.Iterate, nil
 			},
 		}
@@ -229,5 +251,18 @@ func executor(s config.Scenario) engine.Executor {
 		return engine.ConstantArrivalRate{Rate: s.Rate, TimeUnit: s.TimeUnit, Duration: s.Duration, PreAllocatedVUs: s.PreAllocatedVUs}
 	default:
 		return engine.ConstantVUs{VUs: s.VUs, Duration: s.Duration}
+	}
+}
+
+// closeTimeout bounds each close step after a run (ADR-018 §4).
+const closeTimeout = 5 * time.Second
+
+// closeAndWarn runs close with a deadline; an error is a warning, not a
+// failed run.
+func closeAndWarn(warn func(string), what string, close func(context.Context) error) {
+	ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
+	defer cancel()
+	if err := close(ctx); err != nil && warn != nil {
+		warn(fmt.Sprintf("closing %s: %v", what, err))
 	}
 }

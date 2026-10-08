@@ -17,6 +17,7 @@ import (
 
 	"github.com/Arunraj-QA/loadtool/internal/httpclient"
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/ws"
 )
 
 func compile(t *testing.T, filename, src string) *Program {
@@ -130,7 +131,7 @@ http.get("http://127.0.0.1:1/"); export default function () {}`, "not allowed in
 func TestTranspileHasNoInteropHelpers(t *testing.T) {
 	code, err := transpile("test.ts", "", []byte(`
 let count: number = 0;
-export default function (): void { count++; }`))
+export default function (): void { count++; }`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -441,7 +442,7 @@ func TestExamplesLoad(t *testing.T) {
 			continue
 		}
 		t.Run(filepath.Base(path), func(t *testing.T) {
-			p, err := Load(path)
+			p, err := Load(path, ws.Module{})
 			if err != nil {
 				t.Fatalf("Load: %v", err)
 			}
@@ -623,7 +624,7 @@ func TestBuiltinModulesAddNoInteropHelpers(t *testing.T) {
 import http, { get } from "loadtool/http";
 import lt from "loadtool";
 export const options = { vus: 1 };
-export default function () { http.get("x"); get("y"); return lt; }`))
+export default function () { http.get("x"); get("y"); return lt; }`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -732,7 +733,7 @@ func TestRelativeImportsAddNoInteropHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := transpile("main.ts", dir, src)
+	code, err := transpile("main.ts", dir, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

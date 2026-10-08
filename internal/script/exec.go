@@ -41,7 +41,7 @@ func (p *Program) WithExecs(names []string) (*Program, error) {
 		}
 	}
 
-	code, err := transpileEntry(p.filename, p.dir, p.src, entryFor(execs))
+	code, err := transpileEntry(p.filename, p.dir, p.src, entryFor(execs), p.mods)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func exportNames(filename, dir string, src []byte) ([]string, error) {
 		Format:        api.FormatESModule,
 		Platform:      api.PlatformNeutral,
 		Target:        api.ES2017,
-		Plugins:       []api.Plugin{scriptPlugin(filename, dir, string(src), loader)},
+		Plugins:       []api.Plugin{scriptPlugin(filename, dir, string(src), loader, nil)},
 		AbsWorkingDir: dir,
 		Outfile:       outfile,
 		Metafile:      true,

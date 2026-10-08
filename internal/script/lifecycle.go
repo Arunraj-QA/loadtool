@@ -184,3 +184,9 @@ func (vu *VU) parseData(data []byte) (goja.Value, error) {
 	}
 	return v, nil
 }
+
+// Close closes the lifecycle runtime's protocol module instances, after
+// teardown.
+func (l *Lifecycle) Close(ctx context.Context) error {
+	return l.vu.Close(ctx)
+}

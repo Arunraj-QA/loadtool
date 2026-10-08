@@ -195,7 +195,7 @@ export default function () {
 // their methods are never built in any VU.
 func TestUnusedHTTPExportsAreDropped(t *testing.T) {
 	code, err := transpile("test.ts", "", []byte(`import { get } from "loadtool/http";
-export default function () { get("http://x"); }`))
+export default function () { get("http://x"); }`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

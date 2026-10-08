@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/Arunraj-QA/loadtool/internal/protocols/ws"
 )
 
 // Every complete script in the documentation (a TypeScript block with
@@ -42,7 +44,7 @@ func TestDocSnippetsLoad(t *testing.T) {
 				if err := os.WriteFile(path, []byte(code), 0o644); err != nil {
 					t.Fatal(err)
 				}
-				p, err := Load(path)
+				p, err := Load(path, ws.Module{})
 				if err != nil {
 					t.Fatalf("Load: %v\n%s", err, code)
 				}

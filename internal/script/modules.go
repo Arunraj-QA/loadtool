@@ -2,7 +2,6 @@ package script
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -62,16 +61,13 @@ func isBuiltinModule(path string) bool {
 	return path == "loadtool" || strings.HasPrefix(path, "loadtool/")
 }
 
-// builtinModuleSource returns the source of a built-in module.
-func builtinModuleSource(path string) (string, error) {
+// builtinModuleSource returns the source of a built-in module; mods (which
+// may be nil) are the protocol modules, listed in the error for an unknown
+// one.
+func builtinModuleSource(path string, mods *moduleSet) (string, error) {
 	src, ok := builtinModules[path]
 	if !ok {
-		names := make([]string, 0, len(builtinModules))
-		for n := range builtinModules {
-			names = append(names, fmt.Sprintf("%q", n))
-		}
-		sort.Strings(names)
-		return "", fmt.Errorf("unknown module %q; built-in modules are %s", path, strings.Join(names, ", "))
+		return "", fmt.Errorf("unknown module %q; built-in modules are %s", path, strings.Join(mods.names(), ", "))
 	}
 	return src, nil
 }
