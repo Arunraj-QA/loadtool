@@ -51,14 +51,14 @@ HTTP path, the VU engine and the scenario engine as they are.
 7. **Errors** are normalized: results carry `error` and `error_code`, HTTP
    responses included (ADR-016).
 
-The design is in ADR-014 to ADR-017; each protocol gets its own ADR
+The design is in ADR-014 to ADR-017 (accepted 2026-10-08); each protocol gets its own ADR
 (ADR-018 WebSocket, ADR-019 gRPC, ADR-020 GraphQL, ADR-021 Kafka) before
 it is implemented.
 
 ### Phase 2 Exit Criteria
 
-**Proposed on 2026-10-08, not yet agreed.** They must be agreed before
-the Phase 2 benchmark run; until then, do not claim Phase 2 is complete.
+Agreed on 2026-10-08, before the Phase 2 benchmark run. Do not claim
+Phase 2 is complete until all four are measured and recorded.
 
 1. **Mixed protocols work end to end:** an example script that uses HTTP
    and WebSocket in the same iteration, and every other Phase 2 example,

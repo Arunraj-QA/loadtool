@@ -1,6 +1,6 @@
 # ADR-016: Normalized errors across protocols
 
-- Status: Proposed (2026-10-08, Phase 2)
+- Status: Accepted (2026-10-08, Phase 2)
 - Date: 2026-10-08
 
 ## Context
