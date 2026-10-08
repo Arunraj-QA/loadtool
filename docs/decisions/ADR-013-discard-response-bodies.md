@@ -53,10 +53,13 @@ script read it. The cost is that of keeping bodies at all.
 4. **`setup` and `teardown` keep bodies, as before** (ADR-008), because
    setup typically reads a token.
 5. **Regression guards:**
-   - `TestDefaultDiscardsLargeBodies` (in `internal/runner`) asserts that
-     bytes allocated per request stay under 64 KiB by default with 1 MB
-     responses, and reach at least 512 KiB when bodies are kept (about
-     8 KB and 1,060 KB when written).
+   - `TestDiscardedBodiesAreNotAllocated` (in `internal/script`) asserts
+     that bytes allocated per iteration stay under 64 KiB with 1 MB
+     responses when bodies are discarded, and reach at least 512 KiB when
+     they are kept. It measures per iteration of an existing VU, because
+     an earlier per-run version counted start-up costs and failed under
+     the race detector in CI. `TestRunAppliesHTTPOptionsAndWarnings` (in
+     `internal/runner`) checks that the default discards end to end.
    - `benchmarks/body-memory.ps1` measures peak process memory against
      the benchmark server's new `GET /api/large`.
 
