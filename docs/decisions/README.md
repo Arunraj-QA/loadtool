@@ -22,6 +22,7 @@ Significant architecture decisions are recorded here as
 | [ADR-015](ADR-015-metric-families.md) | Metric families (Trend, Counter, Rate) for protocols; reports and thresholds | Accepted |
 | [ADR-016](ADR-016-error-normalization.md) | Normalized errors: `error` and `error_code` across protocols | Accepted |
 | [ADR-017](ADR-017-async-model.md) | Asynchronous protocols: blocking calls and session-scoped loops, no global event loop | Accepted |
+| [ADR-018](ADR-018-protocol-architecture.md) | Phase 2 protocol architecture: packages, interfaces, lifecycle, ownership, errors, metrics, cleanup, concurrency | Proposed |
 
 The numbering was reorganized on 2026-09-24 when the records moved from
 `docs/adr/`. Each record lists its previous path.

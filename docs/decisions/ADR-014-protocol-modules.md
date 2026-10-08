@@ -1,6 +1,8 @@
 # ADR-014: Protocol modules and their lifecycle
 
-- Status: Accepted (2026-10-08, Phase 2)
+- Status: Accepted (2026-10-08, Phase 2). Refined by
+  [ADR-018](ADR-018-protocol-architecture.md), which applies where the
+  two differ.
 - Date: 2026-10-08
 
 ## Context

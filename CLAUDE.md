@@ -51,9 +51,10 @@ HTTP path, the VU engine and the scenario engine as they are.
 7. **Errors** are normalized: results carry `error` and `error_code`, HTTP
    responses included (ADR-016).
 
-The design is in ADR-014 to ADR-017 (accepted 2026-10-08); each protocol gets its own ADR
-(ADR-018 WebSocket, ADR-019 gRPC, ADR-020 GraphQL, ADR-021 Kafka) before
-it is implemented.
+The design is in ADR-014 to ADR-017 (accepted 2026-10-08) and the
+consolidated protocol architecture, ADR-018. Each protocol gets its own
+ADR before it is implemented: ADR-019 WebSocket, ADR-020 gRPC, ADR-021
+GraphQL, ADR-022 Kafka.
 
 ### Phase 2 Exit Criteria
 
