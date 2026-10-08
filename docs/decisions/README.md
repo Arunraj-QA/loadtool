@@ -18,6 +18,10 @@ Significant architecture decisions are recorded here as
 | [ADR-011](ADR-011-json-summary.md) | Versioned JSON summary (`--summary-json`) | Accepted |
 | [ADR-012](ADR-012-html-report-and-time-series.md) | HTML report (`--report-html`) and per-second time series | Accepted |
 | [ADR-013](ADR-013-discard-response-bodies.md) | Discard response bodies by default; `responseType` per request | Accepted |
+| [ADR-014](ADR-014-protocol-modules.md) | Protocol modules: interface, explicit registration, run/VU/iteration lifecycle | Proposed |
+| [ADR-015](ADR-015-metric-families.md) | Metric families (Trend, Counter, Rate) for protocols; reports and thresholds | Proposed |
+| [ADR-016](ADR-016-error-normalization.md) | Normalized errors: `error` and `error_code` across protocols | Proposed |
+| [ADR-017](ADR-017-async-model.md) | Asynchronous protocols: blocking calls and session-scoped loops, no global event loop | Proposed |
 
 The numbering was reorganized on 2026-09-24 when the records moved from
 `docs/adr/`. Each record lists its previous path.
