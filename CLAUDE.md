@@ -52,7 +52,7 @@ HTTP path, the VU engine and the scenario engine as they are.
    responses included (ADR-016).
 
 The design is in ADR-014 to ADR-017 (accepted 2026-10-08) and the
-consolidated protocol architecture, ADR-018. Each protocol gets its own
+consolidated protocol architecture, ADR-018 (accepted 2026-10-08). Each protocol gets its own
 ADR before it is implemented: ADR-019 WebSocket, ADR-020 gRPC, ADR-021
 GraphQL, ADR-022 Kafka.
 

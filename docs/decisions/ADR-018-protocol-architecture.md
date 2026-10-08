@@ -1,6 +1,6 @@
 # ADR-018: Phase 2 protocol architecture
 
-- Status: Proposed (2026-10-08, Phase 2)
+- Status: Accepted (2026-10-08, Phase 2)
 - Date: 2026-10-08
 - Builds on: ADR-014 (protocol modules), ADR-015 (metric families),
   ADR-016 (error normalization), ADR-017 (async model)
