@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "loadtool",
+    "version": "v0.0.0-test"
+  },
+  "script": "examples/mixed.ts",
+  "status": "completed",
+  "outcome": {
+    "passed": true,
+    "exitCode": 0,
+    "reasons": []
+  },
+  "startedAt": "",
+  "elapsedMs": 10000,
+  "teardownError": "",
+  "config": {
+    "vus": 10,
+    "durationMs": 10000,
+    "scenarios": []
+  },
+  "metrics": {
+    "http_reqs": {
+      "count": 1000,
+      "rate": 100
+    },
+    "http_req_failed": {
+      "rate": 0,
+      "failed": 0,
+      "count": 1000
+    },
+    "http_req_duration": {
+      "count": 1000,
+      "min": 9,
+      "avg": 11,
+      "max": 30,
+      "p50": 11,
+      "p90": 12,
+      "p95": 13,
+      "p99": 20
+    },
+    "http_req_duration_successful": {
+      "count": 1000,
+      "p50": 11,
+      "p90": 12,
+      "p95": 13,
+      "p99": 20
+    },
+    "iterations": {
+      "count": 120,
+      "rate": 12
+    },
+    "dropped_iterations": {
+      "count": 0,
+      "rate": 0
+    },
+    "checks": {
+      "rate": null,
+      "passes": 0,
+      "fails": 0,
+      "count": 0
+    },
+    "script_errors": {
+      "count": 0,
+      "first": ""
+    },
+    "http_protocols": {
+      "http1": 0,
+      "http2": 0,
+      "other": 0
+    },
+    "ws_connecting": {
+      "kind": "trend",
+      "count": 120,
+      "failed": 2,
+      "min": 0.8,
+      "avg": 1.5,
+      "max": 9,
+      "p50": 1.2,
+      "p90": 2,
+      "p95": 3,
+      "p99": 8
+    },
+    "ws_msgs_sent": {
+      "kind": "counter",
+      "count": 4000,
+      "rate": 400
+    },
+    "ws_session_failed": {
+      "kind": "rate",
+      "rate": 0.016666666666666666,
+      "trues": 2,
+      "count": 120
+    }
+  },
+  "checks": [],
+  "thresholds": [
+    {
+      "metric": "ws_session_failed",
+      "expression": "rate<0.05",
+      "passed": true,
+      "noData": false,
+      "observed": 0.016666666666666666,
+      "unit": "fraction",
+      "approximate": false
+    }
+  ],
+  "series": []
+}

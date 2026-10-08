@@ -1,0 +1,33 @@
+
+LoadTool summary
+
+  Script:      examples/mixed.ts
+  VUs:         10
+  Duration:    10s (elapsed 10.00s)
+  Status:      completed
+
+  Requests:    1,000 (100.0 req/s)
+  Success:     1,000
+  Errors:      0 (0.00%)
+  Script errs: 0
+
+  Thresholds:  1 of 1 passed
+    ✓ ws_session_failed  rate<0.05  observed 0.0167 (1.67%)
+
+  Latency (all requests sent, failed included):
+    min       9.00ms
+    mean     11.00ms
+    p50      11.00ms
+    p90      12.00ms
+    p95      13.00ms
+    p99      20.00ms
+    max      30.00ms
+  Latency (successful requests):
+    p50      11.00ms
+    p90      12.00ms
+    p95      13.00ms
+    p99      20.00ms
+  Protocol metrics:
+    ws_connecting      120 samples, 2 failed  avg=1.50ms p50=1.20ms p95=3.00ms p99=8.00ms max=9.00ms
+    ws_msgs_sent       4,000 (400.0/s)
+    ws_session_failed  1.67% (2 of 120)

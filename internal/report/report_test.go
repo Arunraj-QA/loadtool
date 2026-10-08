@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,6 +92,29 @@ var goldenCases = map[string]Result{
 			SuccessP50: 11 * time.Millisecond, SuccessP90: 12 * time.Millisecond, SuccessP95: 13 * time.Millisecond, SuccessP99: 20 * time.Millisecond,
 		},
 	},
+	// A run mixing HTTP with protocol metric families (ADR-015): used
+	// families are reported, the unused grpc_reqs is left out.
+	"families": {
+		Script: "examples/mixed.ts", VUs: 10, Duration: 10 * time.Second, GracefulStop: 30 * time.Second,
+		Elapsed: 10 * time.Second,
+		Summary: metrics.Summary{
+			Requests: 1000, Successes: 1000, Sent: 1000, Iterations: 120,
+			Min: 9 * time.Millisecond, Mean: 11 * time.Millisecond, Max: 30 * time.Millisecond,
+			P50: 11 * time.Millisecond, P90: 12 * time.Millisecond, P95: 13 * time.Millisecond, P99: 20 * time.Millisecond,
+			SuccessP50: 11 * time.Millisecond, SuccessP90: 12 * time.Millisecond, SuccessP95: 13 * time.Millisecond, SuccessP99: 20 * time.Millisecond,
+			Families: []metrics.FamilySummary{
+				{Name: "ws_connecting", Kind: metrics.Trend, Count: 120, Failed: 2,
+					Min: 800 * time.Microsecond, Mean: 1500 * time.Microsecond, Max: 9 * time.Millisecond,
+					P50: 1200 * time.Microsecond, P90: 2 * time.Millisecond, P95: 3 * time.Millisecond, P99: 8 * time.Millisecond},
+				{Name: "ws_msgs_sent", Kind: metrics.Counter, Count: 4000},
+				{Name: "ws_session_failed", Kind: metrics.Rate, Count: 120, Trues: 2},
+				{Name: "grpc_reqs", Kind: metrics.Counter},
+			},
+		},
+		Thresholds: []thresholds.Result{
+			{Threshold: thresholds.Threshold{Metric: "ws_session_failed", Expr: "rate<0.05"}, Observed: 2.0 / 120, Unit: thresholds.Fraction, Passed: true},
+		},
+	},
 	"interrupted-none-sent": {
 		Script: "examples/basic-http.ts", VUs: 100, Duration: 30 * time.Second, GracefulStop: 30 * time.Second,
 		Elapsed: 2 * time.Second, Interrupted: true,
@@ -103,12 +127,17 @@ var goldenCases = map[string]Result{
 func TestConsoleMatchesGolden(t *testing.T) {
 	for name, r := range goldenCases {
 		t.Run(name, func(t *testing.T) {
+			var got bytes.Buffer
+			Console(&got, r)
+			if *update {
+				if err := os.WriteFile(filepath.Join("testdata", name+".golden"), got.Bytes(), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
 			want, err := os.ReadFile(filepath.Join("testdata", name+".golden"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			var got bytes.Buffer
-			Console(&got, r)
 			if got.String() != string(want) {
 				t.Errorf("output differs from %s.golden\n--- got ---\n%s\n--- want ---\n%s", name, got.String(), want)
 			}
@@ -131,6 +160,11 @@ func TestJSONMatchesGolden(t *testing.T) {
 			}
 			if doc["schemaVersion"] != float64(SchemaVersion) {
 				t.Errorf("schemaVersion = %v", doc["schemaVersion"])
+			}
+			if *update {
+				if err := os.WriteFile(filepath.Join("testdata", name+".json"), got.Bytes(), 0o644); err != nil {
+					t.Fatal(err)
+				}
 			}
 			want, err := os.ReadFile(filepath.Join("testdata", name+".json"))
 			if err != nil {
@@ -162,5 +196,19 @@ func TestFormatDuration(t *testing.T) {
 		if got := formatDuration(d); got != want {
 			t.Errorf("formatDuration(%v) = %q, want %q", d, got, want)
 		}
+	}
+}
+
+// With families, the metrics object is written by its own encoder; text
+// in it is still not HTML-escaped, as in the rest of the document.
+func TestJSONFamiliesKeepTextUnescaped(t *testing.T) {
+	r := goldenCases["families"]
+	r.Summary.FirstScriptError = `Error: a < b && c > d`
+	var b bytes.Buffer
+	if err := JSON(&b, r, "v"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.String(), `"first": "Error: a < b && c > d"`) {
+		t.Errorf("script error was escaped or lost:\n%s", b.String())
 	}
 }

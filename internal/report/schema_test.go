@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -38,8 +39,9 @@ func loadSchema(t *testing.T) map[string]any {
 }
 
 // validate checks doc against schema, supporting the keywords the
-// summary schema uses: type, const, enum, minimum, properties, required,
-// additionalProperties (false), items and local $ref. It returns every
+// summary schema uses: type, const, enum, pattern, minimum, properties,
+// patternProperties, required, additionalProperties (false), anyOf, items
+// and local $ref. It returns every
 // violation, with its JSON path.
 func validate(root, schema map[string]any, doc any, path string) []string {
 	if ref, ok := schema["$ref"].(string); ok {
@@ -48,6 +50,21 @@ func validate(root, schema map[string]any, doc any, path string) []string {
 	}
 	var errs []string
 	fail := func(format string, args ...any) { errs = append(errs, path+": "+fmt.Sprintf(format, args...)) }
+
+	if branches, ok := schema["anyOf"].([]any); ok {
+		var all []string
+		for _, b := range branches {
+			e := validate(root, b.(map[string]any), doc, path)
+			if len(e) == 0 {
+				all = nil
+				break
+			}
+			all = append(all, e...)
+		}
+		if all != nil {
+			fail("matches none of anyOf: %s", strings.Join(all, "; "))
+		}
+	}
 
 	if types, ok := schema["type"]; ok {
 		var allowed []string
@@ -70,6 +87,11 @@ func validate(root, schema map[string]any, doc any, path string) []string {
 	if e, ok := schema["enum"].([]any); ok && !slices.ContainsFunc(e, func(v any) bool { return equal(v, doc) }) {
 		fail("value %v not in %v", doc, e)
 	}
+	if pat, ok := schema["pattern"].(string); ok {
+		if str, isStr := doc.(string); isStr && !regexp.MustCompile(pat).MatchString(str) {
+			fail("value %q does not match %s", str, pat)
+		}
+	}
 	if m, ok := schema["minimum"].(float64); ok {
 		if n, isNum := doc.(float64); isNum && n < m {
 			fail("value %v below the minimum %v", n, m)
@@ -83,15 +105,23 @@ func validate(root, schema map[string]any, doc any, path string) []string {
 				fail("missing required field %q", r)
 			}
 		}
+		patterns, _ := schema["patternProperties"].(map[string]any)
 		for _, k := range sortedKeys(v) {
 			sub, known := props[k]
-			if !known {
-				if schema["additionalProperties"] == false {
-					fail("field %q is not in the schema", k)
-				}
-				continue
+			if known {
+				errs = append(errs, validate(root, sub.(map[string]any), v[k], path+"."+k)...)
 			}
-			errs = append(errs, validate(root, sub.(map[string]any), v[k], path+"."+k)...)
+			// As in JSON Schema, every matching pattern applies too, and
+			// additionalProperties covers keys matched by neither.
+			for pattern, psub := range patterns {
+				if regexp.MustCompile(pattern).MatchString(k) {
+					known = true
+					errs = append(errs, validate(root, psub.(map[string]any), v[k], path+"."+k)...)
+				}
+			}
+			if !known && schema["additionalProperties"] == false {
+				fail("field %q is not in the schema", k)
+			}
 		}
 	case []any:
 		if items, ok := schema["items"].(map[string]any); ok {
@@ -125,9 +155,11 @@ func jsonType(v any) string {
 
 func equal(a, b any) bool { return fmt.Sprint(a) == fmt.Sprint(b) && jsonType(a) == jsonType(b) }
 
+// asStrings returns a list of strings; a missing list (nil) is empty.
 func asStrings(v any) []string {
 	var out []string
-	for _, x := range v.([]any) {
+	list, _ := v.([]any)
+	for _, x := range list {
 		out = append(out, x.(string))
 	}
 	return out
@@ -290,4 +322,40 @@ func TestSchemaRequiresEveryField(t *testing.T) {
 		}
 	}
 	check("$", schema)
+}
+
+// The schema accepts protocol metric families only with a known protocol
+// prefix and the shape their kind declares.
+func TestSchemaChecksFamilies(t *testing.T) {
+	schema := loadSchema(t)
+	golden, err := os.ReadFile("testdata/families.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	metricsOf := func(d map[string]any) map[string]any { return d["metrics"].(map[string]any) }
+	for _, tt := range []struct {
+		name   string
+		mutate func(d map[string]any)
+		want   string
+	}{
+		{"unknown protocol", func(d map[string]any) { metricsOf(d)["smtp_sent"] = metricsOf(d)["ws_msgs_sent"] }, `field "smtp_sent" is not in the schema`},
+		{"wrong kind", func(d map[string]any) { metricsOf(d)["ws_msgs_sent"].(map[string]any)["kind"] = "trend" }, "$.metrics.ws_msgs_sent: matches none of anyOf"},
+		{"missing field", func(d map[string]any) { delete(metricsOf(d)["ws_connecting"].(map[string]any), "p95") }, "$.metrics.ws_connecting: matches none of anyOf"},
+		{"extra field", func(d map[string]any) { metricsOf(d)["ws_session_failed"].(map[string]any)["passes"] = 1.0 }, "$.metrics.ws_session_failed: matches none of anyOf"},
+		{"unused family", func(d map[string]any) {
+			metricsOf(d)["grpc_reqs"] = map[string]any{"kind": "counter", "count": 0.0, "rate": 0.0}
+		}, "$.metrics.grpc_reqs: matches none of anyOf"},
+		{"threshold on an unknown metric", func(d map[string]any) {
+			d["thresholds"].([]any)[0].(map[string]any)["metric"] = "smtp_sent"
+		}, "$.thresholds[0].metric: matches none of anyOf"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := decode(t, golden).(map[string]any)
+			tt.mutate(doc)
+			errs := strings.Join(validate(schema, schema, doc, "$"), "\n")
+			if !strings.Contains(errs, tt.want) {
+				t.Errorf("errors %q, want one containing %q", errs, tt.want)
+			}
+		})
+	}
 }

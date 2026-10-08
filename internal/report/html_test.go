@@ -265,3 +265,25 @@ func TestWriteRetriesWhileTargetIsOpen(t *testing.T) {
 		t.Error("report was not replaced")
 	}
 }
+
+// Used protocol metric families get a table; unused ones and runs without
+// families get none.
+func TestHTMLFamilies(t *testing.T) {
+	out := renderHTML(t, goldenCases["families"])
+	for _, want := range []string{
+		"<h2>Protocol metrics</h2>",
+		"<td><code>ws_connecting</code></td><td>trend</td><td>120 samples, 2 failed  avg=1.50ms p50=1.20ms p95=3.00ms p99=8.00ms max=9.00ms</td>",
+		"<td><code>ws_msgs_sent</code></td><td>counter</td><td>4,000 (400.0/s)</td>",
+		"<td><code>ws_session_failed</code></td><td>rate</td><td>1.67% (2 of 120)</td>",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("report misses %q", want)
+		}
+	}
+	if strings.Contains(out, "grpc_reqs") {
+		t.Error("the unused family is shown")
+	}
+	if strings.Contains(renderHTML(t, goldenCases["completed"]), "Protocol metrics") {
+		t.Error("a run without families shows a protocol metrics table")
+	}
+}

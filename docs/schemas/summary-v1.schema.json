@@ -46,6 +46,11 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["http_reqs", "http_req_failed", "http_req_duration", "http_req_duration_successful", "iterations", "dropped_iterations", "checks", "script_errors", "http_protocols"],
+      "patternProperties": {
+        "^(ws|grpc|graphql|kafka)_[a-z0-9_]+$": {
+          "anyOf": [{ "$ref": "#/$defs/familyTrend" }, { "$ref": "#/$defs/familyCounter" }, { "$ref": "#/$defs/familyRate" }]
+        }
+      },
       "properties": {
         "http_reqs": { "$ref": "#/$defs/counter" },
         "http_req_failed": {
@@ -133,7 +138,12 @@
         "additionalProperties": false,
         "required": ["metric", "expression", "passed", "noData", "observed", "unit", "approximate"],
         "properties": {
-          "metric": { "enum": ["http_req_duration", "http_req_failed", "http_reqs", "checks", "iterations", "dropped_iterations"] },
+          "metric": {
+            "anyOf": [
+              { "enum": ["http_req_duration", "http_req_failed", "http_reqs", "checks", "iterations", "dropped_iterations"] },
+              { "type": "string", "pattern": "^(ws|grpc|graphql|kafka)_[a-z0-9_]+$" }
+            ]
+          },
           "expression": { "type": "string" },
           "passed": { "type": "boolean" },
           "noData": { "type": "boolean" },
@@ -177,6 +187,44 @@
       }
     },
     "fractionOrNull": { "type": ["number", "null"], "minimum": 0 },
+    "familyTrend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "count", "failed", "min", "avg", "max", "p50", "p90", "p95", "p99"],
+      "properties": {
+        "kind": { "const": "trend" },
+        "count": { "type": "integer", "minimum": 1 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "min": { "type": "number", "minimum": 0 },
+        "avg": { "type": "number", "minimum": 0 },
+        "max": { "type": "number", "minimum": 0 },
+        "p50": { "type": "number", "minimum": 0 },
+        "p90": { "type": "number", "minimum": 0 },
+        "p95": { "type": "number", "minimum": 0 },
+        "p99": { "type": "number", "minimum": 0 }
+      }
+    },
+    "familyCounter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "count", "rate"],
+      "properties": {
+        "kind": { "const": "counter" },
+        "count": { "type": "integer", "minimum": 1 },
+        "rate": { "type": "number", "minimum": 0 }
+      }
+    },
+    "familyRate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "rate", "trues", "count"],
+      "properties": {
+        "kind": { "const": "rate" },
+        "rate": { "type": "number", "minimum": 0 },
+        "trues": { "type": "integer", "minimum": 0 },
+        "count": { "type": "integer", "minimum": 1 }
+      }
+    },
     "scenario": {
       "type": "object",
       "additionalProperties": false,

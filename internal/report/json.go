@@ -1,11 +1,13 @@
 package report
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"time"
 
 	"github.com/Arunraj-QA/loadtool/internal/config"
+	"github.com/Arunraj-QA/loadtool/internal/metrics"
 	"github.com/Arunraj-QA/loadtool/internal/thresholds"
 )
 
@@ -113,6 +115,101 @@ type jsonMetrics struct {
 	// HTTPProtocols counts responses by HTTP version (added in Phase 1,
 	// additive).
 	HTTPProtocols jsonProtocols `json:"http_protocols"`
+
+	// families are the used protocol metric families (ADR-015), written
+	// after the fields above, in declaration order (additive).
+	families []jsonFamily
+}
+
+// jsonFamily is one protocol metric family, keyed by its name. Value is
+// a jsonFamilyTrend, jsonFamilyCounter or jsonFamilyRate; each carries
+// its kind, so readers know its shape.
+type jsonFamily struct {
+	name  string
+	value any
+}
+
+type jsonFamilyTrend struct {
+	Kind   string  `json:"kind"` // "trend"
+	Count  int     `json:"count"`
+	Failed int     `json:"failed"`
+	Min    float64 `json:"min"`
+	Avg    float64 `json:"avg"`
+	Max    float64 `json:"max"`
+	P50    float64 `json:"p50"`
+	P90    float64 `json:"p90"`
+	P95    float64 `json:"p95"`
+	P99    float64 `json:"p99"`
+}
+
+type jsonFamilyCounter struct {
+	Kind  string  `json:"kind"` // "counter"
+	Count int     `json:"count"`
+	Rate  float64 `json:"rate"` // per second of elapsed time
+}
+
+// jsonFamilyRate is the fraction of true samples; for a *_failed family
+// true means failed, as http_req_failed.
+type jsonFamilyRate struct {
+	Kind  string  `json:"kind"` // "rate"
+	Rate  float64 `json:"rate"`
+	Trues int     `json:"trues"`
+	Count int     `json:"count"`
+}
+
+// familiesJSON converts the used families; unused ones are left out, so a
+// run without them writes exactly what Phase 1 wrote.
+func familiesJSON(fams []metrics.FamilySummary, perSecond func(int) float64) []jsonFamily {
+	var out []jsonFamily
+	for _, f := range fams {
+		if !f.Used() {
+			continue
+		}
+		var v any
+		switch f.Kind {
+		case metrics.Trend:
+			v = jsonFamilyTrend{Kind: "trend", Count: f.Count, Failed: f.Failed, Min: ms(f.Min), Avg: ms(f.Mean), Max: ms(f.Max),
+				P50: ms(f.P50), P90: ms(f.P90), P95: ms(f.P95), P99: ms(f.P99)}
+		case metrics.Rate:
+			v = jsonFamilyRate{Kind: "rate", Rate: float64(f.Trues) / float64(f.Count), Trues: f.Trues, Count: f.Count}
+		default:
+			v = jsonFamilyCounter{Kind: "counter", Count: f.Count, Rate: perSecond(f.Count)}
+		}
+		out = append(out, jsonFamily{name: f.Name, value: v})
+	}
+	return out
+}
+
+// MarshalJSON writes the fixed metrics, then the families. HTML is not
+// escaped, as in the rest of the document.
+func (m jsonMetrics) MarshalJSON() ([]byte, error) {
+	type fixed jsonMetrics // without this method
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(fixed(m)); err != nil {
+		return nil, err
+	}
+	if len(m.families) == 0 {
+		return bytes.TrimRight(b.Bytes(), "\n"), nil
+	}
+	// Copied: b is reused below, which would overwrite it.
+	fixedJSON := bytes.TrimRight(b.Bytes(), "\n")
+	out := append([]byte(nil), fixedJSON[:len(fixedJSON)-1]...) // without the closing brace
+	for _, f := range m.families {
+		b.Reset()
+		if err := enc.Encode(f.name); err != nil {
+			return nil, err
+		}
+		name := bytes.TrimRight(b.Bytes(), "\n")
+		out = append(append(append(out, ','), name...), ':')
+		b.Reset()
+		if err := enc.Encode(f.value); err != nil {
+			return nil, err
+		}
+		out = append(out, bytes.TrimRight(b.Bytes(), "\n")...)
+	}
+	return append(out, '}'), nil
 }
 
 type jsonProtocols struct {
@@ -247,6 +344,7 @@ func buildJSON(r Result, version string) jsonSummary {
 			Checks:            jsonRate{Rate: fraction(checkPasses, checkTotal), Passes: checkPasses, Fails: checkTotal - checkPasses, Count: checkTotal},
 			ScriptErrors:      jsonScriptErr{Count: s.ScriptErrors, First: s.FirstScriptError},
 			HTTPProtocols:     jsonProtocols{HTTP1: s.Protocols.HTTP1, HTTP2: s.Protocols.HTTP2, Other: s.Protocols.Other},
+			families:          familiesJSON(s.Families, perSecond),
 		},
 		Checks:     checks,
 		Thresholds: make([]jsonThreshold, 0, len(r.Thresholds)),
