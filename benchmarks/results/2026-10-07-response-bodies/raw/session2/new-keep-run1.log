@@ -1,0 +1,26 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\loadtool\large-body-keep.ts
+  VUs:         1000
+  Duration:    30s (elapsed 30.32s)
+  Status:      completed
+
+  Requests:    72,274 (2383.5 req/s)
+  Success:     72,274
+  Errors:      0 (0.00%)
+  Script errs: 0
+
+  Latency (all requests sent, failed included):
+    min      11.90ms
+    mean    406.13ms
+    p50     400.56ms
+    p90     692.06ms
+    p95     801.11ms
+    p99        1.04s
+    max        2.00s
+  Latency (successful requests):
+    p50     400.56ms
+    p90     692.06ms
+    p95     801.11ms
+    p99        1.04s

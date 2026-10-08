@@ -52,7 +52,7 @@ func TestRunOverHTTP2(t *testing.T) {
 			res, err := runTLS(t, `import http from "loadtool/http";
 import { check } from "loadtool";
 export const options = {
-	vus: 4, duration: "300ms", httpVersion: "`+tt.version+`",
+	vus: 4, duration: "300ms", httpVersion: "`+tt.version+`", discardResponseBodies: false,
 	thresholds: { http_req_failed: ["rate==0"], checks: ["rate==1"], http_req_duration: ["p(95)<1000"] },
 };
 export default function () {

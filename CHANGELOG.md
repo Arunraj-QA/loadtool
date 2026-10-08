@@ -9,7 +9,7 @@ does.
 ### Phase 1: core engine
 
 **Script API**
-([Script API](docs/script-api.md), ADR-005, ADR-007, ADR-008, ADR-009, ADR-010):
+([Script API](docs/script-api.md), ADR-005, ADR-007, ADR-008, ADR-009, ADR-010, ADR-013):
 
 - **Breaking for Phase 0 scripts:** `http` is now imported
   (`import http from "loadtool/http"`) instead of being a global. The
@@ -21,6 +21,13 @@ does.
 - **HTTP:**
   - `http.post`, `put`, `patch`, `del` and `request`.
   - Responses with headers, body, `json()`, cookies and the protocol.
+- **Response bodies are discarded by default** (ADR-013), as in Phase 0.
+  - To read them, set `discardResponseBodies: false`, or
+    `responseType: "text"` in one request's params.
+  - Reading a discarded body warns, and `res.json()` throws a
+    `TypeError` that says how to keep it.
+  - Keeping every body had cost about 2 GB at 1,000 VUs with 1 MB
+    responses; see `benchmarks/results/2026-10-07-response-bodies/`.
 - **Assertions and structure:** `check`, `sleep`, `group`; `setup` and
   `teardown`.
 - **Sessions:** a cookie jar per VU, reset each iteration

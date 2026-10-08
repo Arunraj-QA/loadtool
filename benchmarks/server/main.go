@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -36,11 +37,15 @@ const (
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8080", "listen address")
-	delay := flag.Duration("delay", 10*time.Millisecond, "fixed time /api/test waits before responding")
+	delay := flag.Duration("delay", 10*time.Millisecond, "fixed time /api/test and /api/large wait before responding")
+	largeSize := flag.Int("large-size", 1<<20, "size of the /api/large body in bytes")
 	flag.Parse()
 
 	if *delay < 0 {
 		log.Fatal("-delay must not be negative")
+	}
+	if *largeSize < minLargeSize {
+		log.Fatalf("-large-size must be at least %d", minLargeSize)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -50,19 +55,29 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("benchmark server listening on http://%s (GET /api/test delay %s, GET /health)\n", ln.Addr(), *delay)
-	if err := serve(ctx, ln, newMux(*delay)); err != nil {
+	fmt.Printf("benchmark server listening on http://%s (GET /api/test, GET /api/large (%d bytes), delay %s; GET /health)\n", ln.Addr(), *largeSize, *delay)
+	if err := serve(ctx, ln, newMux(*delay, *largeSize)); err != nil {
 		log.Fatal(err)
 	}
 }
 
 // newMux routes the benchmark endpoints. "GET" patterns also answer HEAD,
 // and the mux returns 405 for other methods and 404 for unknown paths.
-func newMux(delay time.Duration) *http.ServeMux {
+func newMux(delay time.Duration, largeSize int) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/test", jsonHandler(testBody, delay))
+	mux.Handle("GET /api/large", jsonHandler(largeBody(largeSize), delay))
 	mux.Handle("GET /health", jsonHandler(healthBody, 0))
 	return mux
+}
+
+// minLargeSize is the smallest /api/large body: {"data":""}.
+const minLargeSize = len(`{"data":""}`)
+
+// largeBody returns a JSON body of exactly size bytes, for measuring what
+// large responses cost a load generator (ADR-013).
+func largeBody(size int) string {
+	return `{"data":"` + strings.Repeat("x", size-minLargeSize) + `"}`
 }
 
 // jsonHandler responds 200 with body after delay. A request cancelled by

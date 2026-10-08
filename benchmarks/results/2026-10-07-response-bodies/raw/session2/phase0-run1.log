@@ -1,0 +1,22 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\results\2026-10-07-response-bodies\raw\large-body-phase0.ts
+  VUs:         1000
+  Duration:    30s (elapsed 30.16s)
+  Status:      completed
+
+  Requests:    130,686 (4333.5 req/s)
+  Success:     126,693
+  Errors:      3,993 (3.06%)
+  Script errs: 3,993
+    first:     Error: status 0 Get "http://127.0.0.1:8080/api/large": dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it. at large_body_phase0_default (large-body-phase0.ts:9:10(21))
+
+  Latency:
+    min       1.82ms
+    mean    187.53ms
+    p50     180.34ms
+    p90     225.31ms
+    p95     252.78ms
+    p99     348.45ms
+    max       28.78s

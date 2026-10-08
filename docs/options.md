@@ -24,7 +24,7 @@ export const options = {
 | `stages` | | Ramping shorthand: `[{ duration: "30s", target: 10 }, ...]` ([Scenarios](#scenarios)) |
 | `scenarios` | | Named workloads ([Scenarios](#scenarios)) |
 | `thresholds` | | Pass/fail criteria ([Thresholds](#thresholds)) |
-| `discardResponseBodies` | `false` | Drop response bodies; `res.body` is `null` |
+| `discardResponseBodies` | `true` | Drop response bodies after reading them; `false` keeps them for `res.body` and `res.json()` ([Script API](script-api.md#responses)) |
 | `noCookiesReset` | `false` | Keep each VU's cookies across iterations ([Script API](script-api.md#cookies-and-sessions)) |
 | `noConnectionReuse` | `false` | Open a new connection for every request |
 | `httpVersion` | `"auto"` | `"auto"`, `"1.1"` or `"2"` ([Script API](script-api.md#http-versions-and-connections)) |

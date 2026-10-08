@@ -15,9 +15,13 @@ declare module "loadtool/http" {
     error: string;
     /** Response headers by canonical name; repeated headers are joined with ", ". */
     headers: Record<string, string>;
-    /** The body, or null when bodies are discarded or no response arrived. */
+    /**
+     * The body, or null when it was discarded or no response arrived.
+     * Bodies are discarded by default: set options.discardResponseBodies
+     * to false, or params.responseType to "text".
+     */
     body: string | null;
-    /** Parse the body as JSON. Throws SyntaxError on invalid JSON. */
+    /** Parse the body as JSON. Throws SyntaxError on invalid JSON, TypeError if the body was discarded. */
     json(): any;
     timings: {
       /** Time from sending the request to reading the whole body, in milliseconds. */
@@ -45,6 +49,11 @@ declare module "loadtool/http" {
     headers?: Record<string, string>;
     /** Cookies to send with this request, in addition to the VU's jar. */
     cookies?: Record<string, string>;
+    /**
+     * "text" keeps this response's body, "none" discards it; unset follows
+     * options.discardResponseBodies (which discards by default).
+     */
+    responseType?: "text" | "none";
   }
 
   /** Request body: a string. Use JSON.stringify(...) to send JSON. */

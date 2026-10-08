@@ -80,9 +80,9 @@ http.post(`${BASE}/api/orders`, JSON.stringify({ productId: 1, quantity: 2 }), {
 
 ([`examples/post-json.ts`](../examples/post-json.ts) checks the response.)
 
-**`params`** is `{ headers: { name: value }, cookies: { name: value } }`.
-Other keys (such as `timeout` or `tags`) produce one warning per run and
-are ignored.
+**`params`** is `{ headers: { name: value }, cookies: { name: value },
+responseType: "text" | "none" }`. Other keys (such as `timeout` or
+`tags`) produce one warning per run and are ignored.
 
 **Requests never throw on network errors.**
 
@@ -100,15 +100,36 @@ are ignored.
 | `proto` | `"HTTP/1.1"` or `"HTTP/2.0"`; `""` without a response |
 | `error` | `""`, or the network error |
 | `headers` | `{ "Content-Type": "..." }`, canonical names; repeated headers joined with `", "` |
-| `body` | The body as a string; `null` if bodies are discarded or nothing arrived |
-| `json()` | The body parsed as JSON; throws `SyntaxError` on invalid JSON |
+| `body` | The body as a string; `null` if it was discarded (the default) or nothing arrived |
+| `json()` | The body parsed as JSON; throws `SyntaxError` on invalid JSON, and `TypeError` if the body was discarded |
 | `timings.duration` | Milliseconds from sending the request to reading the whole body |
 | `url` | The request URL |
 | `cookies` | Cookies this response set: `{ name: [{ name, value, domain, path, expires, max_age, http_only, secure }] }` |
 
-**Bodies are kept by default.** If a test never reads them, set
-`options.discardResponseBodies: true`: it saves an allocation per
-request, and `body` is then `null`.
+**Response bodies are discarded by default.** Each body is read in full
+(so timings include it), then thrown away. That keeps memory flat
+whatever the response size: keeping 1 MB responses at 1,000 VUs needs
+about 2 GB (ADR-013). To read bodies, ask for them:
+
+| To keep | Set |
+|---|---|
+| Every body | `options.discardResponseBodies: false` |
+| One request's body | `responseType: "text"` in that request's params |
+| Not this one, when every body is kept | `responseType: "none"` |
+
+```typescript
+const res = http.get(`${BASE}/api/products/3`, { responseType: "text" });
+check(res, { "right one": (r) => r.json().id === 3 });
+```
+
+**Reading a discarded body:**
+
+- `res.body` is `null`, and LoadTool warns once per run, saying how to
+  keep it.
+- `res.json()` throws a `TypeError` with the same advice, so a check that
+  uses it fails with that message.
+- `status`, `headers`, `cookies` and timings are always available.
+- Bodies in `setup` and `teardown` are always kept.
 
 A request succeeds when it gets a 2xx or 3xx response.
 
@@ -124,6 +145,8 @@ Runs each condition on `value` and counts a pass or fail per name. It
 returns `true` if all passed.
 
 ```typescript
+// The body is kept for this request so the check can read it.
+const res = http.get(`${BASE}/api/products`, { responseType: "text" });
 const ok = check(res, {
   "status is 200": (r) => r.status === 200,
   "has products": (r) => r.json().products.length > 0,

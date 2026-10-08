@@ -3,6 +3,7 @@ package script
 import (
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -105,12 +106,44 @@ export default function () {
 	try {
 		res.json();
 	} catch (e) {
-		if (String(e).includes("discardResponseBodies")) return;
+		// The error says how to keep the body.
+		if (String(e).includes("discardResponseBodies: false") && String(e).includes('responseType: "text"')) return;
 		throw e;
 	}
 	throw new Error("json() did not throw");
 }`)
 	runScript(t, compile(t, "test.ts", src).WithDiscardResponseBodies(true))
+}
+
+// params.responseType overrides options.discardResponseBodies for one
+// request: "text" keeps the body, "none" discards it (ADR-013).
+func TestResponseTypeParam(t *testing.T) {
+	src, _ := server(t, ok, `import http from "loadtool/http";
+export default function () {
+	const kept = http.get("BASE_URL", { responseType: "text" });
+	if (typeof kept.body !== "string") throw new Error("text: body " + kept.body);
+	const dropped = http.get("BASE_URL", { responseType: "none" });
+	if (dropped.body !== null) throw new Error("none: body " + dropped.body);
+	const def = http.get("BASE_URL", { responseType: undefined });
+	if ((def.body === null) !== DISCARD) throw new Error("unset: body " + def.body);
+}`)
+	for _, discard := range []bool{true, false} {
+		code := strings.Replace(src, "DISCARD", strconv.FormatBool(discard), 1)
+		runScript(t, compile(t, "test.ts", code).WithDiscardResponseBodies(discard))
+	}
+}
+
+// An unsupported responseType is a TypeError, and the request is not sent.
+func TestResponseTypeInvalid(t *testing.T) {
+	src, _ := server(t, ok, `import http from "loadtool/http";
+export default function () { http.get("BASE_URL", { responseType: "binary" }); }`)
+	s := iterate(newVU(t, compile(t, "test.ts", src)))
+	if s.ScriptErrors != 1 || !strings.Contains(s.FirstScriptError, `responseType must be "text" or "none", not "binary"`) {
+		t.Fatalf("got %d errors, first %q", s.ScriptErrors, s.FirstScriptError)
+	}
+	if s.Requests != 0 {
+		t.Errorf("Requests = %d, want 0", s.Requests)
+	}
 }
 
 func TestResponseJSONErrors(t *testing.T) {

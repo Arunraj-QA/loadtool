@@ -20,7 +20,8 @@ type Config struct {
 	// may take to finish before they are cancelled.
 	GracefulStop time.Duration
 	// DiscardResponseBodies drops response bodies instead of handing them
-	// to the script.
+	// to the script. It is true unless the script sets
+	// discardResponseBodies: false (ADR-013).
 	DiscardResponseBodies bool
 	// NoCookiesReset keeps each VU's cookies across iterations instead of
 	// starting every iteration with an empty jar (ADR-009).

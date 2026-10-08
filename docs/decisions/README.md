@@ -17,6 +17,7 @@ Significant architecture decisions are recorded here as
 | [ADR-010](ADR-010-http2.md) | HTTP/2: `httpVersion` auto/1.1/2, h2c, `res.proto` | Accepted |
 | [ADR-011](ADR-011-json-summary.md) | Versioned JSON summary (`--summary-json`) | Accepted |
 | [ADR-012](ADR-012-html-report-and-time-series.md) | HTML report (`--report-html`) and per-second time series | Accepted |
+| [ADR-013](ADR-013-discard-response-bodies.md) | Discard response bodies by default; `responseType` per request | Accepted |
 
 The numbering was reorganized on 2026-09-24 when the records moved from
 `docs/adr/`. Each record lists its previous path.
