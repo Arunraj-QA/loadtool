@@ -20,10 +20,62 @@ The long-term goal is to build a differentiated performance-testing platform wit
 
 We are currently implementing:
 
-**Phase 1 — MVP Core Engine**
+**Phase 2 — Protocol Breadth**
 
-Phase 1 extends the Phase 0 engine. Do not rewrite or redesign it: keep
-the Phase 0 components that work and extend them (see `docs/architecture.md`).
+Phase 2 extends the Phase 1 engine. Do not rewrite or redesign it: add
+protocols through the protocol module interface (ADR-014) and keep the
+HTTP path, the VU engine and the scenario engine as they are.
+
+### Phase 2 Goals
+
+1. WebSocket module
+2. gRPC module
+3. GraphQL module
+4. Kafka module
+5. Common protocol module interface
+6. A single test file that mixes HTTP and at least one non-HTTP protocol
+
+### Phase 2 Scope Decisions (agreed 2026-10-08)
+
+1. **GraphQL** calls made with `loadtool/graphql` are counted only under
+   `graphql_*` metrics, never under `http_*`.
+2. **gRPC** is unary only in Phase 2; streaming is later.
+3. **gRPC connections** are one per VU by default; the choice is
+   confirmed by measurement at 1,000 VUs before it is final.
+4. **Kafka** uses one client per run, shared by the VUs.
+5. **Protocol modules are compiled in** and registered explicitly. No
+   runtime or external plugins.
+6. **Asynchronous protocols** use blocking calls with session-scoped
+   loops (WebSocket: `ws.connect(url, params, callback)` blocks until the
+   socket closes, as in k6). No global event loop or Promises.
+7. **Errors** are normalized: results carry `error` and `error_code`, HTTP
+   responses included (ADR-016).
+
+The design is in ADR-014 to ADR-017; each protocol gets its own ADR
+(ADR-018 WebSocket, ADR-019 gRPC, ADR-020 GraphQL, ADR-021 Kafka) before
+it is implemented.
+
+### Phase 2 Exit Criteria
+
+**Proposed on 2026-10-08, not yet agreed.** They must be agreed before
+the Phase 2 benchmark run; until then, do not claim Phase 2 is complete.
+
+1. **Mixed protocols work end to end:** an example script that uses HTTP
+   and WebSocket in the same iteration, and every other Phase 2 example,
+   passes in CI against local targets (`scripts/smoke-examples.sh`), and
+   the GitHub Action self-test passes.
+2. **No HTTP regression:** at 1,000 VUs, with the Phase 1 exit scenario
+   (`benchmarks/measure.ps1`), LoadTool's peak memory and requests per
+   second are within run-to-run variation of the Phase 1 build
+   (`cf35298`), measured in the same session, and memory is still below
+   JMeter's.
+3. **No per-VU cost for unused modules:** an HTTP-only script's retained
+   memory per VU (`BenchmarkVURetainedMemory`) is within run-to-run
+   variation of the Phase 1 build.
+4. **Each protocol is measured at 1,000 VUs** against a local target, and
+   peak memory, throughput and errors are recorded under `benchmarks/`.
+
+## Phase 1 — MVP Core Engine (complete)
 
 ### Phase 1 Goals
 
@@ -135,6 +187,8 @@ Protocols:
 
 * HTTP/1.1 (Phase 0)
 * HTTP/2 (Phase 1)
+* WebSocket, gRPC (unary), GraphQL, Kafka (Phase 2), as protocol modules
+  (ADR-014)
 
 Load model:
 
@@ -155,7 +209,9 @@ License:
 
 ## Important Architecture Principles
 
-1. Keep each phase minimal. Phase 1 extends the Phase 0 engine; do not rewrite it.
+1. Keep each phase minimal. Each phase extends the previous engine; do not
+   rewrite it. Phase 2 adds protocol modules and leaves the HTTP hot path
+   unchanged.
 2. Do not implement distributed execution yet.
 3. Do not implement Kubernetes yet.
 4. Do not implement ClickHouse yet.
