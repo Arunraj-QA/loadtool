@@ -1,7 +1,8 @@
 # Examples
 
-Ten runnable scripts. They all run against the demo API in
-[`server/`](server/), a small shop with products, orders and a login, so
+Eleven runnable scripts. They all run against the demo API in
+[`server/`](server/), a small shop with products, orders, a login and a
+WebSocket echo, so
 you can try every feature without a server of your own. CI runs every
 example on every change (`scripts/smoke-examples.sh`), so they keep
 working.
@@ -25,6 +26,7 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | [`data-driven.ts`](data-driven.ts) | Test data from a JSON file and a shared module ([`lib/api.ts`](lib/api.ts), [`data/products.json`](data/products.json)) |
 | [`scenarios.ts`](scenarios.ts) | Three workloads at once: `constant-vus`, `ramping-vus` and `constant-arrival-rate` (20 s) |
 | [`http2.ts`](http2.ts) | Requiring HTTP/2 with `httpVersion: "2"`, checking `res.proto` |
+| [`websocket.ts`](websocket.ts) | HTTP and WebSocket in one iteration: log in, then send messages and time each reply; WebSocket thresholds |
 
 **By topic:**
 
@@ -40,6 +42,7 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | Ramping VUs | `scenarios.ts` |
 | Constant arrival rate | `scenarios.ts` |
 | HTTP/2 | `http2.ts` |
+| WebSocket | `websocket.ts` |
 | Setup and teardown | `auth-token.ts` |
 
 ## Against your own server
@@ -71,6 +74,7 @@ go run ./examples/server -addr 127.0.0.1:8090 -delay 5ms
 | `POST /api/login` | `{"username": "any", "password": "demo"}` gives `{"username", "token"}` and a `session` cookie; 401 for another password |
 | `GET /api/me` | `{"username"}` from the `session` cookie or `Authorization: Bearer <token>`; 401 without one |
 | `POST /api/logout` | 204; deletes the `session` cookie |
+| `GET /ws/echo` | WebSocket: echoes every message (text or binary) after `-delay` |
 
 **How it behaves:**
 

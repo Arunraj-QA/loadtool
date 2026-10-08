@@ -1,7 +1,8 @@
 // Command server is the demo API the examples run against: a small shop
-// with products, orders and a login. It uses only the standard library,
-// keeps no per-session state (sessions are signed, not stored), so its
-// memory stays flat under load.
+// with products, orders, a login and a WebSocket echo. It uses the
+// standard library and github.com/coder/websocket, and keeps no
+// per-session state (sessions are signed, not stored), so its memory
+// stays flat under load.
 //
 //	go run ./examples/server                  # http://127.0.0.1:8090
 //	go run ./examples/server -addr 127.0.0.1:9000 -delay 20ms
@@ -17,6 +18,8 @@
 //	GET  /api/me               the user of the session cookie or of
 //	                           "Authorization: Bearer <token>"; 401 without one
 //	POST /api/logout           clears the session cookie
+//	GET  /ws/echo              WebSocket: echoes every message, after the
+//	                           -delay (text and binary)
 //
 // It speaks HTTP/1.1 and HTTP/2 without TLS (h2c) on the same port.
 package main
@@ -41,6 +44,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/coder/websocket"
 )
 
 // Password is the one password every demo user has.
@@ -157,6 +162,7 @@ func newAPI(delay time.Duration, s signer) *api { return &api{delay: delay, sign
 
 func (a *api) routes() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /ws/echo", a.wsEcho)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -287,4 +293,29 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Length", strconv.Itoa(len(b)))
 	w.WriteHeader(status)
 	w.Write(b)
+}
+
+// wsEcho echoes every WebSocket message after the -delay, like a backend
+// that answers each request. It ends when the client closes.
+func (a *api) wsEcho(w http.ResponseWriter, r *http.Request) {
+	c, err := websocket.Accept(w, r, nil)
+	if err != nil {
+		return // Accept has answered the request
+	}
+	defer c.CloseNow()
+	// A hijacked connection's request context is not cancelled when the
+	// client goes away; reads fail instead, which ends the loop.
+	ctx := context.Background()
+	for {
+		typ, data, err := c.Read(ctx)
+		if err != nil {
+			return
+		}
+		if a.delay > 0 {
+			time.Sleep(a.delay)
+		}
+		if err := c.Write(ctx, typ, data); err != nil {
+			return
+		}
+	}
 }

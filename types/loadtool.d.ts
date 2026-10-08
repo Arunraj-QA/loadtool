@@ -109,3 +109,61 @@ declare var __ENV: Record<string, string | undefined>;
 declare const __VU: number;
 /** This VU's iteration number, starting at 0. */
 declare const __ITER: number;
+
+declare module "loadtool/ws" {
+  /** The result of a WebSocket session, returned by connect once the socket closed. */
+  export interface Result {
+    /** The handshake's HTTP status: 101 when the connection was upgraded; 0 without a response. */
+    status: number;
+    /** "" or why the session failed. */
+    error: string;
+    /** "" or a normalized category: "dns", "dial", "tls", "timeout", "protocol", "server", "closed" or "invalid". */
+    error_code: string;
+    url: string;
+    timings: {
+      /** The handshake, in milliseconds. */
+      connecting: number;
+      /** From the end of the handshake to the end of the session, in milliseconds. */
+      duration: number;
+    };
+  }
+
+  export interface SendOptions {
+    /** Time this send until the next message received (ws_msg_latency); replies are matched in order. */
+    reply?: boolean;
+  }
+
+  export interface ErrorEvent {
+    error: string;
+    error_code: string;
+  }
+
+  export interface Socket {
+    on(event: "open", handler: () => void): void;
+    on(event: "message", handler: (data: string | ArrayBuffer) => void): void;
+    on(event: "close", handler: (code: number) => void): void;
+    on(event: "error", handler: (e: ErrorEvent) => void): void;
+    /** Sends a text message; returns false if it could not be sent. */
+    send(data: string, options?: SendOptions): boolean;
+    /** Sends a binary message; returns false if it could not be sent. */
+    sendBinary(data: ArrayBuffer, options?: SendOptions): boolean;
+    /** Starts the close handshake (default code 1000). */
+    close(code?: number): void;
+    /** Runs fn once, after ms milliseconds, inside the session. */
+    setTimeout(fn: () => void, ms: number): number;
+    /** Runs fn every ms milliseconds, inside the session. */
+    setInterval(fn: () => void, ms: number): number;
+  }
+
+  export interface Params {
+    /** Headers for the handshake request. The VU's cookies are sent too. */
+    headers?: Record<string, string>;
+  }
+
+  /** Opens a WebSocket session and blocks until it is closed. */
+  export function connect(url: string, params: Params, setup: (socket: Socket) => void): Result;
+  export function connect(url: string, setup: (socket: Socket) => void): Result;
+
+  const ws: { connect: typeof connect };
+  export default ws;
+}

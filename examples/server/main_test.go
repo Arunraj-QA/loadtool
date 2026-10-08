@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/coder/websocket"
 )
 
 func newTestServer(t *testing.T) *httptest.Server {
@@ -152,5 +154,31 @@ func TestServesH2CAndHTTP1(t *testing.T) {
 		if res.Proto != tt.proto || res.StatusCode != 200 {
 			t.Errorf("%s: %s %d, want %s 200", tt.name, res.Proto, res.StatusCode, tt.proto)
 		}
+	}
+}
+
+// /ws/echo echoes text and binary messages.
+func TestWebSocketEcho(t *testing.T) {
+	srv := newTestServer(t)
+	ctx := context.Background()
+	c, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/ws/echo", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.CloseNow()
+	for _, m := range []struct {
+		typ  websocket.MessageType
+		data string
+	}{{websocket.MessageText, "hello"}, {websocket.MessageBinary, "\x01\x02"}} {
+		if err := c.Write(ctx, m.typ, []byte(m.data)); err != nil {
+			t.Fatal(err)
+		}
+		typ, data, err := c.Read(ctx)
+		if err != nil || typ != m.typ || string(data) != m.data {
+			t.Errorf("echo of %q: %v %q %v", m.data, typ, data, err)
+		}
+	}
+	if err := c.Close(websocket.StatusNormalClosure, ""); err != nil {
+		t.Errorf("close: %v", err)
 	}
 }
