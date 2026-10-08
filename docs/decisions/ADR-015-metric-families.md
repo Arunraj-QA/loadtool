@@ -37,7 +37,7 @@ type Def struct {
 |---|---|---|
 | Trend | An ok/failed pair of the existing sharded histograms | `avg`, `min`, `max`, `med`, `p(N)` |
 | Counter | An int64 per recorder | `count`, `rate` (per second) |
-| Rate | Passes and total per recorder | `rate` |
+| Rate | True samples and total. For a `*_failed` family, true means failed, so its rate is the error rate, as with `http_req_failed` | `rate` |
 
 ### 2. Recording
 
@@ -47,7 +47,7 @@ type Def struct {
   no map lookup and no allocation:
   - `rec.Trend(id, d, ok)`;
   - `rec.Add(id, n)`;
-  - `rec.Rate(id, pass)`.
+  - `rec.Rate(id, v)`.
 - **Shards are allocated only for families of imported modules.** That is
   about 0.6 MB per Trend per run, independent of the VU count.
 
@@ -112,3 +112,39 @@ ADR lists its names:
 - **Counting GraphQL as HTTP as well:** rejected. An HTTP 200 with
   GraphQL `errors` would be a success under one metric and a failure
   under another.
+
+## Implementation notes (2026-10-08, Phase 2 step 1)
+
+These details were settled while building the families. They do not
+change the decision.
+
+- **Storage is run-wide.** One `metrics.Families` holds a run's
+  families, and each VU's recorder is pointed at it with `UseFamilies`.
+  - **The engine does not change.** It still creates recorders as
+    before.
+  - **Setup and teardown are left out for free.** Their throwaway
+    recorder has no families, so whatever they record is dropped.
+- **Recording uses the same shards as HTTP.**
+  - Trend shards reuse the HTTP histogram type.
+  - Counters and rates are atomics padded to a cache line, one per
+    shard.
+  - Recording allocates nothing (`TestFamilyRecordingDoesNotAllocate`).
+- **Rate counts true samples.** A Rate's value is the fraction of true
+  samples, so a `*_failed` family records true for a failure, with the
+  meaning `http_req_failed` has. The summary field is `Trues`, and the
+  JSON field is `trues`.
+- **Names:** `metrics.NewFamilies` checks the `<protocol>_<what>` form
+  and rejects the built-in names.
+- **JSON.**
+  - Each family object carries a `kind`.
+  - The schema accepts the prefixes `ws_`, `grpc_`, `graphql_` and
+    `kafka_`. A new protocol adds its prefix to the schema in the same
+    change.
+  - A generic pattern would also match the built-in `http_*` keys, and
+    JSON Schema applies both `properties` and `patternProperties`.
+- **Console.** Families are printed after the HTTP latency, as
+  `p95=3.00ms`. `benchmarks/measure.ps1` reads the first `p95 <value>`,
+  so it can never pick up a family's percentile.
+- **Unchanged output.** Console, JSON and HTML output of a run without
+  families is byte-identical to before; the existing golden files did
+  not change.

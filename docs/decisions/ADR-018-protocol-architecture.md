@@ -298,9 +298,9 @@ Counter and its failure Rate, any of which may be absent.
 
 | Outcome | Trend | Counter | Failure rate |
 |---|---|---|---|
-| Sent, succeeded | `ok` sample | +1 | pass |
-| Sent, failed | `failed` sample | +1 | fail |
-| Not sent (`invalid`) | none: no latency, like `RecordUnsent` | +1 | fail |
+| Sent, succeeded | `ok` sample | +1 | false |
+| Sent, failed | `failed` sample | +1 | true |
+| Not sent (`invalid`) | none: no latency, like `RecordUnsent` | +1 | true |
 | The test ended | nothing | nothing | nothing |
 
 **Metrics (ADR-015):**
