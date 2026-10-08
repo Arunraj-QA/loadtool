@@ -93,6 +93,55 @@ var known = map[string]metric{
 	"dropped_iterations": counter(func(s metrics.Summary) int { return s.DroppedIterations }),
 }
 
+// familyMetric is the metric of a protocol metric family (ADR-015),
+// read from Summary.Families by name. Its aggregates follow its kind.
+func familyMetric(name string, kind metrics.Kind) metric {
+	switch kind {
+	case metrics.Trend:
+		return metric{
+			aggregates: []string{"avg", "min", "max", "med", "p"},
+			value: func(agg string, p float64, s metrics.Summary, _ time.Duration) (float64, bool) {
+				f, ok := s.Family(name)
+				if !ok || f.Count == 0 {
+					return 0, false
+				}
+				var d time.Duration
+				switch agg {
+				case "avg":
+					d = f.Mean
+				case "min":
+					d = f.Min
+				case "max":
+					d = f.Max
+				case "med":
+					d, _ = f.Percentile(50)
+				case "p":
+					d, _ = f.Percentile(p)
+				}
+				return float64(d) / float64(time.Millisecond), true
+			},
+			unit: func(string) Unit { return Milliseconds },
+		}
+	case metrics.Rate:
+		return metric{
+			aggregates: []string{"rate"},
+			value: func(_ string, _ float64, s metrics.Summary, _ time.Duration) (float64, bool) {
+				f, ok := s.Family(name)
+				if !ok || f.Count == 0 {
+					return 0, false
+				}
+				return float64(f.Trues) / float64(f.Count), true
+			},
+			unit: func(string) Unit { return Fraction },
+		}
+	default: // metrics.Counter
+		return counter(func(s metrics.Summary) int {
+			f, _ := s.Family(name)
+			return f.Count
+		})
+	}
+}
+
 // counter is a metric with a total (count) and a per-second rate. A count
 // of zero is data, not "no data".
 func counter(n func(metrics.Summary) int) metric {
@@ -126,20 +175,41 @@ type Threshold struct {
 	p     float64 // the N of p(N)
 	op    string
 	limit float64
+	// kind is the metric family's kind (ADR-015); 0 for a built-in
+	// metric.
+	kind metrics.Kind
+}
+
+// metric returns the metric t is evaluated against.
+func (t Threshold) metric() metric {
+	if t.kind != 0 {
+		return familyMetric(t.Metric, t.kind)
+	}
+	return known[t.Metric]
 }
 
 var exprPattern = regexp.MustCompile(`^\s*(avg|min|max|med|count|rate|p\(\s*([0-9]+(?:\.[0-9]+)?)\s*\))\s*(<=|>=|==|!=|<|>)\s*(-?[0-9]+(?:\.[0-9]+)?)\s*$`)
 
-// Parse parses every expression of every metric. Thresholds are returned
-// by metric name, then in the order the script wrote them. All problems
-// are reported together, each naming its metric and expression.
-func Parse(defs map[string][]string) ([]Threshold, error) {
+// Parse parses every expression of every metric. families are the run's
+// protocol metric families (ADR-015), which thresholds may name besides
+// the built-in metrics. Thresholds are returned by metric name, then in
+// the order the script wrote them. All problems are reported together,
+// each naming its metric and expression.
+func Parse(defs map[string][]string, families ...metrics.Def) ([]Threshold, error) {
+	kinds := make(map[string]metrics.Kind, len(families))
+	for _, f := range families {
+		kinds[f.Name] = f.Kind
+	}
 	var out []Threshold
 	var errs []error
 	for _, name := range slices.Sorted(maps.Keys(defs)) {
 		m, ok := known[name]
+		kind := kinds[name]
+		if !ok && kind != 0 {
+			m, ok = familyMetric(name, kind), true
+		}
 		if !ok {
-			errs = append(errs, unknownMetric(name))
+			errs = append(errs, unknownMetric(name, kinds))
 			continue
 		}
 		for _, expr := range defs[name] {
@@ -148,18 +218,21 @@ func Parse(defs map[string][]string) ([]Threshold, error) {
 				errs = append(errs, fmt.Errorf("options.thresholds.%s: %q: %w", name, expr, err))
 				continue
 			}
+			t.kind = kind
 			out = append(out, t)
 		}
 	}
 	return out, errors.Join(errs...)
 }
 
-func unknownMetric(name string) error {
+func unknownMetric(name string, families map[string]metrics.Kind) error {
 	if strings.Contains(name, "{") {
 		return fmt.Errorf("options.thresholds: %q: thresholds on sub-metrics (tags) are not supported yet", name)
 	}
+	names := slices.Sorted(maps.Keys(known))
+	names = append(names, slices.Sorted(maps.Keys(families))...)
 	return fmt.Errorf("options.thresholds: unknown metric %q; supported metrics are %s",
-		name, strings.Join(slices.Sorted(maps.Keys(known)), ", "))
+		name, strings.Join(names, ", "))
 }
 
 func parseExpr(name string, m metric, expr string) (Threshold, error) {
@@ -220,7 +293,7 @@ const histogramError = 0.0078
 func Evaluate(ts []Threshold, s metrics.Summary, elapsed time.Duration) []Result {
 	out := make([]Result, len(ts))
 	for i, t := range ts {
-		m := known[t.Metric]
+		m := t.metric()
 		r := Result{Threshold: t, Unit: m.unit(t.agg)}
 		v, ok := m.value(t.agg, t.p, s, elapsed)
 		if !ok {
