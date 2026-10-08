@@ -39,6 +39,11 @@ type Recorder struct {
 	checkNames *checkNames
 	checkIndex map[string]int
 	checks     []checkCount
+
+	// fams receives protocol metric families (ADR-015); nil drops them.
+	// shardIndex picks this recorder's family shard.
+	fams       *Families
+	shardIndex int
 }
 
 // NewRecorders returns n Recorders spread over a fixed set of shared
@@ -51,7 +56,7 @@ func NewRecorders(n int) []*Recorder {
 	names := newCheckNames()
 	recs := make([]*Recorder, n)
 	for i := range recs {
-		recs[i] = &Recorder{shard: shards[i%len(shards)], checkNames: names}
+		recs[i] = &Recorder{shard: shards[i%len(shards)], checkNames: names, shardIndex: i % numShards}
 	}
 	return recs
 }
@@ -148,6 +153,11 @@ type Summary struct {
 	// DroppedIterations counts arrival-rate starts no VU was free for.
 	// The engine sets it; recorders do not track it.
 	DroppedIterations int
+
+	// Families are the protocol metric families (ADR-015), in declaration
+	// order; nil when the run has none. The runner sets them from its
+	// Families; Merge does not.
+	Families []FamilySummary
 
 	// latency is the merged histogram of every request sent; nil when
 	// none was. It backs Percentile.
