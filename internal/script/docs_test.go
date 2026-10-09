@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Arunraj-QA/loadtool/internal/protocols/ws"
+	greeterproto "github.com/Arunraj-QA/loadtool/examples/proto"
 )
 
 // Every complete script in the documentation (a TypeScript block with
@@ -40,14 +40,19 @@ func TestDocSnippetsLoad(t *testing.T) {
 			}
 			name := filepath.Base(doc) + "#" + string(rune('a'+i))
 			t.Run(name, func(t *testing.T) {
-				path := filepath.Join(t.TempDir(), "snippet.ts")
+				dir := t.TempDir()
+				path := filepath.Join(dir, "snippet.ts")
 				if err := os.WriteFile(path, []byte(code), 0o644); err != nil {
 					t.Fatal(err)
 				}
-				p, err := Load(path, ws.Module{})
-				if err != nil {
-					t.Fatalf("Load: %v\n%s", err, code)
+				// Snippets load proto/greeter.proto, as the examples do.
+				if err := os.MkdirAll(filepath.Join(dir, "proto"), 0o755); err != nil {
+					t.Fatal(err)
 				}
+				if err := os.WriteFile(filepath.Join(dir, "proto", "greeter.proto"), []byte(greeterproto.Greeter), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				p := loadWithModules(t, path)
 				l, err := p.NewLifecycle(context.Background())
 				if err != nil {
 					t.Fatalf("NewLifecycle: %v", err)

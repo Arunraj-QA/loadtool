@@ -2,6 +2,7 @@ package runner
 
 import (
 	"github.com/Arunraj-QA/loadtool/internal/protocol"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/ws"
 )
 
@@ -9,4 +10,5 @@ import (
 // This is the only place that lists them.
 var modules = []protocol.Module{
 	ws.Module{},
+	grpc.Module{},
 }

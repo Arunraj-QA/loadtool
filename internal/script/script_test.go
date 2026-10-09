@@ -17,6 +17,8 @@ import (
 
 	"github.com/Arunraj-QA/loadtool/internal/httpclient"
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
+	"github.com/Arunraj-QA/loadtool/internal/protocol"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/ws"
 )
 
@@ -442,10 +444,7 @@ func TestExamplesLoad(t *testing.T) {
 			continue
 		}
 		t.Run(filepath.Base(path), func(t *testing.T) {
-			p, err := Load(path, ws.Module{})
-			if err != nil {
-				t.Fatalf("Load: %v", err)
-			}
+			p := loadWithModules(t, path)
 			// As the runner does: init code and options in the lifecycle
 			// runtime, then a VU, unless the example's scenarios only
 			// run named functions.
@@ -949,4 +948,20 @@ export default function () {
 	if s.ScriptErrors != 1 || !strings.Contains(s.FirstScriptError, "second argument must be a function") {
 		t.Fatalf("group without a function: got %q", s.FirstScriptError)
 	}
+}
+
+// loadWithModules loads the script at path with the protocol modules and
+// starts their runs, as the runner does, so top-level module calls (such
+// as client.load) work.
+func loadWithModules(t *testing.T, path string) *Program {
+	t.Helper()
+	p, err := Load(path, ws.Module{}, grpc.Module{})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, err := p.StartModules(protocol.RunEnv{}); err != nil {
+		t.Fatalf("StartModules: %v", err)
+	}
+	t.Cleanup(func() { _ = p.CloseModules(context.Background()) })
+	return p
 }
