@@ -3,6 +3,7 @@ package script
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ import (
 	"github.com/Arunraj-QA/loadtool/internal/protocol"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/graphql"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/kafka"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/ws"
 )
 
@@ -453,8 +455,34 @@ func TestExamplesLoad(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewLifecycle: %v", err)
 			}
-			if _, err := l.Options(); err != nil {
+			opts, err := l.Options()
+			if err != nil {
 				t.Fatalf("Options: %v", err)
+			}
+			// Scenarios' named exec functions are compiled again with
+			// their own entry, which must resolve the same imports.
+			var o struct {
+				Scenarios map[string]struct{ Exec string }
+			}
+			if opts != nil {
+				if err := json.Unmarshal(opts, &o); err != nil {
+					t.Fatalf("options: %v", err)
+				}
+			}
+			var execs []string
+			for _, s := range o.Scenarios {
+				if s.Exec != "" && s.Exec != "default" {
+					execs = append(execs, s.Exec)
+				}
+			}
+			q, err := p.WithExecs(execs)
+			if err != nil {
+				t.Fatalf("WithExecs(%v): %v", execs, err)
+			}
+			for _, exec := range execs {
+				if _, err := q.NewVUExec(context.Background(), 1, exec, http.DefaultClient); err != nil {
+					t.Fatalf("NewVUExec(%s): %v", exec, err)
+				}
 			}
 			if !l.HasDefault() {
 				return
@@ -956,7 +984,7 @@ export default function () {
 // as client.load) work.
 func loadWithModules(t *testing.T, path string) *Program {
 	t.Helper()
-	p, err := Load(path, ws.Module{}, grpc.Module{}, graphql.Module{})
+	p, err := Load(path, ws.Module{}, grpc.Module{}, graphql.Module{}, kafka.Module{})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

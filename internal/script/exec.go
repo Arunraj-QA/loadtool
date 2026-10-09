@@ -31,7 +31,7 @@ func (p *Program) WithExecs(names []string) (*Program, error) {
 	}
 	slices.Sort(execs)
 
-	exports, err := exportNames(p.filename, p.dir, p.src)
+	exports, err := exportNames(p.filename, p.dir, p.src, p.mods)
 	if err != nil {
 		return nil, err
 	}
@@ -75,9 +75,10 @@ func entryFor(execs []string) string {
 	return b.String()
 }
 
-// exportNames lists the script's named exports, from esbuild's metadata
+// exportNames lists the script's named exports (mods are the protocol
+// modules it may import), from esbuild's metadata
 // for a bundle that re-exports them ("export *" leaves out default).
-func exportNames(filename, dir string, src []byte) ([]string, error) {
+func exportNames(filename, dir string, src []byte, mods *moduleSet) ([]string, error) {
 	loader := api.LoaderJS
 	if strings.EqualFold(filepath.Ext(filename), ".ts") {
 		loader = api.LoaderTS
@@ -88,7 +89,7 @@ func exportNames(filename, dir string, src []byte) ([]string, error) {
 		Format:        api.FormatESModule,
 		Platform:      api.PlatformNeutral,
 		Target:        api.ES2017,
-		Plugins:       []api.Plugin{scriptPlugin(filename, dir, string(src), loader, nil)},
+		Plugins:       []api.Plugin{scriptPlugin(filename, dir, string(src), loader, mods)},
 		AbsWorkingDir: dir,
 		Outfile:       outfile,
 		Metafile:      true,
