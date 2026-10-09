@@ -135,6 +135,14 @@ this fail the test.
 | `is a streaming method; use client.stream` | `invoke` on a streaming method | Use `client.stream` |
 | Warning `grpc: a stream was still open when the iteration ended` | A stream was not read to the end or closed | Read until `recv()` returns `null`, or call `stream.close()` |
 
+## GraphQL
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `http_ok` true but `ok` false, `error_code` `server` | The server answered HTTP 200 with GraphQL `errors` | Read `res.errors` (and `res.error`, the first message); `res.data` may hold partial data |
+| `error_code` `protocol` | The response was not GraphQL JSON (an HTML error page, a wrong URL) | Check the endpoint URL |
+| `graphql_reqs` counts but `http_reqs` does not | GraphQL operations are counted under `graphql_*` only | Use `graphql_req_failed` and `graphql_req_duration` in thresholds |
+
 ## Logins and sessions
 
 - **Every iteration logs in again.** Each iteration starts with an empty

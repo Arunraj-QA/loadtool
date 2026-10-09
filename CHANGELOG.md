@@ -29,6 +29,15 @@ does.
   - `grpc_*` metrics in the summary, reports and thresholds.
   - The demo API serves a greeter service on port 8091, and there are two
     examples (`grpc-unary.ts`, `grpc-streaming.ts`).
+- **GraphQL** (`loadtool/graphql`, ADR-021), built on the HTTP
+  transport (the same connections, HTTP/2 and cookies; no second HTTP
+  client):
+  - queries, mutations, variables, headers and a `Client` with default
+    headers;
+  - results separate HTTP success (`http_ok`) from GraphQL success (`ok`),
+    so HTTP 200 with GraphQL errors is a failed operation;
+  - `graphql_*` metrics (not `http_*`).
+  - The demo API serves `/graphql`, and there are three examples.
 - **Protocol modules** (ADR-014 to ADR-018): a common interface and
   lifecycle for protocols, with metric families (ADR-015) and
   normalized error codes (ADR-016).
