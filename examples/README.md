@@ -1,6 +1,6 @@
 # Examples
 
-Twenty-one runnable scripts. They all run against the demo API in
+Twenty-two runnable scripts. They all run against the demo API in
 [`server/`](server/), a small shop with products, orders, a login, a
 WebSocket echo, a gRPC greeter, a GraphQL endpoint and an in-process
 Kafka broker, so
@@ -38,6 +38,7 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | [`kafka-consumer.ts`](kafka-consumer.ts) | Producing and consuming at once (two scenarios), a consumer group, end-to-end latency |
 | [`kafka-throughput.ts`](kafka-throughput.ts) | Batches of 100 messages per call; a threshold on messages per second |
 | [`kafka-errors.ts`](kafka-errors.ts) | Kafka errors in results: an unknown topic, an invalid message, an unreachable broker |
+| [`mixed-protocols.ts`](mixed-protocols.ts) | HTTP, GraphQL, WebSocket, gRPC and Kafka in one iteration: shared setup, checks and thresholds ([how it runs](../docs/mixed-protocols.md)) |
 
 **By topic:**
 
@@ -57,6 +58,7 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | gRPC | `grpc-unary.ts` (`.proto`), `grpc-streaming.ts` (reflection, streams) |
 | GraphQL | `graphql-query.ts`, `graphql-mutation.ts`, `graphql-errors.ts` |
 | Kafka | `kafka-producer.ts`, `kafka-consumer.ts`, `kafka-throughput.ts`, `kafka-errors.ts` |
+| Several protocols in one test | `mixed-protocols.ts` (all five), `websocket.ts` (HTTP + WebSocket) |
 | Setup and teardown | `auth-token.ts` |
 
 ## Against your own server

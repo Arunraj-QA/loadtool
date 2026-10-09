@@ -32,6 +32,7 @@
 | gRPC | [Script API: `loadtool/grpc`](script-api.md#loadtoolgrpc) |
 | GraphQL | [Script API: `loadtool/graphql`](script-api.md#loadtoolgraphql) |
 | Kafka | [Script API: `loadtool/kafka`](script-api.md#loadtoolkafka) |
+| Several protocols in one test | [Mixed-protocol tests](mixed-protocols.md) |
 | JSON reports | [JSON summary](json-summary.md) |
 | HTML reports | [Results: The HTML report](results.md#the-html-report) |
 | CI usage | [CI](ci/README.md) |
