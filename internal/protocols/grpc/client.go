@@ -146,23 +146,29 @@ func (c *client) dial(address string, plaintext, reflect bool, timeout time.Dura
 	return nil, protocol.CodeNone
 }
 
-// waitReady connects and waits for the Ready state. grpc-go retries a
-// failed connection in the background; the first failure is reported
-// rather than waiting out the timeout.
+// waitReady connects and waits for the Ready state, until ctx's deadline.
+// A failed attempt is not final: grpc-go reconnects with backoff, and a
+// burst of VUs connecting at once can see some attempts refused (a full
+// listen backlog) that succeed a moment later. If the deadline passes
+// after a failed attempt, the error is "dial"; otherwise "timeout".
 func waitReady(ctx context.Context, conn *grpc.ClientConn) (error, protocol.ErrorCode) {
 	conn.Connect()
+	failed := false
 	for {
-		switch s := conn.GetState(); s {
+		s := conn.GetState()
+		switch s {
 		case connectivity.Ready:
 			return nil, protocol.CodeNone
-		case connectivity.TransientFailure:
-			return fmt.Errorf("could not connect to %s", conn.Target()), protocol.CodeDial
 		case connectivity.Shutdown:
 			return fmt.Errorf("the connection to %s was closed", conn.Target()), protocol.CodeClosed
-		default:
-			if !conn.WaitForStateChange(ctx, s) {
-				return fmt.Errorf("could not connect to %s: %w", conn.Target(), ctx.Err()), protocol.CodeTimeout
+		case connectivity.TransientFailure:
+			failed = true
+		}
+		if !conn.WaitForStateChange(ctx, s) {
+			if failed {
+				return fmt.Errorf("could not connect to %s: every attempt failed until the connect timeout", conn.Target()), protocol.CodeDial
 			}
+			return fmt.Errorf("could not connect to %s: %w", conn.Target(), ctx.Err()), protocol.CodeTimeout
 		}
 	}
 }

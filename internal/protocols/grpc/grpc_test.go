@@ -203,7 +203,7 @@ var notConnected = unconnected.invoke("greeter.Greeter/SayHello", {});
 `+connectProto+`
 var unknown = client.invoke("greeter.Greeter/Nope", {});
 var badField = client.invoke("greeter.Greeter/SayHello", { nosuchfield: 1 });
-var refused = new grpc.Client().connect("127.0.0.1:1", { plaintext: true, timeout: "3s" });
+var refused = new grpc.Client().connect("127.0.0.1:1", { plaintext: true, timeout: "1s" });
 var res = { nc: notConnected.error_code, unknown: unknown.error_code, bad: badField.error_code,
 	refused: refused.error_code, refusedErr: refused.error };`)
 	for k, want := range map[string]string{"nc": "invalid", "unknown": "invalid", "bad": "invalid", "refused": "dial"} {
@@ -318,4 +318,39 @@ if (n !== 5) throw new Error("stream got " + n);`, "ADDR", addr))
 	}
 	wg.Wait()
 	waitGoroutines(t, before+8)
+}
+
+// A connection refused at first (a server not listening yet, or a full
+// listen backlog when many VUs connect at once) is retried until the
+// connect timeout, not reported at the first failure.
+func TestConnectRetriesUntilTimeout(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	ln.Close() // refused until the server starts below
+	time.AfterFunc(300*time.Millisecond, func() {
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		srv := grpc.NewServer()
+		if err := grpctest.Register(srv, 0); err != nil {
+			t.Error(err)
+			return
+		}
+		go srv.Serve(ln)
+		t.Cleanup(srv.Stop)
+	})
+	h := harness(t)
+	res := run(t, h, addr, `
+var client = new grpc.Client();
+client.load(["."], "greeter.proto");
+var conn = client.connect("ADDR", { plaintext: true, timeout: "10s" });
+var res = { err: conn.error, msg: conn.error === "" ? client.invoke("greeter.Greeter/SayHello", { name: "late" }).message.message : "" };`)
+	if res.Get("err").String() != "" || res.Get("msg").String() != "Hello, late" {
+		t.Errorf("result = %v", res.Export())
+	}
 }
