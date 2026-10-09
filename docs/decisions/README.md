@@ -24,7 +24,7 @@ Significant architecture decisions are recorded here as
 | [ADR-017](ADR-017-async-model.md) | Asynchronous protocols: blocking calls and session-scoped loops, no global event loop | Accepted |
 | [ADR-018](ADR-018-protocol-architecture.md) | Phase 2 protocol architecture: packages, interfaces, lifecycle, ownership, errors, metrics, cleanup, concurrency | Accepted |
 | [ADR-019](ADR-019-websocket.md) | WebSocket module: callback and blocking styles, reply latency, metrics, errors | Accepted |
-| [ADR-020](ADR-020-grpc.md) | gRPC module: grpc-go, protobuf and protocompile; unary and blocking streams; .proto or reflection | Proposed |
+| [ADR-020](ADR-020-grpc.md) | gRPC module: grpc-go, protobuf and protocompile; unary and blocking streams; .proto or reflection | Accepted |
 
 The numbering was reorganized on 2026-09-24 when the records moved from
 `docs/adr/`. Each record lists its previous path.

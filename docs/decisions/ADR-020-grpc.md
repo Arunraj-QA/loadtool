@@ -1,6 +1,7 @@
 # ADR-020: gRPC module
 
-- Status: Proposed (2026-10-09, Phase 2)
+- Status: Accepted (2026-10-09, Phase 2), with the connect-retry
+  amendment
 - Date: 2026-10-09
 - Builds on: ADR-014 to ADR-018 (protocol modules), ADR-016 (errors),
   ADR-017 (blocking calls)
