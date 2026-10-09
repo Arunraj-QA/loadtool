@@ -8,10 +8,14 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/coder/websocket"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	reflectionpb "google.golang.org/grpc/reflection/grpc_reflection_v1"
 )
 
 func newTestServer(t *testing.T) *httptest.Server {
@@ -180,5 +184,41 @@ func TestWebSocketEcho(t *testing.T) {
 	}
 	if err := c.Close(websocket.StatusNormalClosure, ""); err != nil {
 		t.Errorf("close: %v", err)
+	}
+}
+
+// The demo serves the greeter gRPC service, with reflection.
+func TestServeGRPC(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop, err := serveGRPC(ln, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	conn, err := grpc.NewClient(ln.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	stream, err := reflectionpb.NewServerReflectionClient(conn).ServerReflectionInfo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := stream.Send(&reflectionpb.ServerReflectionRequest{MessageRequest: &reflectionpb.ServerReflectionRequest_ListServices{}}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := stream.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, s := range res.GetListServicesResponse().GetService() {
+		names = append(names, s.GetName())
+	}
+	if !slices.Contains(names, "greeter.Greeter") {
+		t.Errorf("services = %v, want greeter.Greeter", names)
 	}
 }

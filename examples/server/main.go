@@ -21,6 +21,9 @@
 //	GET  /ws/echo              WebSocket: echoes every message, after the
 //	                           -delay (text and binary)
 //
+// On -grpc-addr (127.0.0.1:8091) it serves the gRPC greeter service of
+// examples/proto/greeter.proto, with server reflection.
+//
 // It speaks HTTP/1.1 and HTTP/2 without TLS (h2c) on the same port.
 package main
 
@@ -46,6 +49,9 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"google.golang.org/grpc"
+
+	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc/grpctest"
 )
 
 // Password is the one password every demo user has.
@@ -78,7 +84,8 @@ func findProduct(id int) (product, bool) {
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8090", "listen address")
-	delay := flag.Duration("delay", 5*time.Millisecond, "time every /api/ request waits before responding")
+	grpcAddr := flag.String("grpc-addr", "127.0.0.1:8091", "gRPC listen address (greeter service with reflection); empty to turn it off")
+	delay := flag.Duration("delay", 5*time.Millisecond, "time every /api/ request, WebSocket echo and gRPC SayHello waits before answering")
 	flag.Parse()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -89,9 +96,40 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("demo API listening on http://%s (HTTP/1.1 and h2c; /api/ delay %s; password %q)\n", ln.Addr(), *delay, Password)
+	if *grpcAddr != "" {
+		gln, err := net.Listen("tcp", *grpcAddr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		stopGRPC, err := serveGRPC(gln, *delay)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer stopGRPC()
+		fmt.Printf("demo gRPC listening on %s (greeter.Greeter, reflection on)\n", gln.Addr())
+	}
 	if err := serve(ctx, ln, newAPI(*delay, newSigner()).routes()); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// serveGRPC serves the greeter service (examples/proto/greeter.proto, with
+// server reflection) on ln. The returned function stops it, letting calls
+// in progress finish.
+func serveGRPC(ln net.Listener, delay time.Duration) (stop func(), err error) {
+	srv := grpc.NewServer()
+	if err := grpctest.Register(srv, delay); err != nil {
+		return nil, err
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = srv.Serve(ln)
+	}()
+	return func() {
+		srv.GracefulStop()
+		<-done
+	}, nil
 }
 
 // serve runs the server on ln until ctx is done, then shuts it down.

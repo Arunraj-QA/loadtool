@@ -1,8 +1,8 @@
 # Examples
 
-Twelve runnable scripts. They all run against the demo API in
-[`server/`](server/), a small shop with products, orders, a login and a
-WebSocket echo, so
+Fourteen runnable scripts. They all run against the demo API in
+[`server/`](server/), a small shop with products, orders, a login, a
+WebSocket echo and a gRPC greeter, so
 you can try every feature without a server of your own. CI runs every
 example on every change (`scripts/smoke-examples.sh`), so they keep
 working.
@@ -28,6 +28,8 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | [`http2.ts`](http2.ts) | Requiring HTTP/2 with `httpVersion: "2"`, checking `res.proto` |
 | [`websocket.ts`](websocket.ts) | HTTP and WebSocket in one iteration: log in, then send messages and time each reply; WebSocket thresholds |
 | [`websocket-request-reply.ts`](websocket-request-reply.ts) | WebSocket in the blocking style: `connect`, `send`, `receive`, `close` |
+| [`grpc-unary.ts`](grpc-unary.ts) | gRPC unary calls from a `.proto` file ([`proto/greeter.proto`](proto/greeter.proto)): metadata, deadline, checks, thresholds |
+| [`grpc-streaming.ts`](grpc-streaming.ts) | gRPC by server reflection: server, client and bidirectional streams |
 
 **By topic:**
 
@@ -44,6 +46,7 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | Constant arrival rate | `scenarios.ts` |
 | HTTP/2 | `http2.ts` |
 | WebSocket | `websocket.ts` (callbacks), `websocket-request-reply.ts` (blocking) |
+| gRPC | `grpc-unary.ts` (`.proto`), `grpc-streaming.ts` (reflection, streams) |
 | Setup and teardown | `auth-token.ts` |
 
 ## Against your own server
@@ -76,6 +79,7 @@ go run ./examples/server -addr 127.0.0.1:8090 -delay 5ms
 | `GET /api/me` | `{"username"}` from the `session` cookie or `Authorization: Bearer <token>`; 401 without one |
 | `POST /api/logout` | 204; deletes the `session` cookie |
 | `GET /ws/echo` | WebSocket: echoes every message (text or binary) after `-delay` |
+| gRPC on `-grpc-addr` (`127.0.0.1:8091`) | `greeter.Greeter` from `proto/greeter.proto`, with server reflection: `SayHello` (after `-delay`), `LotsOfReplies`, `LotsOfGreetings`, `Chat`, `Fail` |
 
 **How it behaves:**
 

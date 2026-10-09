@@ -203,3 +203,72 @@ declare module "loadtool/websocket" {
   import ws from "loadtool/ws";
   export default ws;
 }
+
+declare module "loadtool/grpc" {
+  export interface CallParams {
+    /** Request metadata (headers). */
+    metadata?: Record<string, string>;
+    /** Deadline: milliseconds, or a duration such as "2s" (default 30 s). For a stream it bounds the whole stream. */
+    timeout?: number | string;
+  }
+
+  export interface ConnectParams {
+    /** Use h2c (gRPC without TLS). Default: TLS, certificates verified. */
+    plaintext?: boolean;
+    /** Describe the server's methods by server reflection instead of a .proto file. */
+    reflect?: boolean;
+    /** Milliseconds or a duration such as "5s" (default 30 s). */
+    timeout?: number | string;
+  }
+
+  export interface Status {
+    /** The gRPC status code: 0 is OK. */
+    status: number;
+    /** Its name, such as "OK" or "NotFound". */
+    status_text: string;
+    /** "" or the status message. */
+    error: string;
+    /** "" or a normalized category: "timeout", "dial", "closed", "server", "invalid", ... */
+    error_code: string;
+  }
+
+  export interface Response extends Status {
+    /** The reply as an object (null when the call failed). */
+    message: any;
+    headers: Record<string, string>;
+    trailers: Record<string, string>;
+    timings: { duration: number };
+  }
+
+  /** A stream in the blocking style; its status fields are final once it ended. */
+  export interface Stream extends Status {
+    closed: boolean;
+    trailers?: Record<string, string>;
+    timings?: { duration: number };
+    /** Sends one message; false once the stream is over. */
+    send(message: object): boolean;
+    /** Ends the client side. */
+    closeSend(): void;
+    /** The next message, or null once the stream ended. */
+    recv(): any | null;
+    /** Cancels the stream if it is still open. */
+    close(): void;
+  }
+
+  export class Client {
+    constructor();
+    /** Parses .proto files (relative to the script); allowed in top-level code. */
+    load(importPaths: string[], ...files: string[]): void;
+    /** Connects and waits until ready; the connection is kept across iterations. */
+    connect(address: string, params?: ConnectParams): { error: string; error_code: string };
+    /** One unary call: "package.Service/Method". */
+    invoke(method: string, request: object, params?: CallParams): Response;
+    /** Opens a stream for a streaming method (server, client or bidirectional). */
+    stream(method: string, params?: CallParams): Stream;
+    close(): void;
+  }
+
+  const grpc: { Client: typeof Client };
+  export default grpc;
+}
+

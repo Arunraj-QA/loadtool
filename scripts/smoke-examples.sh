@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Runs every example against the demo API and fails if one exits
-# non-zero, has script errors, sends no requests (HTTP or WebSocket), has
-# failed requests or WebSocket sessions, or fails a check. CI runs it so
-# the examples keep working.
+# non-zero, has script errors, does nothing (no HTTP requests and no
+# protocol activity), has failed requests or protocol operations (any
+# *_failed metric), or fails a check. CI runs it so the examples keep
+# working.
 #
 #   go run ./examples/server &       # the demo API, on 127.0.0.1:8090
 #   scripts/smoke-examples.sh bin/loadtool
@@ -29,6 +30,8 @@ runs=(
   "http2.ts|--vus 2 --duration 2s"
   "websocket.ts|--vus 2 --duration 2s"
   "websocket-request-reply.ts|--vus 2 --duration 2s"
+  "grpc-unary.ts|--vus 2 --duration 2s"
+  "grpc-streaming.ts|--vus 2 --duration 2s"
   "scenarios.ts|"
 )
 
@@ -59,9 +62,10 @@ for entry in "${runs[@]}"; do
   fi
   problem=$("$jq" -r '
     if .metrics.script_errors.count > 0 then "script errors: \(.metrics.script_errors.first)"
-    elif .metrics.http_reqs.count == 0 and ((.metrics.ws_sessions.count // 0) == 0) then "no requests or sessions"
+    elif .metrics.http_reqs.count == 0 and ([.metrics[] | objects | select(.kind == "counter") | .count] | add // 0) == 0 then "no requests, sessions or calls"
     elif .metrics.http_req_failed.failed > 0 then "failed requests: \(.metrics.http_req_failed.failed)"
-    elif (.metrics.ws_session_failed.trues // 0) > 0 then "failed WebSocket sessions: \(.metrics.ws_session_failed.trues)"
+    elif ([.metrics | to_entries[] | select(.value.kind? == "rate" and (.key | endswith("_failed")) and .value.trues > 0)] | length) > 0
+      then "failures in \([.metrics | to_entries[] | select(.value.kind? == "rate" and (.key | endswith("_failed")) and .value.trues > 0) | .key] | join(", "))"
     elif .metrics.checks.fails > 0 then "failed checks: \([.checks[] | select(.fails > 0) | .name] | join(", "))"
     else "" end' "$summary")
   if [ -n "$problem" ]; then
