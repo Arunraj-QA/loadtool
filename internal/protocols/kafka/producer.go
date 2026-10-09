@@ -55,6 +55,7 @@ func (p *producer) clientFor() (*kgo.Client, error) {
 	opts := append(p.cfg.clientOpts(p.inst.run.env),
 		kgo.ProducerLinger(0),
 		kgo.RecordDeliveryTimeout(p.cfg.timeout),
+		kgo.MetadataMinAge(metadataMinAge(p.cfg.timeout)),
 		kgo.RecordPartitioner(newPartitioner()),
 	)
 	if p.cfg.topic != "" {
@@ -66,6 +67,15 @@ func (p *producer) clientFor() (*kgo.Client, error) {
 	}
 	p.client = cl
 	return cl, nil
+}
+
+// metadataMinAge is how often a producer may refresh metadata: a third of
+// the timeout, so a record waiting on an unknown topic or a moved leader
+// sees a refresh (and reports the broker's error rather than a bare
+// timeout), and at most franz-go's default of 5 s, so the default 30 s
+// timeout keeps the broker load of the default.
+func metadataMinAge(timeout time.Duration) time.Duration {
+	return min(max(timeout/3, 100*time.Millisecond), 5*time.Second)
 }
 
 var errNoValue = errors.New("a message needs a value")
@@ -139,7 +149,9 @@ func (p *producer) produceBatch(list goja.Value) goja.Value {
 func (p *producer) send(msgs []goja.Value) []goja.Value {
 	i := p.inst
 	i.requireIteration("producing")
-	ctx, cancel := context.WithTimeout(i.vu.Context(), p.cfg.timeout)
+	// franz-go's record timeout ends a late produce, with the broker's last
+	// error as its cause; the context is only a backstop, a little later.
+	ctx, cancel := context.WithTimeout(i.vu.Context(), p.cfg.timeout+time.Second)
 	defer cancel()
 
 	results := make([]goja.Value, len(msgs))
@@ -164,11 +176,17 @@ func (p *producer) send(msgs []goja.Value) []goja.Value {
 		}
 		return results
 	}
+	// ProduceSync returns results in the order they complete, not the
+	// order the records were given: match them by record.
+	pos := make(map[*kgo.Record]int, len(records))
+	for j, r := range records {
+		pos[r] = index[j]
+	}
 	start := time.Now()
 	produced := cl.ProduceSync(ctx, records...)
 	d := time.Since(start)
-	for j, pr := range produced {
-		results[index[j]] = p.result(pr.Record, protocol.Outcome{Duration: d, Err: pr.Err, Code: errorCode(pr.Err), Sent: true}, d)
+	for _, pr := range produced {
+		results[pos[pr.Record]] = p.result(pr.Record, protocol.Outcome{Duration: d, Err: pr.Err, Code: errorCode(pr.Err), Sent: true}, d)
 	}
 	return results
 }

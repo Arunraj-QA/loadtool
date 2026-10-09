@@ -108,17 +108,22 @@ var producer = new kafka.Producer({ brokers: BROKERS, topic: "events" });
 var explicit = producer.produce({ value: "x", partition: 2 });
 var a = producer.produce({ key: "same", value: "1" }), b = producer.produce({ key: "same", value: "2" });
 var batch = producer.produceBatch([{ value: "b0" }, { value: "b1" }, { value: "b2", partition: 1 }]);
+// Results come back in the messages' order whatever order the broker
+// acknowledges them in.
+var spread = producer.produceBatch([{ value: "p0", partition: 0 }, { value: "p2", partition: 2 }, { value: "p1", partition: 1 }]);
 var res = {
 	explicit: explicit.partition,
 	sameKey: a.partition === b.partition && b.offset === a.offset + 1,
 	batchOK: batch.length === 3 && batch.every(function (r) { return r.ok; }),
 	batchExplicit: batch[2].partition,
+	spread: spread.map(function (r) { return r.partition; }).join(","),
 };`)
-	if res.Get("explicit").ToInteger() != 2 || !res.Get("sameKey").ToBoolean() || !res.Get("batchOK").ToBoolean() || res.Get("batchExplicit").ToInteger() != 1 {
+	if res.Get("explicit").ToInteger() != 2 || !res.Get("sameKey").ToBoolean() || !res.Get("batchOK").ToBoolean() ||
+		res.Get("batchExplicit").ToInteger() != 1 || res.Get("spread").String() != "0,2,1" {
 		t.Errorf("result = %v", res.Export())
 	}
-	if h.Family(lkafka.MetricMessagesProduced).Count != 6 {
-		t.Errorf("produced = %d, want 6", h.Family(lkafka.MetricMessagesProduced).Count)
+	if h.Family(lkafka.MetricMessagesProduced).Count != 9 {
+		t.Errorf("produced = %d, want 9", h.Family(lkafka.MetricMessagesProduced).Count)
 	}
 }
 
@@ -148,8 +153,12 @@ func TestProduceErrors(t *testing.T) {
 var producer = new kafka.Producer({ brokers: BROKERS, timeout: "3s" });
 function r(x) { return [x.ok, x.error_code].join(","); }
 var unknown = producer.produce({ topic: "no-such-topic", value: "x" });
+// Again, as an iteration later, once the client knows the topic is
+// missing: still the broker's error, not a bare timeout.
+kafka.produce({ brokers: ["127.0.0.1:1"], topic: "orders", value: "x", timeout: "1s" });
+var again = producer.produce({ topic: "no-such-topic", value: "x" });
 var res = {
-	unknown: r(unknown), unknownError: unknown.error,
+	unknown: r(unknown), unknownError: unknown.error, againError: again.error,
 	badPartition: r(producer.produce({ topic: "orders", value: "x", partition: 7 })),
 	noValue: r(producer.produce({ topic: "orders" })),
 	noTopic: r(producer.produce({ value: "x" })),
@@ -162,8 +171,10 @@ var res = {
 			t.Errorf("%s = %q, want %q", k, got, want)
 		}
 	}
-	if !strings.Contains(strings.ToUpper(res.Get("unknownError").String()), "UNKNOWN_TOPIC") {
-		t.Errorf("unknown topic error = %q", res.Get("unknownError"))
+	for _, k := range []string{"unknownError", "againError"} {
+		if !strings.Contains(strings.ToUpper(res.Get(k).String()), "UNKNOWN_TOPIC") {
+			t.Errorf("%s = %q, want the broker's UNKNOWN_TOPIC", k, res.Get(k))
+		}
 	}
 	if got := res.Get("badPartition").String(); !strings.HasPrefix(got, "false,") {
 		t.Errorf("badPartition = %q, want a failure", got)
@@ -171,8 +182,8 @@ var res = {
 	if got := res.Get("unreachable").String(); got != "false,timeout" && got != "false,dial" {
 		t.Errorf("unreachable = %q, want a dial or timeout failure", got)
 	}
-	// Five failures; the two invalid messages have no duration.
-	if f := h.Family(lkafka.MetricProduceFailed); f.Trues != 5 || h.Family(lkafka.MetricMessagesProduced).Count != 0 {
+	// Seven failures; the two invalid messages have no duration.
+	if f := h.Family(lkafka.MetricProduceFailed); f.Trues != 7 || h.Family(lkafka.MetricMessagesProduced).Count != 0 {
 		t.Errorf("failed %d of %d, produced %d", f.Trues, f.Count, h.Family(lkafka.MetricMessagesProduced).Count)
 	}
 }
