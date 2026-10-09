@@ -24,6 +24,10 @@ message HelloRequest {
   string name = 1;
   // How many replies LotsOfReplies sends (default 3).
   int32 count = 2;
+  // If set, a stream ends with this gRPC status code instead of OK: after
+  // its replies (LotsOfReplies), instead of its reply (LotsOfGreetings), or
+  // when this request arrives (Chat). For error tests.
+  int32 fail_code = 3;
 }
 
 message HelloReply {

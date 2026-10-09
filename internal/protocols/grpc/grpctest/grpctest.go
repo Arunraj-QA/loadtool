@@ -59,7 +59,8 @@ func Files() (*protoregistry.Files, error) {
 }
 
 // Register adds the greeter service, and server reflection for it, to srv.
-// Unary SayHello waits delay before answering.
+// SayHello waits delay before answering, and LotsOfReplies before each
+// reply.
 func Register(srv *grpc.Server, delay time.Duration) error {
 	fs, err := Files()
 	if err != nil {
@@ -132,14 +133,8 @@ func (g *greeter) reply(text string, index int) *dynamicpb.Message {
 // sayHello answers "Hello, <name>" after the delay. It echoes the
 // request's x-request-id metadata as a header and sets a trailer.
 func (g *greeter) sayHello(ctx context.Context, req *dynamicpb.Message) (*dynamicpb.Message, error) {
-	if g.delay > 0 {
-		t := time.NewTimer(g.delay)
-		select {
-		case <-t.C:
-		case <-ctx.Done():
-			t.Stop()
-			return nil, status.FromContextError(ctx.Err()).Err()
-		}
+	if err := g.wait(ctx); err != nil {
+		return nil, err
 	}
 	if md, ok := metadata.FromIncomingContext(ctx); ok && len(md.Get("x-request-id")) > 0 {
 		_ = grpc.SetHeader(ctx, metadata.Pairs("x-request-id", md.Get("x-request-id")[0]))
@@ -153,7 +148,16 @@ func (g *greeter) fail(_ context.Context, req *dynamicpb.Message) (*dynamicpb.Me
 	return nil, status.Error(codes.Code(num(req, "code")), str(req, "message"))
 }
 
-// lotsOfReplies sends `count` replies (default 3).
+// failure returns the status a request's fail_code names, or nil.
+func failure(req *dynamicpb.Message) error {
+	if c := num(req, "fail_code"); c != 0 {
+		return status.Errorf(codes.Code(c), "failed as asked (fail_code %d)", c)
+	}
+	return nil
+}
+
+// lotsOfReplies sends `count` replies (default 3), then ends with the
+// request's fail_code status, if any.
 func (g *greeter) lotsOfReplies(_ any, stream grpc.ServerStream) error {
 	req := dynamicpb.NewMessage(g.method("LotsOfReplies").Input())
 	if err := stream.RecvMsg(req); err != nil {
@@ -164,30 +168,42 @@ func (g *greeter) lotsOfReplies(_ any, stream grpc.ServerStream) error {
 		n = 3
 	}
 	for i := range n {
+		if err := g.wait(stream.Context()); err != nil {
+			return err
+		}
 		if err := stream.SendMsg(g.reply(fmt.Sprintf("Hello %d, %s", i, str(req, "name")), i)); err != nil {
 			return err
 		}
 	}
-	return nil
+	return failure(req)
 }
 
-// lotsOfGreetings answers once, naming every request it received.
+// lotsOfGreetings answers once, naming every request it received; a
+// request with fail_code makes it end with that status instead.
 func (g *greeter) lotsOfGreetings(_ any, stream grpc.ServerStream) error {
 	var names []string
+	var fail error
 	for {
 		req := dynamicpb.NewMessage(g.method("LotsOfGreetings").Input())
 		err := stream.RecvMsg(req)
 		if errors.Is(err, io.EOF) {
+			if fail != nil {
+				return fail
+			}
 			return stream.SendMsg(g.reply("Hello, "+strings.Join(names, ", "), len(names)))
 		}
 		if err != nil {
 			return err
 		}
 		names = append(names, str(req, "name"))
+		if fail == nil {
+			fail = failure(req)
+		}
 	}
 }
 
-// chat answers each request as it arrives.
+// chat answers each request as it arrives; a request with fail_code
+// ends the stream with that status.
 func (g *greeter) chat(_ any, stream grpc.ServerStream) error {
 	for i := 0; ; i++ {
 		req := dynamicpb.NewMessage(g.method("Chat").Input())
@@ -198,8 +214,26 @@ func (g *greeter) chat(_ any, stream grpc.ServerStream) error {
 		if err != nil {
 			return err
 		}
+		if err := failure(req); err != nil {
+			return err
+		}
 		if err := stream.SendMsg(g.reply("Hello, "+str(req, "name"), i)); err != nil {
 			return err
 		}
+	}
+}
+
+// wait waits the configured delay, or until the call is cancelled.
+func (g *greeter) wait(ctx context.Context) error {
+	if g.delay <= 0 {
+		return nil
+	}
+	t := time.NewTimer(g.delay)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return status.FromContextError(ctx.Err()).Err()
 	}
 }
