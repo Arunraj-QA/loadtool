@@ -166,3 +166,79 @@ called:
   could deadlock with a full event channel until the 5 s timeout.
 - **`gorilla/websocket`:** usable, but `coder/websocket` takes contexts,
   which cancellation needs.
+
+## Amendment (2026-10-09): the blocking style
+
+Users asked for a request/reply style:
+
+```ts
+const socket = ws.connect(url);
+socket.send("hello");
+const reply = socket.receive(5000);
+socket.close();
+```
+
+It fits the blocking VU model (ADR-017), which has no event loop, so it
+is added next to the callback style rather than replacing it.
+
+### API
+
+**`ws.connect(url, params?)` without a setup function returns a socket
+at once.** Its fields are the result's (`status`, `error`, `error_code`,
+`url`, `timings`) plus `closed`, and they are updated as the session
+goes.
+
+**A failed handshake gives a closed socket with the error.** `send`
+returns `false` and `receive` returns `null`; nothing throws.
+
+**`socket.receive(timeoutMs = 30000)`** returns the next message, a
+string or an `ArrayBuffer`, or `null` when:
+
+- **the timeout passes:** `error_code` becomes `"timeout"` and it counts
+  in `ws_errors`, but the socket stays open;
+- **the socket closes;**
+- **the test ends.**
+
+**`send`, `sendBinary` and `close`** are as in the callback style.
+`close` waits until the socket is closed.
+
+### Latency
+
+**In this style, every send is timed by default** until a later
+`receive` returns a message, matched in order. Opt out with
+`{ reply: false }`.
+
+Calling `receive` is the script saying it expects a reply, so timing by
+default fits this style. The callback style keeps `{ reply: true }` as
+an opt-in, because handlers also see messages the server pushes on its
+own.
+
+### Ownership and cleanup
+
+**A blocking socket belongs to the iteration (or setup, or teardown)
+that opened it,** and is kept in that VU's instance:
+
+- the reader goroutine and the bounded channel are as in the callback
+  style;
+- the script pulls messages with `receive`, instead of an event loop
+  pushing them to handlers.
+
+**A socket the script leaves open is closed when the iteration
+returns,** with a normal close and a once-per-run warning. This needs
+an end-of-iteration hook: `protocol.Instance.EndIteration` (ADR-018
+amendment).
+
+**When the test ends,** sockets close at once and nothing is recorded,
+as in the callback style. `Instance.Close` closes anything still open.
+
+### Name
+
+**`loadtool/websocket` is an alias for `loadtool/ws`,** through the new
+optional `protocol.Aliased` interface. It is one module with one set of
+metrics.
+
+### Not covered
+
+**Choosing a message by content.** `receive` returns the next message;
+a reply that arrives out of order (or a pushed message) is still
+returned next.

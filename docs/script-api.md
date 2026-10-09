@@ -393,6 +393,9 @@ export default function () {
 }
 ```
 
+There are two styles: **callbacks**, below, and a **blocking** style
+([further down](#the-blocking-style)) for request/reply tests.
+
 **`ws.connect(url, params?, setup)` blocks until the socket closes.**
 
 1. It connects (`ws://` or `wss://`).
@@ -459,3 +462,41 @@ the JSON summary and in the HTML report, and thresholds can use them:
 - **Not supported yet:** subprotocols, compression and ping/pong events.
 - **Top-level code:** `ws.connect` is not allowed there, as with HTTP
   requests.
+
+### The blocking style
+
+Leave out the setup function, and `connect` returns a socket you drive
+statement by statement
+([`examples/websocket-request-reply.ts`](../examples/websocket-request-reply.ts)):
+
+```typescript
+import ws from "loadtool/websocket"; // or "loadtool/ws": the same module
+import { check } from "loadtool";
+
+export default function () {
+  const socket = ws.connect("ws://127.0.0.1:8090/ws/echo");
+  socket.send("hello");
+  const response = socket.receive(5000); // the next message, or null
+  check(response, { "message received": (r) => r != null });
+  socket.close();
+}
+```
+
+| Socket | |
+|---|---|
+| `send(text, { reply })`, `sendBinary(buffer, { reply })` | Send; `false` if it could not be sent. Each send is timed until a later `receive` returns a message, unless `reply: false` |
+| `receive(timeoutMs = 30000)` | The next message (string or `ArrayBuffer`), or `null` on a timeout, a close or the end of the test |
+| `close(code = 1000)` | Close and wait until closed |
+| `status`, `error`, `error_code`, `closed`, `url`, `timings` | The session so far |
+
+**How it behaves:**
+
+- **A failed handshake** gives a closed socket with `error` and
+  `error_code`; `send` returns `false` and `receive` returns `null`.
+- **A receive timeout** sets `error_code` to `"timeout"` and counts in
+  `ws_errors`, but the socket stays open.
+- **A socket left open** is closed when the iteration ends, with a
+  warning.
+- **Replies are taken in order:** `receive` returns the next message,
+  whatever it is. For servers that push messages on their own, use the
+  callback style.

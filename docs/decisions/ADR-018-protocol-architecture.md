@@ -465,3 +465,16 @@ tests itself without the rest of LoadTool.
   large refactor of measured code, with no user benefit in Phase 2.
 - **Run-time plugins and a distributed or remote architecture:** out of
   scope (scope decision 5).
+
+## Amendment (2026-10-09)
+
+Added for the WebSocket blocking style (ADR-019 amendment):
+
+- **`Instance.EndIteration()`** is called when an iteration, setup or
+  teardown returns, while its context is still set. A module uses it to
+  release what the script left open in it.
+- **The optional `Aliased` interface** (`Aliases() []string`) lets a
+  module be imported under other names.
+- **`RunEnv.Warn` is once per run,** as documented. The script package
+  now wraps the runner's warning function in its once-per-run warner.
+  Before this, a module warning once per iteration would repeat.

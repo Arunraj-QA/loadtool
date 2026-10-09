@@ -17,6 +17,10 @@ does.
   - It can be mixed with HTTP in one iteration
     (`examples/websocket.ts`), and the demo API has a `/ws/echo`
     endpoint.
+  - A blocking style for request/reply tests: `ws.connect(url)` returns a
+    socket with `send`, `receive(timeout)` and `close`
+    (`examples/websocket-request-reply.ts`).
+  - The module can also be imported as `loadtool/websocket`.
 - **Protocol modules** (ADR-014 to ADR-018): a common interface and
   lifecycle for protocols, with metric families (ADR-015) and
   normalized error codes (ADR-016).

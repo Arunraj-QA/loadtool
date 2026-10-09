@@ -117,7 +117,9 @@ this fail the test.
 | `res.status` is 404 (or another HTTP status) and `error_code` is `server` | The server refused the upgrade at that path | Check the WebSocket path, such as `/ws/echo` |
 | `error_code` `invalid` | The URL is not `ws://` or `wss://` | Use `ws://` (or `wss://` for TLS) |
 | `ws.connect` never returns | Nothing closes the session | Close it in a handler, or add a guard: `socket.setTimeout(() => socket.close(), 5000)` |
-| `ws_msg_latency` has no samples | No send was marked `{ reply: true }` | Mark the sends whose replies you want timed |
+| `ws_msg_latency` has no samples | In the callback style, no send was marked `{ reply: true }` | Mark the sends whose replies you want timed |
+| `socket.receive()` returns `null`, `error_code` `timeout` | No message arrived within the timeout (default 30 s) | Check the server answers that message; raise the timeout if replies are slow |
+| Warning `ws: a socket was still open when the iteration ended` | A blocking-style socket was not closed | Call `socket.close()`; LoadTool closed it for you |
 | `on("error")` with `closed`, close code 1006 | The server dropped the connection without a close frame | Check the server's logs and limits |
 | `thresholds … unknown metric "ws_…"` | The script does not import `loadtool/ws` | WebSocket metrics exist only in scripts that import it |
 
