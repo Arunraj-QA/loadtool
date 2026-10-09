@@ -38,6 +38,16 @@ does.
     so HTTP 200 with GraphQL errors is a failed operation;
   - `graphql_*` metrics (not `http_*`).
   - The demo API serves `/graphql`, and there are three examples.
+- **Kafka** (`loadtool/kafka`, ADR-022), on franz-go:
+  - `Producer` (`produce`, `produceBatch`) and `Consumer` (`consume`),
+    one client per VU, reused across iterations and closed at the end;
+  - keys, headers, explicit partitions, consumer groups, `startAt`;
+  - results with `ok`, `error` and `error_code`, never exceptions;
+  - `kafka_*` metrics: produce duration, end-to-end consume latency,
+    messages produced and consumed, failure rates.
+  - The demo API runs an in-process broker on port 9092, there are four
+    examples, and CI also tests against a real broker in Docker
+    (`testenv/kafka`).
 - **Protocol modules** (ADR-014 to ADR-018): a common interface and
   lifecycle for protocols, with metric families (ADR-015) and
   normalized error codes (ADR-016).

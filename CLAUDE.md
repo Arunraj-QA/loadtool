@@ -44,7 +44,10 @@ HTTP path, the VU engine and the scenario engine as they are.
    the user's request; it was unary only.
 3. **gRPC connections** are one per VU by default; the choice is
    confirmed by measurement at 1,000 VUs before it is final.
-4. **Kafka** uses one client per run, shared by the VUs.
+4. **Kafka** clients are owned by the VU: one per Producer or Consumer
+   (and per configuration for the one-off calls), reused across
+   iterations (ADR-022). Changed on 2026-10-09 by the Kafka
+   requirements (VU-owned client state); it was one client per run.
 5. **Protocol modules are compiled in** and registered explicitly. No
    runtime or external plugins.
 6. **Asynchronous protocols** use blocking calls with session-scoped

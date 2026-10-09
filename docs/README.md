@@ -5,7 +5,7 @@
 | Page | What it covers |
 |---|---|
 | [Getting started](getting-started.md) | Install, a first test, checks, thresholds, result files |
-| [Script API](script-api.md) | `loadtool/http`, responses, `check`/`sleep`/`group`, globals, imports, setup/teardown, cookies, HTTP/2, WebSocket, gRPC, GraphQL |
+| [Script API](script-api.md) | `loadtool/http`, responses, `check`/`sleep`/`group`, globals, imports, setup/teardown, cookies, HTTP/2, WebSocket, gRPC, GraphQL, Kafka |
 | [Options](options.md) | Every option, where settings come from, scenarios and executors, thresholds |
 | [Command line](cli.md) | Flags, environment variables, output, exit codes, Ctrl+C |
 | [Results](results.md) | The summary, what is counted, latency and precision, the time series |
@@ -31,6 +31,7 @@
 | WebSocket | [Script API: `loadtool/ws`](script-api.md#loadtoolws) |
 | gRPC | [Script API: `loadtool/grpc`](script-api.md#loadtoolgrpc) |
 | GraphQL | [Script API: `loadtool/graphql`](script-api.md#loadtoolgraphql) |
+| Kafka | [Script API: `loadtool/kafka`](script-api.md#loadtoolkafka) |
 | JSON reports | [JSON summary](json-summary.md) |
 | HTML reports | [Results: The HTML report](results.md#the-html-report) |
 | CI usage | [CI](ci/README.md) |

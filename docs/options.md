@@ -166,6 +166,7 @@ An expression is `<aggregate> <op> <number>`, with `<`, `<=`, `>`, `>=`,
 | `ws_*` | by kind: trend `avg`, `min`, `max`, `med`, `p(N)`; counter `count`, `rate`; rate `rate` | WebSocket metrics, in scripts that import `loadtool/ws` ([list](script-api.md#loadtoolws)) |
 | `grpc_*` | by kind, as above | gRPC metrics, in scripts that import `loadtool/grpc` ([list](script-api.md#loadtoolgrpc)) |
 | `graphql_*` | by kind, as above | GraphQL metrics, in scripts that import `loadtool/graphql` ([list](script-api.md#loadtoolgraphql)) |
+| `kafka_*` | by kind, as above | Kafka metrics, in scripts that import `loadtool/kafka` ([list](script-api.md#loadtoolkafka)) |
 
 **Rules:**
 

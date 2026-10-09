@@ -26,6 +26,7 @@ Significant architecture decisions are recorded here as
 | [ADR-019](ADR-019-websocket.md) | WebSocket module: callback and blocking styles, reply latency, metrics, errors | Accepted |
 | [ADR-020](ADR-020-grpc.md) | gRPC module: grpc-go, protobuf and protocompile; unary and blocking streams; .proto or reflection | Accepted |
 | [ADR-021](ADR-021-graphql.md) | GraphQL module: HTTP-based (httpclient.Send over the VU's session); HTTP vs GraphQL success | Accepted |
+| [ADR-022](ADR-022-kafka.md) | Kafka module: franz-go (kfake for tests); per-VU producers and consumers; end-to-end consume latency | Proposed |
 
 The numbering was reorganized on 2026-09-24 when the records moved from
 `docs/adr/`. Each record lists its previous path.

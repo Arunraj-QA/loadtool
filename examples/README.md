@@ -1,8 +1,9 @@
 # Examples
 
-Seventeen runnable scripts. They all run against the demo API in
+Twenty-one runnable scripts. They all run against the demo API in
 [`server/`](server/), a small shop with products, orders, a login, a
-WebSocket echo, a gRPC greeter and a GraphQL endpoint, so
+WebSocket echo, a gRPC greeter, a GraphQL endpoint and an in-process
+Kafka broker, so
 you can try every feature without a server of your own. CI runs every
 example on every change (`scripts/smoke-examples.sh`), so they keep
 working.
@@ -33,6 +34,10 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | [`graphql-query.ts`](graphql-query.ts) | GraphQL queries with variables, a client with default headers |
 | [`graphql-mutation.ts`](graphql-mutation.ts) | A GraphQL mutation with variables, after an HTTP login (bearer token header) |
 | [`graphql-errors.ts`](graphql-errors.ts) | GraphQL errors with HTTP 200: `http_ok` true, `ok` false, partial data |
+| [`kafka-producer.ts`](kafka-producer.ts) | A Kafka producer per VU: keys, headers, acknowledgement checks and thresholds |
+| [`kafka-consumer.ts`](kafka-consumer.ts) | Producing and consuming at once (two scenarios), a consumer group, end-to-end latency |
+| [`kafka-throughput.ts`](kafka-throughput.ts) | Batches of 100 messages per call; a threshold on messages per second |
+| [`kafka-errors.ts`](kafka-errors.ts) | Kafka errors in results: an unknown topic, an invalid message, an unreachable broker |
 
 **By topic:**
 
@@ -51,14 +56,17 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | WebSocket | `websocket.ts` (callbacks), `websocket-request-reply.ts` (blocking) |
 | gRPC | `grpc-unary.ts` (`.proto`), `grpc-streaming.ts` (reflection, streams) |
 | GraphQL | `graphql-query.ts`, `graphql-mutation.ts`, `graphql-errors.ts` |
+| Kafka | `kafka-producer.ts`, `kafka-consumer.ts`, `kafka-throughput.ts`, `kafka-errors.ts` |
 | Setup and teardown | `auth-token.ts` |
 
 ## Against your own server
 
-Every example reads `BASE_URL` from the environment:
+Every example reads `BASE_URL` from the environment (the gRPC ones
+`GRPC_ADDR`, and the Kafka ones `KAFKA_BROKERS`, comma-separated):
 
 ```bash
 loadtool run -e BASE_URL=https://staging.example.test examples/basic-http.ts
+loadtool run -e KAFKA_BROKERS=broker1:9092,broker2:9092 examples/kafka-producer.ts
 ```
 
 The paths (`/api/products`, `/api/login`, …) are the demo API's; change
@@ -85,6 +93,7 @@ go run ./examples/server -addr 127.0.0.1:8090 -delay 5ms
 | `GET /ws/echo` | WebSocket: echoes every message (text or binary) after `-delay` |
 | `POST /graphql` | GraphQL (after `-delay`): `products`, `product(id)` (an error for an unknown id), `fail(message)`, mutation `placeOrder(productId, quantity)` |
 | gRPC on `-grpc-addr` (`127.0.0.1:8091`) | `greeter.Greeter` from `proto/greeter.proto`, with server reflection: `SayHello` (after `-delay`), `LotsOfReplies` (each reply after `-delay`), `LotsOfGreetings`, `Chat`, `Fail`; `fail_code` on a streaming request ends the stream with that status |
+| Kafka on `127.0.0.1:` `-kafka-port` (`9092`; `0` turns it off) | An in-process broker (franz-go's kfake, not a real Kafka) with the topics `orders` and `events`, 3 partitions each, in memory. The Kafka examples read `KAFKA_BROKERS` to use a real broker instead (`testenv/kafka/up.sh` starts one in Docker) |
 
 **How it behaves:**
 

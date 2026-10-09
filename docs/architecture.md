@@ -188,11 +188,17 @@ matter:
 | `benchmarks/server` | Deterministic benchmark target (standard library only) | `GET /api/test`, `GET /health` | 113 / 184 |
 | `examples/server` | Demo API the examples run against (standard library and `coder/websocket`) | products, orders, login, `/api/me`, `/ws/echo`; HTTP/1.1 and h2c | 321 / 184 |
 | `internal/protocol` | Protocol module interfaces, error codes, recording helper, `protocoltest` harness (Phase 2, ADR-018) | `Module`, `Run`, `Instance`, `VU`, `Record`, `Classify` | 423 / 161 |
-| `internal/protocols/ws` | WebSocket module (Phase 2, ADR-019) | `ws.connect`, socket handlers and timers | 709 / 454 |
+| `internal/protocols/ws` | WebSocket module (Phase 2, ADR-019) | `ws.connect`, socket handlers and timers | 974 / 663 |
+| `internal/protocols/grpc` | gRPC module on grpc-go (Phase 2, ADR-020) | `grpc.Client`: `load`, `connect`, `invoke`, `stream` | 1191 / 514 |
+| `internal/protocols/graphql` | GraphQL module over the VU's HTTP session (Phase 2, ADR-021) | `graphql.query`, `mutation`, `Client` | 549 / 287 |
+| `internal/protocols/kafka` | Kafka module on franz-go, clients per VU (Phase 2, ADR-022); `kafkatest` runs an in-process broker (kfake) | `kafka.Producer`, `kafka.Consumer`, `produce`, `consume` | 786 / 388 |
 
 External modules: `spf13/cobra` (CLI), `dop251/goja` (JavaScript engine)
-and `evanw/esbuild` (TypeScript transpiling). Everything else is the Go
-standard library.
+and `evanw/esbuild` (TypeScript transpiling), and for the Phase 2
+protocols `coder/websocket`, `google.golang.org/grpc` with `protobuf` and
+`bufbuild/protocompile`, and `twmb/franz-go` (with its `kfake` broker in
+tests and the demo API; `graphql-go/graphql` serves the demo's GraphQL).
+Everything else is the Go standard library.
 
 ## 4. Lifecycle of a run
 

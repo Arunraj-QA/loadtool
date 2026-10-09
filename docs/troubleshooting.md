@@ -143,6 +143,17 @@ this fail the test.
 | `error_code` `protocol` | The response was not GraphQL JSON (an HTML error page, a wrong URL) | Check the endpoint URL |
 | `graphql_reqs` counts but `http_reqs` does not | GraphQL operations are counted under `graphql_*` only | Use `graphql_req_failed` and `graphql_req_duration` in thresholds |
 
+## Kafka
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `producing is not allowed in the script's top-level code` (or `consuming`) | `produce` or `consume` outside an iteration | Create the `Producer`/`Consumer` in top-level code, but call them in the default function (or `setup`/`teardown`) |
+| `error_code` `server`, `UNKNOWN_TOPIC_OR_PARTITION` | The topic does not exist (LoadTool does not create topics) | Create it first (`kafka-topics.sh --create`), or check the name |
+| `error_code` `timeout` or `dial` on every produce | No broker answers at `brokers` | Check the address; a broker in Docker must advertise an address the host can reach (see `testenv/kafka/docker-compose.yml`) |
+| `consume` always returns `[]` | `startAt: "latest"` (the default) reads only messages produced after the consumer joins; or the group already committed the end | Produce while consuming, use `startAt: "earliest"`, or a new `group` |
+| One consumer VU gets messages and the others none | A group has at most one consumer per partition | Give the topic at least as many partitions as consumer VUs |
+| `kafka_consume_latency` is large or negative-looking (clamped to 0) | The producer's and consumer's clocks differ, or the messages were produced before the test | Produce and consume with LoadTool on one machine, or synchronize clocks |
+
 ## Logins and sessions
 
 - **Every iteration logs in again.** Each iteration starts with an empty
