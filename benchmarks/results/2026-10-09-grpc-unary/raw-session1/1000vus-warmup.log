@@ -1,0 +1,19 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\loadtool\grpc-unary.ts
+  VUs:         1000
+  Duration:    10s (elapsed 10.03s)
+  Status:      completed
+
+  Requests:    0 (0.0 req/s)
+  Success:     0
+  Errors:      0 (0.00%)
+  Script errs: 1,830,855
+    first:     Error: connect: could not connect to 127.0.0.1:8091 at grpc_unary_default (grpc-unary.ts:17:33(25))
+
+  Latency:     no requests were sent
+  Protocol metrics:
+    grpc_req_duration  58,024 samples  avg=94.79ms p50=70.78ms p95=283.12ms p99=438.30ms max=1.14s
+    grpc_reqs          1,888,489 (188366.2/s)
+    grpc_req_failed    96.93% (1,830,465 of 1,888,489)

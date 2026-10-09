@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "loadtool",
+    "version": "dev"
+  },
+  "script": "D:\\AI Training\\Claude Workspace\\loadtool\\benchmarks\\loadtool\\grpc-unary.ts",
+  "status": "completed",
+  "outcome": {
+    "passed": true,
+    "exitCode": 0,
+    "reasons": []
+  },
+  "startedAt": "2026-10-09T08:44:56.236Z",
+  "elapsedMs": 10008.9421,
+  "teardownError": "",
+  "config": {
+    "vus": 100,
+    "durationMs": 10000,
+    "scenarios": [
+      {
+        "name": "default",
+        "executor": "constant-vus",
+        "exec": "default",
+        "startTimeMs": 0,
+        "gracefulStopMs": 30000,
+        "vus": 100,
+        "durationMs": 10000
+      }
+    ]
+  },
+  "metrics": {
+    "http_reqs": {
+      "count": 0,
+      "rate": 0
+    },
+    "http_req_failed": {
+      "rate": null,
+      "failed": 0,
+      "count": 0
+    },
+    "http_req_duration": null,
+    "http_req_duration_successful": null,
+    "iterations": {
+      "count": 91933,
+      "rate": 9185.086603708098
+    },
+    "dropped_iterations": {
+      "count": 0,
+      "rate": 0
+    },
+    "checks": {
+      "rate": null,
+      "passes": 0,
+      "fails": 0,
+      "count": 0
+    },
+    "script_errors": {
+      "count": 0,
+      "first": ""
+    },
+    "http_protocols": {
+      "http1": 0,
+      "http2": 0,
+      "other": 0
+    },
+    "grpc_req_duration": {
+      "kind": "trend",
+      "count": 91933,
+      "failed": 0,
+      "min": 10,
+      "avg": 10.824888,
+      "max": 24.7612,
+      "p50": 10.682368,
+      "p90": 11.599872,
+      "p95": 11.862016,
+      "p99": 13.172736
+    },
+    "grpc_reqs": {
+      "kind": "counter",
+      "count": 91933,
+      "rate": 9185.086603708098
+    },
+    "grpc_req_failed": {
+      "kind": "rate",
+      "rate": 0,
+      "trues": 0,
+      "count": 91933
+    }
+  },
+  "checks": [],
+  "thresholds": [],
+  "series": [
+    {
+      "atMs": 1000.7206,
+      "vus": 100,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 2000.7206,
+      "vus": 100,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 3000.7206,
+      "vus": 100,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 4000.7206,
+      "vus": 100,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 5000.7206,
+      "vus": 100,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 6000.7206,
+      "vus": 100,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 7000.7206,
+      "vus": 100,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 8000.7206,
+      "vus": 100,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 9000.7206,
+      "vus": 100,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 10000.7206,
+      "vus": 0,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 10008.9421,
+      "vus": 0,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    }
+  ]
+}

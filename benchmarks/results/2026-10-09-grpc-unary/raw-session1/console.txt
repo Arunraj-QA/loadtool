@@ -1,0 +1,12 @@
+﻿   10 VUs run1  calls/s     902.3  p50 10.944512 p95 11.862016 p99 12.255232 ms  failed 0  peak private 63.1 MB  CPU 3.4%  exit 0
+  100 VUs run1  calls/s    9005.1  p50 10.81344 p95 12.386304 p99 15.007744 ms  failed 0  peak private 88.9 MB  CPU 28.7%  exit 0
+  500 VUs run1  calls/s  139234.6  p50 31.326208 p95 185.597952 p99 354.418688 ms  failed 4070100  peak private 285.2 MB  CPU 53%  exit 0
+ 1000 VUs run1  calls/s   90060.9  p50 74.973184 p95 557.842432 p99 817.88928 ms  failed 2584562  peak private 410.9 MB  CPU 54.6%  exit 0
+   10 VUs run2  calls/s     903.2  p50 10.944512 p95 11.862016 p99 12.386304 ms  failed 0  peak private 64.2 MB  CPU 3.1%  exit 0
+  100 VUs run2  calls/s    9054.2  p50 10.81344 p95 12.12416 p99 13.828096 ms  failed 0  peak private 89.6 MB  CPU 22.4%  exit 0
+  500 VUs run2  calls/s  101142.4  p50 34.865152 p95 196.083712 p99 325.05856 ms  failed 2872568  peak private 251.7 MB  CPU 49.3%  exit 0
+ 1000 VUs run2  calls/s   73428.2  p50 81.26464 p95 608.17408 p99 1019.215872 ms  failed 2093852  peak private 408.3 MB  CPU 47.6%  exit 0
+   10 VUs run3  calls/s     893.5  p50 11.075584 p95 11.993088 p99 12.648448 ms  failed 0  peak private 64 MB  CPU 3.7%  exit 0
+  100 VUs run3  calls/s    9121.6  p50 10.81344 p95 11.862016 p99 13.43488 ms  failed 0  peak private 88.4 MB  CPU 22.5%  exit 0
+  500 VUs run3  calls/s  140831.4  p50 27.918336 p95 177.209344 p99 299.892736 ms  failed 4050191  peak private 243.3 MB  CPU 62.8%  exit 0
+ 1000 VUs run3  calls/s  128174.2  p50 65.798144 p95 480.247808 p99 801.112064 ms  failed 3743152  peak private 307.2 MB  CPU 66.9%  exit 0
