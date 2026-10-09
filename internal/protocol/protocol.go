@@ -30,7 +30,8 @@ type Module interface {
 	// Name is the module's import name, such as "ws".
 	Name() string
 	// Exports are the functions the module object provides; each is also
-	// a named export of the JavaScript module.
+	// a named export of the JavaScript module. A capitalized export (such
+	// as "Client") is a class: scripts may call it with new.
 	Exports() []string
 	// Metrics are the metric families the module records (ADR-015).
 	Metrics() []metrics.Def
@@ -55,8 +56,9 @@ type RunEnv struct {
 	TLS *tls.Config
 	// Warn reports a problem once per run; nil discards it.
 	Warn func(msg string)
-	// MaxVUs is the most VUs the run has at once, for sizing pools.
-	MaxVUs int
+	// Dir is the script's directory, for files the module reads (such as
+	// .proto files); empty when the script was not loaded from a file.
+	Dir string
 }
 
 // Run is a module's state for one test run, shared by its VUs. It must

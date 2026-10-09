@@ -136,6 +136,7 @@ func (p *Program) StartModules(env protocol.RunEnv) ([]metrics.Def, error) {
 	}
 	env.Families = fams
 	env.Warn = p.warn.once // once per run, however many VUs report it
+	env.Dir = p.dir
 	for i, m := range ms.all {
 		if !ms.imported[i] {
 			continue
@@ -176,11 +177,19 @@ func (p *Program) CloseModules(ctx context.Context) error {
 
 // newModuleObject builds the module object of module i in this VU: one
 // function per export, each calling into the VU's instance (see
-// callModule). It is built on first access, like every builtin module.
+// callModule). A capitalized export is a class (new grpc.Client()), built
+// with goja's constructor form. The object is built on first access, like
+// every builtin module.
 func (vu *VU) newModuleObject(i int) goja.Value {
 	m := vu.mods.all[i]
 	props := make([]lazyProp, 0, len(m.Exports()))
 	for _, e := range m.Exports() {
+		if isClassName(e) {
+			props = append(props, lazyProp{e, func(vu *VU) goja.Value {
+				return vu.rt.ToValue(func(call goja.ConstructorCall) *goja.Object { return vu.constructModule(i, e, call) })
+			}})
+			continue
+		}
 		props = append(props, lazyProp{e, func(vu *VU) goja.Value {
 			return vu.rt.ToValue(func(call goja.FunctionCall) goja.Value { return vu.callModule(i, e, call) })
 		}})
@@ -188,14 +197,16 @@ func (vu *VU) newModuleObject(i int) goja.Value {
 	return vu.newLazyObject(props)
 }
 
-// callModule calls export name of module i on this VU's instance,
-// creating the instance on first use.
-func (vu *VU) callModule(i int, name string, call goja.FunctionCall) goja.Value {
+func isClassName(name string) bool { return name != "" && name[0] >= 'A' && name[0] <= 'Z' }
+
+// instanceFor returns this VU's instance of module i, creating it on first
+// use.
+func (vu *VU) instanceFor(i int) protocol.Instance {
 	inst := vu.insts[i]
 	if inst == nil {
 		run := vu.mods.runs[i]
 		if run == nil {
-			panic(vu.rt.NewGoError(fmt.Errorf("loadtool/%s cannot be used before the test starts (in the script's top-level code)", vu.mods.all[i].Name())))
+			panic(vu.rt.NewGoError(fmt.Errorf("loadtool/%s cannot be used before the test starts", vu.mods.all[i].Name())))
 		}
 		var err error
 		if inst, err = run.NewInstance(vu); err != nil {
@@ -203,6 +214,27 @@ func (vu *VU) callModule(i int, name string, call goja.FunctionCall) goja.Value 
 		}
 		vu.insts[i] = inst
 	}
+	return inst
+}
+
+// constructModule builds class name of module i, with or without new.
+func (vu *VU) constructModule(i int, name string, call goja.ConstructorCall) *goja.Object {
+	inst := vu.instanceFor(i)
+	ctor, ok := goja.AssertConstructor(inst.Value().ToObject(vu.rt).Get(name))
+	if !ok {
+		panic(vu.rt.NewTypeError("loadtool/%s has no class %s", vu.mods.all[i].Name(), name))
+	}
+	obj, err := ctor(nil, call.Arguments...)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// callModule calls export name of module i on this VU's instance,
+// creating the instance on first use.
+func (vu *VU) callModule(i int, name string, call goja.FunctionCall) goja.Value {
+	inst := vu.instanceFor(i)
 	fn, ok := goja.AssertFunction(inst.Value().ToObject(vu.rt).Get(name))
 	if !ok {
 		panic(vu.rt.NewTypeError("loadtool/%s has no function %s", vu.mods.all[i].Name(), name))

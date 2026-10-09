@@ -47,7 +47,7 @@ func New(t testing.TB, m protocol.Module, opts ...Option) *Harness {
 		t.Fatalf("metric families: %v", err)
 	}
 	vu := NewVU(1)
-	env := protocol.RunEnv{Families: fams, Warn: vu.Warn, MaxVUs: 1}
+	env := protocol.RunEnv{Families: fams, Warn: vu.Warn}
 	for _, o := range opts {
 		o(&env)
 	}

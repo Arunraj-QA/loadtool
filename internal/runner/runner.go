@@ -80,6 +80,14 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	}
 	// Before reading options, so options can use __ENV too.
 	prog = prog.WithEnv(p.Env).WithConsole(p.Console).WithWarn(p.Warn)
+	// Protocol modules the script imports start before its top-level code
+	// runs (it may call them, as client.load does), and before thresholds
+	// are parsed, so thresholds can name their metric families (ADR-015).
+	families, err := prog.StartModules(protocol.RunEnv{TLS: p.TLSConfig})
+	if err != nil {
+		return report.Result{}, err
+	}
+	defer closeAndWarn(p.Warn, "protocol modules", prog.CloseModules)
 
 	// The lifecycle runtime runs the top-level code once, then options,
 	// setup and teardown.
@@ -107,13 +115,6 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 		return report.Result{}, err
 	}
 	// Parsed now, so a typo fails before setup or any load.
-	// Protocol modules the script imports start before thresholds are
-	// parsed, so thresholds can name their metric families (ADR-015).
-	families, err := prog.StartModules(protocol.RunEnv{TLS: p.TLSConfig, Warn: p.Warn, MaxVUs: cfg.VUs})
-	if err != nil {
-		return report.Result{}, err
-	}
-	defer closeAndWarn(p.Warn, "protocol modules", prog.CloseModules)
 	ths, err := thresholds.Parse(opts.Thresholds, families...)
 	if err != nil {
 		return report.Result{}, err
