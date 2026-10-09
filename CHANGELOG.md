@@ -48,6 +48,13 @@ does.
   - The demo API runs an in-process broker on port 9092, there are four
     examples, and CI also tests against a real broker in Docker
     (`testenv/kafka`).
+- **Mixed-protocol tests:** `examples/mixed-protocols.ts` uses HTTP,
+  GraphQL, WebSocket, gRPC and Kafka in one iteration, with shared setup,
+  checks, thresholds and reports. An end-to-end test runs it, and covers
+  cancellation and per-VU state. `docs/mixed-protocols.md` describes the
+  execution flow.
+- **Fixed:** a script whose scenarios name `exec` functions could not
+  import protocol modules.
 - **Protocol modules** (ADR-014 to ADR-018): a common interface and
   lifecycle for protocols, with metric families (ADR-015) and
   normalized error codes (ADR-016).
