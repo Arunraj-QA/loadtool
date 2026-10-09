@@ -1,6 +1,6 @@
 # ADR-021: GraphQL module
 
-- Status: Proposed (2026-10-09, Phase 2)
+- Status: Accepted (2026-10-09, Phase 2)
 - Date: 2026-10-09
 - Builds on: ADR-014 to ADR-018 (protocol modules), ADR-009 (sessions),
   ADR-010 (HTTP/2), ADR-016 (errors)
