@@ -183,7 +183,16 @@ from the `.proto` fixture `examples/proto/greeter.proto`. It uses
 - server-streaming `LotsOfReplies`;
 - client-streaming `LotsOfGreetings`;
 - bidirectional `Chat`;
-- `Fail`, which returns any status the request names, for error tests.
+- `Fail`, which returns any status the request names, for error tests;
+- `fail_code` on a streaming request, which makes the stream end with
+  that status;
+- the server's `-delay`, before each `SayHello` reply and each
+  `LotsOfReplies` reply, for timeout tests.
+
+**Coverage.** Every call kind (unary, server, client, bidirectional) is
+tested with `.proto` files and with reflection, and with an error status,
+a deadline and cancellation. Most of this is in
+`internal/protocols/grpc/matrix_test.go`.
 
 **Reflection is enabled** through grpc-go's `reflection.NewServerV1`,
 with the fixture's descriptors as its resolver.

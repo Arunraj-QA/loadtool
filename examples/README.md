@@ -79,7 +79,7 @@ go run ./examples/server -addr 127.0.0.1:8090 -delay 5ms
 | `GET /api/me` | `{"username"}` from the `session` cookie or `Authorization: Bearer <token>`; 401 without one |
 | `POST /api/logout` | 204; deletes the `session` cookie |
 | `GET /ws/echo` | WebSocket: echoes every message (text or binary) after `-delay` |
-| gRPC on `-grpc-addr` (`127.0.0.1:8091`) | `greeter.Greeter` from `proto/greeter.proto`, with server reflection: `SayHello` (after `-delay`), `LotsOfReplies`, `LotsOfGreetings`, `Chat`, `Fail` |
+| gRPC on `-grpc-addr` (`127.0.0.1:8091`) | `greeter.Greeter` from `proto/greeter.proto`, with server reflection: `SayHello` (after `-delay`), `LotsOfReplies` (each reply after `-delay`), `LotsOfGreetings`, `Chat`, `Fail`; `fail_code` on a streaming request ends the stream with that status |
 
 **How it behaves:**
 
