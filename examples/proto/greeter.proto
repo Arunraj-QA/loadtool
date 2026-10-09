@@ -1,0 +1,39 @@
+// The greeter service the gRPC examples and tests run against. The demo
+// API (go run ./examples/server) serves it on 127.0.0.1:8091, with
+// server reflection enabled.
+syntax = "proto3";
+
+package greeter;
+
+option go_package = "github.com/Arunraj-QA/loadtool/examples/proto;greeterpb";
+
+service Greeter {
+  // Unary: one request, one reply.
+  rpc SayHello (HelloRequest) returns (HelloReply);
+  // Server streaming: `count` replies to one request.
+  rpc LotsOfReplies (HelloRequest) returns (stream HelloReply);
+  // Client streaming: one reply after all requests, naming them all.
+  rpc LotsOfGreetings (stream HelloRequest) returns (HelloReply);
+  // Bidirectional: one reply per request, as they arrive.
+  rpc Chat (stream HelloRequest) returns (stream HelloReply);
+  // Fails with the status code in the request (for error tests).
+  rpc Fail (FailRequest) returns (HelloReply);
+}
+
+message HelloRequest {
+  string name = 1;
+  // How many replies LotsOfReplies sends (default 3).
+  int32 count = 2;
+}
+
+message HelloReply {
+  string message = 1;
+  // The position of this reply in a stream, from 0.
+  int32 index = 2;
+}
+
+message FailRequest {
+  // A gRPC status code, such as 5 (NOT_FOUND) or 14 (UNAVAILABLE).
+  int32 code = 1;
+  string message = 2;
+}

@@ -38,8 +38,10 @@ func TestProtocolPackagesImportOnlyAllowedPackages(t *testing.T) {
 			}
 			for _, imp := range f.Imports {
 				path, _ := strconv.Unquote(imp.Path.Value)
-				own := internal + "protocols/" + filepath.Base(dir) // its external tests
-				if strings.HasPrefix(path, internal) && !allowed[path] && path != own {
+				// The package itself (for its external tests) and its own
+				// sub-packages, such as a test service.
+				own := internal + "protocols/" + filepath.Base(dir)
+				if strings.HasPrefix(path, internal) && !allowed[path] && path != own && !strings.HasPrefix(path, own+"/") {
 					t.Errorf("%s imports %s; protocol packages may only use %v", file, path, keys(allowed))
 				}
 			}
