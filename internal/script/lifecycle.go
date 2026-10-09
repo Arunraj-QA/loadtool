@@ -144,6 +144,10 @@ func (l *Lifecycle) call(ctx context.Context, client *http.Client, timeout time.
 	case ctx.Err() != nil:
 		return nil, fmt.Errorf("%s interrupted: %w", name, context.Cause(ctx))
 	case err == nil:
+		// An async setup's data, or its error, is in its Promise.
+		if v, err = settle(v); err != nil {
+			return nil, fmt.Errorf("%s: %s", name, err.Error())
+		}
 		return v, nil
 	case errors.Is(callCtx.Err(), context.DeadlineExceeded):
 		return nil, fmt.Errorf("%s did not finish within %s (%s %s)", name, timeoutOption, timeoutOption, timeout)

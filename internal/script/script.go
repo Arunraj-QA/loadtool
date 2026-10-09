@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -489,7 +490,10 @@ func (vu *VU) Iterate(ctx context.Context, rec *metrics.Recorder) {
 	_ = vu.rt.Set("__ITER", vu.iter)
 	vu.iter++
 	stop := context.AfterFunc(ctx, func() { vu.rt.Interrupt(errStopped) })
-	_, err := vu.fn(goja.Undefined(), vu.data)
+	v, err := vu.fn(goja.Undefined(), vu.data)
+	if err == nil {
+		_, err = settle(v) // an async function's errors are in its Promise
+	}
 	stop()
 	vu.ctx, vu.rec = nil, nil
 
@@ -501,4 +505,47 @@ func (vu *VU) Iterate(ctx context.Context, rec *metrics.Recorder) {
 // isRelativeImport reports whether path is relative to the importing file.
 func isRelativeImport(path string) bool {
 	return strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../")
+}
+
+var promiseType = reflect.TypeFor[*goja.Promise]()
+
+// errNeverSettled is the error for an async function whose Promise is
+// still pending when it returns: something it awaits never resolves.
+var errNeverSettled = errors.New("the async function did not finish: it awaits something that never resolves " +
+	"(LoadTool has no event loop, so await only works on values that are already available)")
+
+// settle returns the outcome of a function the script exported. A
+// non-Promise value is returned as is. An async function returns a
+// Promise; goja runs its jobs before the call returns, so with no event
+// loop (ADR-017) the Promise is already settled unless it awaits
+// something that never resolves. A rejected Promise is the function's
+// error, which would otherwise be lost and hide every failure.
+func settle(v goja.Value) (goja.Value, error) {
+	// ExportType reads the type without converting the object, so a
+	// function returning a plain object pays nothing here.
+	obj, ok := v.(*goja.Object)
+	if !ok || obj.ExportType() != promiseType {
+		return v, nil
+	}
+	p := obj.Export().(*goja.Promise)
+	switch p.State() {
+	case goja.PromiseStateFulfilled:
+		return p.Result(), nil
+	case goja.PromiseStateRejected:
+		return nil, rejection(p.Result())
+	default:
+		return nil, errNeverSettled
+	}
+}
+
+// rejection describes a Promise's rejection reason: an Error's stack when
+// it has one (it names the script location), else its text.
+func rejection(reason goja.Value) error {
+	msg := reason.String()
+	if o, ok := reason.(*goja.Object); ok {
+		if stack := o.Get("stack"); isSet(stack) && stack.String() != "" {
+			msg = stack.String()
+		}
+	}
+	return errors.New(msg)
 }
