@@ -2,13 +2,16 @@
 
 One LoadTool test can use several protocols in the same iteration.
 [`examples/mixed-protocols.ts`](../examples/mixed-protocols.ts) uses five
-of them in one user journey:
+of them in one user journey, two operations each. It logs in over HTTP
+first, and the other steps use that session's token:
 
-1. it logs in over HTTP;
-2. it reads a product over GraphQL with the session's token;
-3. it exchanges a message over WebSocket;
-4. it calls a gRPC service;
-5. it publishes an event to Kafka.
+| Protocol | First operation | Second operation |
+|---|---|---|
+| HTTP | `GET /api/me` (the user) | `POST /api/orders` |
+| GraphQL | `query { products }` | `mutation placeOrder` |
+| WebSocket | `connect`, `send` | `receive` (the echo) |
+| gRPC | `Greeter.SayHello` (unary) | `Greeter.LotsOfReplies` (server stream) |
+| Kafka | produce to `orders` | consume from `orders` |
 
 ```bash
 go run ./examples/server        # HTTP + WebSocket :8090, gRPC :8091, Kafka :9092
@@ -55,9 +58,10 @@ sequenceDiagram
    Its requests are not part of the load metrics.
 5. **The VUs start.** Each VU is a goroutine with its own JavaScript
    runtime, and runs the top-level code again. In the example, that gives
-   each VU its own gRPC client, GraphQL client and Kafka producer. None
+   each VU its own gRPC client, GraphQL client, Kafka producer and Kafka
+   consumer. None
    of them connects yet: network calls are not allowed in top-level code.
-6. **Iterations.** Each runs the five steps in turn on the VU's
+6. **Iterations.** Each runs the protocols' steps in turn on the VU's
    goroutine. Every call blocks until it completes or times out, so the
    steps run in order, and the next one can use the previous one's
    result (the login's token).
@@ -82,9 +86,12 @@ another's:
 | Kafka | One franz-go client per `Producer`/`Consumer` (ADR-022) | From first use to the end of the test |
 | Script variables | Top-level `let`/`const` | The VU's runtime, for the whole test |
 
-The example's checks each compare with something only that VU sent: the
-login's user, the echoed message, the gRPC greeting, and the Kafka key.
-State that leaked between VUs would fail them.
+Where they can, the example's checks compare with something only that
+VU sent: the logged-in user, the echoed message, the gRPC greeting and
+the stream's replies. The test also checks every Kafka order's key at
+the broker. State that leaked between VUs would fail them. (The Kafka
+consumer reads every VU's orders, as a consumer of a shared topic
+should.)
 
 ## Shared metrics, checks, thresholds and reports
 
@@ -112,9 +119,11 @@ the VUs' context is cancelled:
 `TestMixedProtocolsEndToEnd` (`internal/runner/mixed_test.go`) runs the
 example against in-process servers for all five protocols. It checks:
 
-- every check passes in every iteration, and each protocol makes one call
-  per iteration, counted in its own family;
-- all nine thresholds pass;
+- all nine checks pass in every iteration, and each protocol's
+  operations are counted in its own family (3 HTTP requests, 2 GraphQL
+  operations, 1 WebSocket session, 1 gRPC call and 1 stream, 1 Kafka
+  produce per iteration);
+- all eleven thresholds pass;
 - the JSON and HTML reports carry every protocol;
 - setup's data reaches the iterations, and teardown runs;
 - at the broker, every Kafka event was produced by the VU its key names;

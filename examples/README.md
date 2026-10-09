@@ -38,7 +38,7 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | [`kafka-consumer.ts`](kafka-consumer.ts) | Producing and consuming at once (two scenarios), a consumer group, end-to-end latency |
 | [`kafka-throughput.ts`](kafka-throughput.ts) | Batches of 100 messages per call; a threshold on messages per second |
 | [`kafka-errors.ts`](kafka-errors.ts) | Kafka errors in results: an unknown topic, an invalid message, an unreachable broker |
-| [`mixed-protocols.ts`](mixed-protocols.ts) | HTTP, GraphQL, WebSocket, gRPC and Kafka in one iteration: shared setup, checks and thresholds ([how it runs](../docs/mixed-protocols.md)) |
+| [`mixed-protocols.ts`](mixed-protocols.ts) | HTTP, GraphQL, WebSocket, gRPC and Kafka in one iteration, two operations each: shared setup, checks and thresholds ([how it runs](../docs/mixed-protocols.md)) |
 
 **By topic:**
 
