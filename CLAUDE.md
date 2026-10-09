@@ -39,7 +39,9 @@ HTTP path, the VU engine and the scenario engine as they are.
 
 1. **GraphQL** calls made with `loadtool/graphql` are counted only under
    `graphql_*` metrics, never under `http_*`.
-2. **gRPC** is unary only in Phase 2; streaming is later.
+2. **gRPC** covers unary calls and server, client and bidirectional
+   streaming, in the blocking style (ADR-020). Changed on 2026-10-09 at
+   the user's request; it was unary only.
 3. **gRPC connections** are one per VU by default; the choice is
    confirmed by measurement at 1,000 VUs before it is final.
 4. **Kafka** uses one client per run, shared by the VUs.
