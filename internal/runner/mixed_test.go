@@ -39,8 +39,8 @@ type mixedTargets struct {
 }
 
 // newMixedTargets starts an HTTP server with the demo API's routes the
-// example uses (login, me, the WebSocket echo, GraphQL), a gRPC greeter
-// and a Kafka cluster with the topic "events".
+// example uses (login, me, orders, the WebSocket echo, GraphQL), a gRPC
+// greeter and a Kafka cluster with the topic "orders".
 func newMixedTargets(t *testing.T) *mixedTargets {
 	t.Helper()
 	m := &mixedTargets{}
@@ -65,6 +65,15 @@ func newMixedTargets(t *testing.T) *mixedTargets {
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]string{"username": user})
+	})
+	mux.HandleFunc("POST /api/orders", func(w http.ResponseWriter, r *http.Request) {
+		var in struct{ ProductID, Quantity int }
+		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer token-") || json.NewDecoder(r.Body).Decode(&in) != nil || in.Quantity < 1 {
+			http.Error(w, "bad order", http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]int{"id": 1, "productId": in.ProductID, "quantity": in.Quantity})
 	})
 	mux.HandleFunc("GET /ws/echo", func(w http.ResponseWriter, r *http.Request) {
 		c, err := websocket.Accept(w, r, nil)
@@ -95,7 +104,7 @@ func newMixedTargets(t *testing.T) *mixedTargets {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	cluster, err := kafkatest.NewCluster(0, "events")
+	cluster, err := kafkatest.NewCluster(0, "orders")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,11 +127,12 @@ func mixedExample(t *testing.T) string {
 	return path
 }
 
-// The protocols' operation counters; each runs once per iteration.
-var mixedCounters = []string{"graphql_reqs", "ws_sessions", "grpc_reqs", "kafka_messages_produced"}
+// The protocols' operation counters, and how many operations each
+// iteration makes.
+var mixedCounters = map[string]int{"graphql_reqs": 2, "ws_sessions": 1, "grpc_reqs": 1, "grpc_streams": 1, "kafka_messages_produced": 1}
 
 // The protocols' failure rates.
-var mixedFailures = []string{"http_req_failed", "graphql_req_failed", "ws_session_failed", "grpc_req_failed", "kafka_produce_failed"}
+var mixedFailures = []string{"http_req_failed", "graphql_req_failed", "ws_session_failed", "grpc_req_failed", "grpc_stream_failed", "kafka_produce_failed", "kafka_consume_failed"}
 
 func TestMixedProtocolsEndToEnd(t *testing.T) {
 	targets := newMixedTargets(t)
@@ -156,8 +166,11 @@ func TestMixedProtocolsEndToEnd(t *testing.T) {
 	// passed. Each compares with something only its VU sent, so state
 	// leaking between VUs would fail it.
 	wantChecks := []string{
-		"http: logged in as this VU", "graphql: product found",
-		"websocket: echoed this VU's message", "grpc: greeted this VU", "kafka: event acknowledged",
+		"http GET: this VU's user", "http POST: order created",
+		"graphql query: products listed", "graphql mutation: order placed",
+		"websocket: echoed this VU's message",
+		"grpc unary: greeted this VU", "grpc stream: 3 replies to this VU",
+		"kafka produce: order acknowledged", "kafka consume: orders read",
 	}
 	byName := map[string]metrics.CheckResult{}
 	for _, c := range s.Checks {
@@ -170,17 +183,20 @@ func TestMixedProtocolsEndToEnd(t *testing.T) {
 		}
 	}
 
-	// Shared metrics model: one operation per protocol per iteration, each
-	// counted under its own family; HTTP counts the two HTTP requests
-	// only (GraphQL is not HTTP's, scope decision 1; setup's request is
-	// not part of the load phase).
-	if s.Requests != 2*s.Iterations {
-		t.Errorf("%d HTTP requests for %d iterations; want 2 each", s.Requests, s.Iterations)
+	// Shared metrics model: each protocol's operations counted under its
+	// own family; HTTP counts the three HTTP requests only (GraphQL is not
+	// HTTP's, scope decision 1; setup's request is not part of the load
+	// phase).
+	if s.Requests != 3*s.Iterations {
+		t.Errorf("%d HTTP requests for %d iterations; want 3 each", s.Requests, s.Iterations)
 	}
-	for _, name := range mixedCounters {
-		if f, ok := s.Family(name); !ok || f.Count != s.Iterations {
-			t.Errorf("%s = %d; want %d, one per iteration", name, f.Count, s.Iterations)
+	for name, per := range mixedCounters {
+		if f, ok := s.Family(name); !ok || f.Count != per*s.Iterations {
+			t.Errorf("%s = %d; want %d, %d per iteration", name, f.Count, per*s.Iterations, per)
 		}
+	}
+	if f, _ := s.Family("kafka_messages_consumed"); f.Count < s.Iterations {
+		t.Errorf("kafka_messages_consumed = %d; want at least one per iteration", f.Count)
 	}
 	for _, name := range mixedFailures[1:] {
 		if f, _ := s.Family(name); f.Trues != 0 {
@@ -188,9 +204,9 @@ func TestMixedProtocolsEndToEnd(t *testing.T) {
 		}
 	}
 
-	// Shared thresholds: all nine, across five protocols, passed.
-	if len(res.Thresholds) != 9 {
-		t.Errorf("%d thresholds; want 9", len(res.Thresholds))
+	// Shared thresholds: all eleven, across five protocols, passed.
+	if len(res.Thresholds) != 11 {
+		t.Errorf("%d thresholds; want 11", len(res.Thresholds))
 	}
 	for _, th := range res.Thresholds {
 		if !th.Passed {
@@ -210,7 +226,11 @@ func TestMixedProtocolsEndToEnd(t *testing.T) {
 	if err := json.Unmarshal(b.Bytes(), &doc); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range append(append([]string{"http_reqs", "ws_msg_latency", "grpc_req_duration", "graphql_req_duration", "kafka_produce_duration"}, mixedCounters...), mixedFailures...) {
+	names := append([]string{"http_reqs", "ws_msg_latency", "grpc_req_duration", "grpc_stream_duration", "graphql_req_duration", "kafka_produce_duration", "kafka_consume_latency"}, mixedFailures...)
+	for name := range mixedCounters {
+		names = append(names, name)
+	}
+	for _, name := range names {
 		if _, ok := doc.Metrics[name]; !ok {
 			t.Errorf("JSON summary misses %s", name)
 		}
@@ -222,7 +242,7 @@ func TestMixedProtocolsEndToEnd(t *testing.T) {
 	if err := report.HTML(&b, res, "test"); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"ws_msg_latency", "grpc_req_duration", "graphql_req_duration", "kafka_produce_duration"} {
+	for _, name := range []string{"ws_msg_latency", "grpc_req_duration", "grpc_stream_duration", "graphql_req_duration", "kafka_produce_duration", "kafka_consume_latency"} {
 		if !strings.Contains(b.String(), "<td><code>"+name+"</code></td>") {
 			t.Errorf("HTML report misses %s", name)
 		}
@@ -231,23 +251,23 @@ func TestMixedProtocolsEndToEnd(t *testing.T) {
 		t.Error("HTML report misses the checks")
 	}
 
-	// No cross-VU leakage at the broker either: every event was produced
+	// No cross-VU leakage at the broker either: every order was produced
 	// by the VU its key names, and all VUs produced.
 	users := kafkaEventUsers(t, targets.brokers, s.Iterations)
 	if len(users) != vus {
-		t.Errorf("events from %d VUs; want %d", len(users), vus)
+		t.Errorf("orders from %d VUs; want %d", len(users), vus)
 	}
 
 	// Clean shutdown: every VU's sockets, connections and clients closed.
 	waitForGoroutines(t, before)
 }
 
-// kafkaEventUsers reads want events from the cluster and returns how many
-// each user produced, failing the test if an event's key is not the user
-// in its value.
+// kafkaEventUsers reads want orders from the cluster and returns how
+// many each user produced, failing the test if an order's key is not the
+// user in its value.
 func kafkaEventUsers(t *testing.T, brokers []string, want int) map[string]int {
 	t.Helper()
-	cl, err := kgo.NewClient(kgo.SeedBrokers(brokers...), kgo.ConsumeTopics("events"), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()))
+	cl, err := kgo.NewClient(kgo.SeedBrokers(brokers...), kgo.ConsumeTopics("orders"), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +280,7 @@ func kafkaEventUsers(t *testing.T, brokers []string, want int) map[string]int {
 			n++
 			var v struct{ User string }
 			if err := json.Unmarshal(r.Value, &v); err != nil || v.User != string(r.Key) {
-				t.Errorf("event with key %q and value %s: produced by another VU", r.Key, r.Value)
+				t.Errorf("order with key %q and value %s: produced by another VU", r.Key, r.Value)
 			}
 			users[v.User]++
 		})
