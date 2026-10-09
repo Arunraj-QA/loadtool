@@ -123,6 +123,18 @@ this fail the test.
 | `on("error")` with `closed`, close code 1006 | The server dropped the connection without a close frame | Check the server's logs and limits |
 | `thresholds … unknown metric "ws_…"` | The script does not import `loadtool/ws` | WebSocket metrics exist only in scripts that import it |
 
+## gRPC
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `client.load: … could not … greeter.proto` | The `.proto` file was not found | Paths are relative to the script; pass the directory as an import path: `client.load(["proto"], "greeter.proto")` |
+| `connect` returns `error_code` `dial` | Nothing listens there, or TLS failed | Check the address; for a server without TLS add `plaintext: true` |
+| `error_code` `invalid`: `unknown method` | No loaded `.proto` or reflection describes it | Load the right `.proto` file, or `connect(…, { reflect: true })`; write the method as `"package.Service/Method"` |
+| `error_code` `invalid`: `not connected` | `invoke` before `connect` | Connect once per VU: `if (__ITER === 0) client.connect(…)` |
+| `error_code` `timeout`, `status_text` `DeadlineExceeded` | The call took longer than its timeout (default 30 s) | Raise `timeout`, or look at the server |
+| `is a streaming method; use client.stream` | `invoke` on a streaming method | Use `client.stream` |
+| Warning `grpc: a stream was still open when the iteration ended` | A stream was not read to the end or closed | Read until `recv()` returns `null`, or call `stream.close()` |
+
 ## Logins and sessions
 
 - **Every iteration logs in again.** Each iteration starts with an empty

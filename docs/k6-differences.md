@@ -40,6 +40,7 @@ and `setup`/`teardown` need only the import lines changed.
 | **Options** | Unknown options warn and are ignored. Options combining `scenarios` with `vus`/`duration`/`stages` are an error. |
 | **HTTP/2** | Negotiated over TLS by default, as in k6. `httpVersion: "2"` also speaks h2c (HTTP/2 without TLS), which k6 does not. |
 | **WebSocket** | `loadtool/ws` follows `k6/ws`: `connect(url, params, fn)`, `on`, `send`, `sendBinary`, `close`, `setTimeout`, `setInterval`. Differences: `send(…, { reply: true })` times a reply (`ws_msg_latency`); `connect` returns `error_code`; no `ping`/`pong` events or `ws_ping` metric; no subprotocols; `params` takes `headers` only. LoadTool also has a blocking style (`connect` without a callback, then `send`/`receive`/`close`), which k6 does not. |
+| **gRPC** | `loadtool/grpc` follows `k6/net/grpc` for clients and unary calls: `new grpc.Client()`, `load`, `connect(addr, { plaintext, reflect, timeout })`, `invoke`, `close`. Differences: `connect` returns `{ error, error_code }` instead of throwing; streams are blocking (`client.stream`, then `send`/`closeSend`/`recv`) instead of `grpc.Stream` with events; results carry `status_text` and `error_code`; no `tls` options or `insecureSkipVerify`. |
 | **Percentiles** | From a histogram, within ±0.78 %. |
 
 ## Not supported (yet)
@@ -63,7 +64,8 @@ and `setup`/`teardown` need only the import lines changed.
 
 **Runtime and modules:**
 
-- Other protocols (gRPC, and k6's experimental WebSocket API) and browser
+- Other protocols (k6's experimental WebSocket API, Kafka, GraphQL
+  helpers) and browser
   testing.
 - npm packages and remote (URL) modules.
 - `--out` streaming outputs and k6 Cloud.

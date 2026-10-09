@@ -164,6 +164,7 @@ An expression is `<aggregate> <op> <number>`, with `<`, `<=`, `>`, `>=`,
 | `iterations` | `count`, `rate` | Iterations that ran to their end |
 | `dropped_iterations` | `count`, `rate` | Arrival-rate starts that found no free VU |
 | `ws_*` | by kind: trend `avg`, `min`, `max`, `med`, `p(N)`; counter `count`, `rate`; rate `rate` | WebSocket metrics, in scripts that import `loadtool/ws` ([list](script-api.md#loadtoolws)) |
+| `grpc_*` | by kind, as above | gRPC metrics, in scripts that import `loadtool/grpc` ([list](script-api.md#loadtoolgrpc)) |
 
 **Rules:**
 

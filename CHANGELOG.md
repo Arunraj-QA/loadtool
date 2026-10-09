@@ -21,6 +21,14 @@ does.
     socket with `send`, `receive(timeout)` and `close`
     (`examples/websocket-request-reply.ts`).
   - The module can also be imported as `loadtool/websocket`.
+- **gRPC** (`loadtool/grpc`, ADR-020), on grpc-go:
+  - unary calls and server, client and bidirectional streams (blocking);
+  - methods described by `.proto` files (parsed in Go, no `protoc`) or
+    by server reflection;
+  - metadata and deadlines;
+  - `grpc_*` metrics in the summary, reports and thresholds.
+  - The demo API serves a greeter service on port 8091, and there are two
+    examples (`grpc-unary.ts`, `grpc-streaming.ts`).
 - **Protocol modules** (ADR-014 to ADR-018): a common interface and
   lifecycle for protocols, with metric families (ADR-015) and
   normalized error codes (ADR-016).

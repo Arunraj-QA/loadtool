@@ -478,3 +478,20 @@ Added for the WebSocket blocking style (ADR-019 amendment):
 - **`RunEnv.Warn` is once per run,** as documented. The script package
   now wraps the runner's warning function in its once-per-run warner.
   Before this, a module warning once per iteration would repeat.
+
+## Amendment (2026-10-09): gRPC
+
+Added for the gRPC module (ADR-020):
+
+- **Capitalized exports are classes.** An export such as `Client` is
+  built with goja's constructor form, so `new grpc.Client()` works (and
+  so does a plain call). A plain native function cannot be used with
+  `new`.
+- **Module runs start before the script's top-level code.** They are
+  created right after the script is loaded, not after options are read,
+  so top-level module calls such as `client.load` work. Thresholds are
+  still parsed after the families exist.
+- **`RunEnv` changes:**
+  - It gains `Dir`, the script's directory, for files a module reads.
+  - It loses `MaxVUs`, which no module used and which is not known that
+    early.

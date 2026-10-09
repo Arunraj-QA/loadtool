@@ -99,8 +99,9 @@ runs.
 
 **Protocol metric families** (Phase 2,
 [ADR-015](decisions/ADR-015-metric-families.md)) are additional keys in
-`metrics`, written by protocol modules: the WebSocket module's
-`ws_*` metrics ([Script API](script-api.md#loadtoolws)).
+`metrics`, written by protocol modules: `ws_*`
+([WebSocket](script-api.md#loadtoolws)) and `grpc_*`
+([gRPC](script-api.md#loadtoolgrpc)).
 
 - **Where they appear:** after the keys above, in a fixed order, and
   only when they recorded something. A run without them writes exactly
