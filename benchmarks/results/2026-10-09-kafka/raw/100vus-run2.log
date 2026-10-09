@@ -1,0 +1,18 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\loadtool\kafka-produce.ts
+  VUs:         100
+  Duration:    30s (elapsed 30.00s)
+  Status:      completed
+
+  Requests:    0 (0.0 req/s)
+  Success:     0
+  Errors:      0 (0.00%)
+  Script errs: 0
+
+  Latency:     no requests were sent
+  Protocol metrics:
+    kafka_produce_duration   1,038,108 samples  avg=2.82ms p50=2.57ms p95=6.00ms p99=9.37ms max=79.71ms
+    kafka_messages_produced  1,038,108 (34602.2/s)
+    kafka_produce_failed     0.00% (0 of 1,038,108)

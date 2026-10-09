@@ -1,0 +1,3 @@
+﻿before: total CPU % (6 x 5 s samples): 19, 18, 19, 31, 24, 19
+PowerOnline: True
+after: total CPU % (6 x 5 s samples): 42, 44, 94, 76, 50, 51
