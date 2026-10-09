@@ -41,6 +41,7 @@ runs=(
   "kafka-consumer.ts|"
   "kafka-throughput.ts|--vus 2 --duration 2s"
   "kafka-errors.ts|--vus 1 --duration 6s|failures-ok"
+  "mixed-protocols.ts|--vus 2 --duration 2s"
   "scenarios.ts|"
 )
 
