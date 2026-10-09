@@ -1,6 +1,7 @@
 # ADR-019: WebSocket module
 
-- Status: Proposed (2026-10-08, Phase 2)
+- Status: Accepted (2026-10-09, Phase 2), with the amendment for the
+  blocking style
 - Date: 2026-10-08
 - Builds on: ADR-017 (async model), ADR-018 (protocol architecture)
 
