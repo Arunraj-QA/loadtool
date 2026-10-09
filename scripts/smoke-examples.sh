@@ -6,6 +6,7 @@
 # working.
 #
 #   go run ./examples/server &       # the demo API, on 127.0.0.1:8090
+#                                    # (gRPC on :8091, Kafka on :9092)
 #   scripts/smoke-examples.sh bin/loadtool
 #
 # Set BASE_URL if the demo API listens elsewhere.
@@ -36,6 +37,10 @@ runs=(
   "graphql-query.ts|--vus 2 --duration 2s"
   "graphql-mutation.ts|--vus 2 --duration 2s"
   "graphql-errors.ts|--vus 2 --duration 2s|failures-ok"
+  "kafka-producer.ts|--vus 2 --duration 2s"
+  "kafka-consumer.ts|"
+  "kafka-throughput.ts|--vus 2 --duration 2s"
+  "kafka-errors.ts|--vus 1 --duration 6s|failures-ok"
   "scenarios.ts|"
 )
 

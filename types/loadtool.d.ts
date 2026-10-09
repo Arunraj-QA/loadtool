@@ -323,3 +323,103 @@ declare module "loadtool/graphql" {
   export default graphql;
 }
 
+
+declare module "loadtool/kafka" {
+  /** Where and how to connect. Clients are per VU and connect on first use. */
+  export interface Config {
+    /** Seed brokers, "host:port". Required. */
+    brokers: string[];
+    /** The default topic (a Consumer's only topic). */
+    topic?: string;
+    /** TLS with the run's TLS settings (default false). */
+    tls?: boolean;
+    /** Milliseconds, or a duration such as "2s": the delivery timeout for a
+     * producer (default 30 s), the poll timeout for a consumer (default 2 s). */
+    timeout?: number | string;
+  }
+
+  export interface ConsumerConfig extends Config {
+    topic: string;
+    /** A consumer group to join; without one, the VU reads every partition. */
+    group?: string;
+    /** Where to start without a committed offset (default "latest"). */
+    startAt?: "earliest" | "latest";
+  }
+
+  export interface Message {
+    /** Overrides the producer's topic. */
+    topic?: string;
+    /** Messages with the same key go to the same partition. */
+    key?: string | ArrayBuffer;
+    /** Required. */
+    value: string | ArrayBuffer;
+    headers?: Record<string, string | ArrayBuffer>;
+    /** A partition to send to, instead of the one the key chooses. */
+    partition?: number;
+  }
+
+  /** The outcome of one message; errors are reported here, never thrown. */
+  export interface ProduceResult {
+    /** The broker acknowledged the message. */
+    ok: boolean;
+    /** "" or why it was not acknowledged. */
+    error: string;
+    /** "" or "server" (a broker error), "timeout", "dial", "closed", ..., "invalid" (never sent). */
+    error_code: string;
+    topic: string;
+    /** -1 when not acknowledged. */
+    partition: number;
+    /** -1 when not acknowledged. */
+    offset: number;
+    /** Milliseconds from sending to the acknowledgement. */
+    timings: { duration: number };
+  }
+
+  export interface ConsumedMessage {
+    topic: string;
+    partition: number;
+    offset: number;
+    /** null when the message has no key. */
+    key: string | null;
+    value: string;
+    headers: Record<string, string>;
+    /** When the message was produced, in Unix milliseconds. */
+    timestamp: number;
+    /** Milliseconds from production to consumption (kafka_consume_latency). */
+    latency: number;
+  }
+
+  export interface ConsumeParams {
+    /** Most messages to return (default 1). */
+    max?: number;
+    /** How long to wait for one; [] if none arrives (default: the consumer's timeout). */
+    timeout?: number | string;
+  }
+
+  export class Producer {
+    constructor(config: Config);
+    produce(message: Message): ProduceResult;
+    /** Sends the messages together; one result each, in the same order. */
+    produceBatch(messages: Message[]): ProduceResult[];
+    /** Closes the client now; it is closed at the end of the test otherwise. */
+    close(): void;
+  }
+
+  export class Consumer {
+    constructor(config: ConsumerConfig);
+    consume(params?: ConsumeParams): ConsumedMessage[];
+    /** "" or why the last consume failed. */
+    readonly error: string;
+    readonly error_code: string;
+    /** Leaves the group and closes the client; otherwise at the end of the test. */
+    close(): void;
+  }
+
+  /** One message, with a client kept per configuration in the VU. */
+  export function produce(message: Config & Message): ProduceResult;
+  /** Messages, with a client kept per configuration in the VU. */
+  export function consume(params: ConsumerConfig & ConsumeParams): ConsumedMessage[];
+
+  const kafka: { Producer: typeof Producer; Consumer: typeof Consumer; produce: typeof produce; consume: typeof consume };
+  export default kafka;
+}
