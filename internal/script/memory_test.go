@@ -7,6 +7,11 @@ import (
 	"testing"
 
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
+	"github.com/Arunraj-QA/loadtool/internal/protocol"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/graphql"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/kafka"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/ws"
 )
 
 // retainedVUs is how many VUs the retained-memory benchmark creates; large
@@ -29,14 +34,7 @@ func liveHeap() uint64 {
 func BenchmarkVURetainedMemory(b *testing.B) {
 	// Built-in modules and console methods are built on first use, so the
 	// cost depends on what the script imports.
-	scripts := []struct{ name, src string }{
-		{"no-imports", `
-const BASE_URL = "http://localhost:8080";
-export default function (): void {
-	let total = 0;
-	for (let i = 0; i < 10; i++) total += i;
-}`},
-		{"http", `
+	httpOnly := `
 import http from "loadtool/http";
 const BASE_URL = "http://localhost:8080";
 export default function (): void {
@@ -44,7 +42,21 @@ export default function (): void {
 	for (let i = 0; i < 10; i++) total += i;
 	// Referenced but never called, so esbuild keeps the import.
 	if (total < 0) http.get(BASE_URL);
-}`},
+}`
+	scripts := []struct {
+		name, src string
+		// mods are registered as the runner registers them; a script that
+		// imports none of them should pay nothing for them.
+		mods []protocol.Module
+	}{
+		{"no-imports", `
+const BASE_URL = "http://localhost:8080";
+export default function (): void {
+	let total = 0;
+	for (let i = 0; i < 10; i++) total += i;
+}`, nil},
+		{"http", httpOnly, nil},
+		{"http-all-modules", httpOnly, []protocol.Module{ws.Module{}, grpc.Module{}, graphql.Module{}, kafka.Module{}}},
 		{"http-sleep", `
 import http from "loadtool/http";
 import { sleep } from "loadtool";
@@ -57,7 +69,7 @@ export default function (): void {
 		http.get(BASE_URL);
 		sleep(1);
 	}
-}`},
+}`, nil},
 		{"http-setup-teardown", `
 import http from "loadtool/http";
 const BASE_URL = "http://localhost:8080";
@@ -67,11 +79,11 @@ export default function (data: any): void {
 	for (let i = 0; i < 10; i++) total += i;
 	if (total < 0) http.get(BASE_URL + data.token);
 }
-export function teardown(data: any) {}`},
+export function teardown(data: any) {}`, nil},
 	}
 
 	for _, sc := range scripts {
-		p, err := Compile("test.ts", []byte(sc.src))
+		p, err := Compile("test.ts", []byte(sc.src), sc.mods...)
 		if err != nil {
 			b.Fatal(err)
 		}
