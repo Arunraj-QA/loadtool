@@ -294,8 +294,7 @@ func TestMisuse(t *testing.T) {
 	h := protocoltest.New(t, ws.Module{})
 	for src, want := range map[string]string{
 		`ws.connect()`:                "url is required",
-		`ws.connect("ws://x")`:        "the last argument must be a function",
-		`ws.connect("ws://x", {}, 1)`: "the last argument must be a function",
+		`ws.connect("ws://x", {}, 1)`: "the third argument must be a function",
 		`ws.connect("WS", function (s) { s.on("data", function () {}); })`: "unknown event",
 	} {
 		_, err := h.Run(strings.ReplaceAll(src, "WS", wsURL(server(t), "/echo")))

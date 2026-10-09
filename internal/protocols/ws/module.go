@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/dop251/goja"
 
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
@@ -66,6 +67,7 @@ type Module struct{}
 var _ protocol.Module = Module{}
 
 func (Module) Name() string      { return "ws" }
+func (Module) Aliases() []string { return []string{"websocket"} }
 func (Module) Exports() []string { return []string{"connect"} }
 
 func (Module) Metrics() []metrics.Def {
@@ -129,12 +131,14 @@ func (r *run) Close(context.Context) error {
 	return nil
 }
 
-// instance is the module in one VU. Sessions are scoped to connect calls,
-// so it holds nothing between them.
+// instance is the module in one VU. Callback-style sessions are scoped
+// to their connect call; open holds the blocking-style sockets the
+// current iteration opened and has not closed yet.
 type instance struct {
-	vu  protocol.VU
-	run *run
-	obj *goja.Object
+	vu   protocol.VU
+	run  *run
+	obj  *goja.Object
+	open []*blockingSocket
 }
 
 func (i *instance) Value() goja.Value {
@@ -146,5 +150,29 @@ func (i *instance) Value() goja.Value {
 	return i.obj
 }
 
-func (i *instance) BeginIteration()             {}
-func (i *instance) Close(context.Context) error { return nil }
+func (i *instance) BeginIteration() {}
+
+// EndIteration closes the blocking-style sockets the iteration left open,
+// with a normal close (or at once, if the test is ending).
+func (i *instance) EndIteration() {
+	for _, b := range i.open {
+		if !b.finished {
+			i.vu.Warn("ws: a socket was still open when the iteration ended; it was closed for you (call socket.close())")
+			break
+		}
+	}
+	i.closeOpen()
+}
+
+// Close closes any socket still open; normally EndIteration already has.
+func (i *instance) Close(context.Context) error {
+	i.closeOpen()
+	return nil
+}
+
+func (i *instance) closeOpen() {
+	for _, b := range i.open {
+		b.close(websocket.StatusNormalClosure)
+	}
+	i.open = nil
+}

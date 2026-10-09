@@ -18,9 +18,15 @@ import (
 
 var errInitConnect = errors.New("ws.connect is not allowed in the script's top-level code; call it inside the default function")
 
-// connect implements ws.connect(url, params?, callback). It returns the
-// session's result after the socket closed. A handshake failure is in the
-// result (the callback is not called); script misuse throws.
+// connect implements ws.connect in both styles:
+//
+//	ws.connect(url, params?, callback)  the callback style: blocks until the
+//	                                    socket closes, returns the result
+//	ws.connect(url, params?)            the blocking style: returns a socket
+//	                                    with send, receive and close
+//
+// A handshake failure is in the result (or the socket's error fields);
+// script misuse throws.
 func (i *instance) connect(call goja.FunctionCall) goja.Value {
 	rt := i.vu.Runtime()
 	ctx := i.vu.Context()
@@ -32,16 +38,19 @@ func (i *instance) connect(call goja.FunctionCall) goja.Value {
 		panic(rt.NewTypeError("ws.connect: url is required"))
 	}
 	params, cbArg := call.Argument(1), call.Argument(2)
-	if !isSet(cbArg) {
+	if _, isFn := goja.AssertFunction(params); isFn && !isSet(cbArg) {
 		params, cbArg = goja.Undefined(), params // connect(url, callback)
+	}
+	s := &session{inst: i, rt: rt, ctx: ctx, url: rawURL.String()}
+	if !isSet(cbArg) {
+		return i.connectBlocking(s, params) // connect(url, params?)
 	}
 	cb, ok := goja.AssertFunction(cbArg)
 	if !ok {
-		panic(rt.NewTypeError("ws.connect: the last argument must be a function that sets up the socket"))
+		panic(rt.NewTypeError("ws.connect: the third argument must be a function that sets up the socket, or left out for a blocking socket"))
 	}
 	header := headersFrom(rt, params)
 
-	s := &session{inst: i, rt: rt, ctx: ctx, url: rawURL.String()}
 	if !s.dial(header) {
 		return s.result()
 	}

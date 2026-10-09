@@ -210,3 +210,51 @@ export default function () {}`)
 		t.Errorf("error = %v, want a top-level code error", err)
 	}
 }
+
+// The blocking style, as a user wrote it: "loadtool/websocket", an async
+// default function, send then receive, and a check on the reply.
+func TestRunBlockingWebSocketStyle(t *testing.T) {
+	srv := mixedServer(t)
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws"
+	path := scriptFile(t, `import ws from "loadtool/websocket";
+import { check } from "loadtool";
+
+export const options = { thresholds: { ws_msg_latency: ["p(95)<1000"], checks: ["rate==1"] } };
+
+export default async function () {
+	const socket = ws.connect("`+wsURL+`");
+	socket.send("hello");
+	const response = socket.receive(5000);
+	check(response, {
+		"message received": (r) => r != null,
+		"echoed": (r) => r === "hello",
+	});
+	socket.close();
+}`)
+	var warnings []string
+	res, err := Run(context.Background(), Params{
+		Config:    config.Config{Script: path, GracefulStop: time.Second},
+		Overrides: config.Overrides{VUs: intp(3), Duration: durp(200 * time.Millisecond)},
+		Warn:      func(msg string) { warnings = append(warnings, msg) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := res.Summary
+	if s.ScriptErrors != 0 {
+		t.Fatalf("script error: %s", s.FirstScriptError)
+	}
+	sessions, _ := s.Family("ws_sessions")
+	latency, _ := s.Family("ws_msg_latency")
+	if sessions.Count == 0 || latency.Count != sessions.Count {
+		t.Errorf("%d sessions, %d latency samples; want one per session", sessions.Count, latency.Count)
+	}
+	for _, th := range res.Thresholds {
+		if !th.Passed {
+			t.Errorf("threshold %s %s failed", th.Metric, th.Expr)
+		}
+	}
+	if len(warnings) != 0 {
+		t.Errorf("warnings: %q", warnings)
+	}
+}
