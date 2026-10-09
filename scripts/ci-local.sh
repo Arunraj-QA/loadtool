@@ -30,7 +30,7 @@ echo "== build"
 (cd "$root" && go build -o "$out/loadtool$exe" ./cmd/loadtool && go build -o "$out/server$exe" ./examples/server)
 
 echo "== start the demo API on 127.0.0.1:$port"
-"$out/server$exe" -addr "127.0.0.1:$port" -grpc-addr "" >"$out/server.log" 2>&1 &
+"$out/server$exe" -addr "127.0.0.1:$port" -grpc-addr "" -kafka-port 0 >"$out/server.log" 2>&1 &
 server=$!
 trap 'kill "$server" 2>/dev/null || true' EXIT
 for _ in $(seq 50); do

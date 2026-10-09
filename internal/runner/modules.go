@@ -4,6 +4,7 @@ import (
 	"github.com/Arunraj-QA/loadtool/internal/protocol"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/graphql"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/kafka"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/ws"
 )
 
@@ -13,4 +14,5 @@ var modules = []protocol.Module{
 	ws.Module{},
 	grpc.Module{},
 	graphql.Module{},
+	kafka.Module{},
 }

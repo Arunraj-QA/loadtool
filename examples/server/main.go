@@ -24,7 +24,9 @@
 //	                           placeOrder mutation, after the -delay
 //
 // On -grpc-addr (127.0.0.1:8091) it serves the gRPC greeter service of
-// examples/proto/greeter.proto, with server reflection.
+// examples/proto/greeter.proto, with server reflection. On -kafka-port
+// (9092) it runs an in-process Kafka broker (franz-go's kfake) with the
+// topics orders and events, so the Kafka examples need no Docker.
 //
 // It speaks HTTP/1.1 and HTTP/2 without TLS (h2c) on the same port.
 package main
@@ -55,6 +57,7 @@ import (
 
 	"github.com/Arunraj-QA/loadtool/internal/protocols/graphql/graphqltest"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc/grpctest"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/kafka/kafkatest"
 )
 
 // Password is the one password every demo user has.
@@ -88,6 +91,7 @@ func findProduct(id int) (product, bool) {
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8090", "listen address")
 	grpcAddr := flag.String("grpc-addr", "127.0.0.1:8091", "gRPC listen address (greeter service with reflection); empty to turn it off")
+	kafkaPort := flag.Int("kafka-port", 9092, "port of the in-process Kafka broker (topics orders and events); 0 to turn it off")
 	delay := flag.Duration("delay", 5*time.Millisecond, "time every /api/ request, WebSocket echo and gRPC SayHello waits before answering")
 	flag.Parse()
 
@@ -110,6 +114,14 @@ func main() {
 		}
 		defer stopGRPC()
 		fmt.Printf("demo gRPC listening on %s (greeter.Greeter, reflection on)\n", gln.Addr())
+	}
+	if *kafkaPort != 0 {
+		cluster, err := kafkatest.NewCluster(*kafkaPort, "orders", "events")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer cluster.Close()
+		fmt.Printf("demo Kafka listening on %s (in-process; topics orders and events, %d partitions each)\n", strings.Join(cluster.ListenAddrs(), ","), kafkatest.Partitions)
 	}
 	if err := serve(ctx, ln, newAPI(*delay, newSigner()).routes()); err != nil {
 		log.Fatal(err)
