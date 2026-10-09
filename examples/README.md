@@ -1,6 +1,6 @@
 # Examples
 
-Eleven runnable scripts. They all run against the demo API in
+Twelve runnable scripts. They all run against the demo API in
 [`server/`](server/), a small shop with products, orders, a login and a
 WebSocket echo, so
 you can try every feature without a server of your own. CI runs every
@@ -27,6 +27,7 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | [`scenarios.ts`](scenarios.ts) | Three workloads at once: `constant-vus`, `ramping-vus` and `constant-arrival-rate` (20 s) |
 | [`http2.ts`](http2.ts) | Requiring HTTP/2 with `httpVersion: "2"`, checking `res.proto` |
 | [`websocket.ts`](websocket.ts) | HTTP and WebSocket in one iteration: log in, then send messages and time each reply; WebSocket thresholds |
+| [`websocket-request-reply.ts`](websocket-request-reply.ts) | WebSocket in the blocking style: `connect`, `send`, `receive`, `close` |
 
 **By topic:**
 
@@ -42,7 +43,7 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | Ramping VUs | `scenarios.ts` |
 | Constant arrival rate | `scenarios.ts` |
 | HTTP/2 | `http2.ts` |
-| WebSocket | `websocket.ts` |
+| WebSocket | `websocket.ts` (callbacks), `websocket-request-reply.ts` (blocking) |
 | Setup and teardown | `auth-token.ts` |
 
 ## Against your own server

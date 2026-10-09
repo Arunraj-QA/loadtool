@@ -27,6 +27,7 @@ runs=(
   "data-driven.ts|--vus 2 --duration 2s"
   "http2.ts|--vus 2 --duration 2s"
   "websocket.ts|--vus 2 --duration 2s"
+  "websocket-request-reply.ts|--vus 2 --duration 2s"
   "scenarios.ts|"
 )
 

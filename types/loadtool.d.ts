@@ -160,10 +160,46 @@ declare module "loadtool/ws" {
     headers?: Record<string, string>;
   }
 
-  /** Opens a WebSocket session and blocks until it is closed. */
+  /**
+   * A socket in the blocking style: returned by connect without a setup
+   * function. Its fields describe the session and are updated as it goes.
+   */
+  export interface BlockingSocket extends Result {
+    /** True once the socket is closed (or never opened). */
+    closed: boolean;
+    /**
+     * Sends a text message; returns false if it could not be sent. Every
+     * send is timed until a later receive returns a message (ws_msg_latency),
+     * unless { reply: false } is given.
+     */
+    send(data: string, options?: SendOptions): boolean;
+    sendBinary(data: ArrayBuffer, options?: SendOptions): boolean;
+    /**
+     * Waits for the next message (default 30 000 ms). Returns null on a
+     * timeout (error_code "timeout"; the socket stays open), when the socket
+     * closes, or when the test ends.
+     */
+    receive(timeoutMs?: number): string | ArrayBuffer | null;
+    /** Closes the socket and waits until it is closed. */
+    close(code?: number): void;
+  }
+
+  /** Opens a WebSocket session and blocks until it is closed (the callback style). */
   export function connect(url: string, params: Params, setup: (socket: Socket) => void): Result;
   export function connect(url: string, setup: (socket: Socket) => void): Result;
+  /**
+   * Opens a socket and returns it (the blocking style). A socket left open
+   * is closed when the iteration ends.
+   */
+  export function connect(url: string, params?: Params): BlockingSocket;
 
   const ws: { connect: typeof connect };
+  export default ws;
+}
+
+/** "loadtool/websocket" is another name for "loadtool/ws". */
+declare module "loadtool/websocket" {
+  export * from "loadtool/ws";
+  import ws from "loadtool/ws";
   export default ws;
 }
