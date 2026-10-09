@@ -222,3 +222,28 @@ func TestServeGRPC(t *testing.T) {
 		t.Errorf("services = %v, want greeter.Greeter", names)
 	}
 }
+
+// /graphql runs queries and mutations, and reports GraphQL errors with
+// HTTP 200.
+func TestGraphQL(t *testing.T) {
+	srv := newTestServer(t)
+	c := srv.Client()
+	post := func(body string) (int, string) {
+		res, err := c.Post(srv.URL+"/graphql", "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, string(b)
+	}
+	if code, body := post(`{"query":"{ product(id: 2) { name } }"}`); code != 200 || !strings.Contains(body, `"Milk frother"`) {
+		t.Errorf("query: %d %s", code, body)
+	}
+	if code, body := post(`{"query":"mutation { placeOrder(productId: 1, quantity: 2) { totalCents } }"}`); code != 200 || !strings.Contains(body, `"totalCents":4980`) {
+		t.Errorf("mutation: %d %s", code, body)
+	}
+	if code, body := post(`{"query":"{ product(id: 9) { name } }"}`); code != 200 || !strings.Contains(body, `"errors"`) {
+		t.Errorf("error: %d %s", code, body)
+	}
+}

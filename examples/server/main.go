@@ -20,6 +20,8 @@
 //	POST /api/logout           clears the session cookie
 //	GET  /ws/echo              WebSocket: echoes every message, after the
 //	                           -delay (text and binary)
+//	POST /graphql              GraphQL: products, product(id), fail and the
+//	                           placeOrder mutation, after the -delay
 //
 // On -grpc-addr (127.0.0.1:8091) it serves the gRPC greeter service of
 // examples/proto/greeter.proto, with server reflection.
@@ -51,6 +53,7 @@ import (
 	"github.com/coder/websocket"
 	"google.golang.org/grpc"
 
+	"github.com/Arunraj-QA/loadtool/internal/protocols/graphql/graphqltest"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc/grpctest"
 )
 
@@ -201,6 +204,11 @@ func newAPI(delay time.Duration, s signer) *api { return &api{delay: delay, sign
 func (a *api) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /ws/echo", a.wsEcho)
+	gql, err := graphqltest.Handler(a.delay)
+	if err != nil {
+		panic(err) // the schema is fixed: an error is a bug
+	}
+	mux.Handle("POST /graphql", gql)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})

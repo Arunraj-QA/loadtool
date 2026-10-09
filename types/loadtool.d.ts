@@ -272,3 +272,54 @@ declare module "loadtool/grpc" {
   export default grpc;
 }
 
+declare module "loadtool/graphql" {
+  export interface Params {
+    /** The operation's variables. */
+    variables?: Record<string, any>;
+    /** Request headers (a Client's default headers are merged under them). */
+    headers?: Record<string, string>;
+    /** Which operation of the document to run. */
+    operationName?: string;
+    /** Milliseconds, or a duration such as "2s" (default: the HTTP timeout, 30 s). */
+    timeout?: number | string;
+  }
+
+  export interface Result {
+    /** "query" or "mutation". */
+    kind: string;
+    /** HTTP status; 0 without a response. */
+    status: number;
+    proto: string;
+    headers: Record<string, string>;
+    /** Transport success: an HTTP 2xx response. */
+    http_ok: boolean;
+    /** GraphQL success: http_ok, a JSON body, and no GraphQL errors. */
+    ok: boolean;
+    /** The response's data (null when absent). */
+    data: any;
+    /** The response's GraphQL errors; [] when none. */
+    errors: Array<{ message: string; path?: (string | number)[]; locations?: { line: number; column: number }[]; extensions?: any }>;
+    /** "" or why it is not ok: the transport error, the HTTP status, or the first GraphQL error. */
+    error: string;
+    /** "" or "server" (HTTP error or GraphQL errors), "protocol" (not GraphQL JSON), "dial", "timeout", ..., "invalid". */
+    error_code: string;
+    /** The raw response body. */
+    body: string | null;
+    timings: { duration: number };
+  }
+
+  export function query(url: string, document: string, params?: Params): Result;
+  export function mutation(url: string, document: string, params?: Params): Result;
+
+  /** An endpoint with default headers. */
+  export class Client {
+    constructor(url: string, params?: { headers?: Record<string, string> });
+    readonly url: string;
+    query(document: string, params?: Params): Result;
+    mutation(document: string, params?: Params): Result;
+  }
+
+  const graphql: { query: typeof query; mutation: typeof mutation; Client: typeof Client };
+  export default graphql;
+}
+

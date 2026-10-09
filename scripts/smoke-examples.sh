@@ -17,7 +17,8 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
 
-# script, then loadtool run arguments
+# script, loadtool run arguments, and optionally "failures-ok" for an
+# example whose operations fail on purpose (its checks must still pass)
 runs=(
   "basic-http.ts|--vus 2 --duration 2s"
   "basic-http.js|--vus 2 --duration 2s"
@@ -32,6 +33,9 @@ runs=(
   "websocket-request-reply.ts|--vus 2 --duration 2s"
   "grpc-unary.ts|--vus 2 --duration 2s"
   "grpc-streaming.ts|--vus 2 --duration 2s"
+  "graphql-query.ts|--vus 2 --duration 2s"
+  "graphql-mutation.ts|--vus 2 --duration 2s"
+  "graphql-errors.ts|--vus 2 --duration 2s|failures-ok"
   "scenarios.ts|"
 )
 
@@ -50,7 +54,12 @@ fail() {
 failed=0
 for entry in "${runs[@]}"; do
   script=${entry%%|*}
-  args=${entry#*|}
+  rest=${entry#*|}
+  args=${rest%%|*}
+  failures_ok=false
+  if [ "$rest" != "$args" ] && [ "${rest#*|}" = failures-ok ]; then
+    failures_ok=true
+  fi
   summary="$out/${script}.json"
   code=0
   # shellcheck disable=SC2086
@@ -60,11 +69,11 @@ for entry in "${runs[@]}"; do
     tail -5 "$out/${script}.log"
     continue
   fi
-  problem=$("$jq" -r '
+  problem=$("$jq" -r --argjson failuresOK "$failures_ok" '
     if .metrics.script_errors.count > 0 then "script errors: \(.metrics.script_errors.first)"
     elif .metrics.http_reqs.count == 0 and ([.metrics[] | objects | select(.kind == "counter") | .count] | add // 0) == 0 then "no requests, sessions or calls"
     elif .metrics.http_req_failed.failed > 0 then "failed requests: \(.metrics.http_req_failed.failed)"
-    elif ([.metrics | to_entries[] | select(.value.kind? == "rate" and (.key | endswith("_failed")) and .value.trues > 0)] | length) > 0
+    elif $failuresOK == false and ([.metrics | to_entries[] | select(.value.kind? == "rate" and (.key | endswith("_failed")) and .value.trues > 0)] | length) > 0
       then "failures in \([.metrics | to_entries[] | select(.value.kind? == "rate" and (.key | endswith("_failed")) and .value.trues > 0) | .key] | join(", "))"
     elif .metrics.checks.fails > 0 then "failed checks: \([.checks[] | select(.fails > 0) | .name] | join(", "))"
     else "" end' "$summary")

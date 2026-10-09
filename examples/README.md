@@ -1,8 +1,8 @@
 # Examples
 
-Fourteen runnable scripts. They all run against the demo API in
+Seventeen runnable scripts. They all run against the demo API in
 [`server/`](server/), a small shop with products, orders, a login, a
-WebSocket echo and a gRPC greeter, so
+WebSocket echo, a gRPC greeter and a GraphQL endpoint, so
 you can try every feature without a server of your own. CI runs every
 example on every change (`scripts/smoke-examples.sh`), so they keep
 working.
@@ -30,6 +30,9 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | [`websocket-request-reply.ts`](websocket-request-reply.ts) | WebSocket in the blocking style: `connect`, `send`, `receive`, `close` |
 | [`grpc-unary.ts`](grpc-unary.ts) | gRPC unary calls from a `.proto` file ([`proto/greeter.proto`](proto/greeter.proto)): metadata, deadline, checks, thresholds |
 | [`grpc-streaming.ts`](grpc-streaming.ts) | gRPC by server reflection: server, client and bidirectional streams |
+| [`graphql-query.ts`](graphql-query.ts) | GraphQL queries with variables, a client with default headers |
+| [`graphql-mutation.ts`](graphql-mutation.ts) | A GraphQL mutation with variables, after an HTTP login (bearer token header) |
+| [`graphql-errors.ts`](graphql-errors.ts) | GraphQL errors with HTTP 200: `http_ok` true, `ok` false, partial data |
 
 **By topic:**
 
@@ -47,6 +50,7 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | HTTP/2 | `http2.ts` |
 | WebSocket | `websocket.ts` (callbacks), `websocket-request-reply.ts` (blocking) |
 | gRPC | `grpc-unary.ts` (`.proto`), `grpc-streaming.ts` (reflection, streams) |
+| GraphQL | `graphql-query.ts`, `graphql-mutation.ts`, `graphql-errors.ts` |
 | Setup and teardown | `auth-token.ts` |
 
 ## Against your own server
@@ -79,6 +83,7 @@ go run ./examples/server -addr 127.0.0.1:8090 -delay 5ms
 | `GET /api/me` | `{"username"}` from the `session` cookie or `Authorization: Bearer <token>`; 401 without one |
 | `POST /api/logout` | 204; deletes the `session` cookie |
 | `GET /ws/echo` | WebSocket: echoes every message (text or binary) after `-delay` |
+| `POST /graphql` | GraphQL (after `-delay`): `products`, `product(id)` (an error for an unknown id), `fail(message)`, mutation `placeOrder(productId, quantity)` |
 | gRPC on `-grpc-addr` (`127.0.0.1:8091`) | `greeter.Greeter` from `proto/greeter.proto`, with server reflection: `SayHello` (after `-delay`), `LotsOfReplies` (each reply after `-delay`), `LotsOfGreetings`, `Chat`, `Fail`; `fail_code` on a streaming request ends the stream with that status |
 
 **How it behaves:**
