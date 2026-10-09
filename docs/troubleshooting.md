@@ -64,6 +64,7 @@ An iteration threw. The summary shows the count and the first message
 |---|---|---|
 | `TypeError: http: the request body must be a string; use JSON.stringify(...)` | An object passed as a body | `http.post(url, JSON.stringify(obj), { headers: { "Content-Type": "application/json" } })` |
 | `SyntaxError: …` from `json()` | The body is not JSON, such as an HTML error page | Check `status` first, or call `json()` inside a `check` |
+| `the async function did not finish: it awaits something that never resolves …` | An `async` function awaits something that never resolves; LoadTool has no event loop | Remove the `await`: LoadTool calls (`http.get`, `ws.connect`, …) are blocking and return their result directly |
 | `Error: …` from your code | A `throw` in the script | Expected, if the script throws on purpose (see `examples/basic-http.ts`) |
 
 ## Checks fail

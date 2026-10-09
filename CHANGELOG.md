@@ -105,6 +105,12 @@ does.
 
 **Fixes found along the way:**
 
+- An `async` default function (or `setup`, `teardown`, or a scenario
+  function) hid every error: its rejected Promise was ignored, so a
+  failing script reported no script errors. Errors in `async` functions
+  are now reported, and one that awaits something that never resolves is
+  a script error that says so.
+
 - A setup cancelled with Ctrl+C could count as successful and start the
   load phase.
 - On Windows, replacing a result file another process briefly holds open

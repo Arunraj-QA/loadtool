@@ -51,6 +51,19 @@ again until its scenario ends.
   `maximum call stack size of 2500 frames exceeded`, which `try/catch`
   cannot catch.
 
+**`async` functions** (the default function, scenario functions,
+`setup`, `teardown`) work, with errors reported as for other functions.
+LoadTool has no event loop, though, and no LoadTool API returns a
+Promise:
+
+- **`await` on a value that is already available** works:
+  `await Promise.resolve(1)`, or an `async` helper that does not wait on
+  anything.
+- **`await` on something that never resolves** ends the iteration with a
+  script error that says so.
+- **`async` gains nothing.** LoadTool calls are blocking, so a plain
+  function does the same.
+
 **TypeScript** types are removed with esbuild but **not type-checked**.
 Error locations point at the original `.ts` lines.
 
