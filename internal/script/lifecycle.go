@@ -132,6 +132,7 @@ func (l *Lifecycle) call(ctx context.Context, client *http.Client, timeout time.
 	vu.ctx, vu.rec, vu.client = callCtx, &metrics.Recorder{}, httpclient.WithJar(client, &vu.jar)
 	release := vu.interruptOn(callCtx)
 	v, err := fn(goja.Undefined(), args...)
+	vu.endIteration()
 	release()
 	vu.ctx, vu.rec, vu.client = nil, nil, nil
 

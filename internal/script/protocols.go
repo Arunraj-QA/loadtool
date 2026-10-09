@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -40,22 +41,22 @@ func newModuleSet(mods []protocol.Module) (*moduleSet, error) {
 	ms := &moduleSet{all: mods, imported: make([]bool, len(mods)), runs: make([]protocol.Run, len(mods))}
 	seen := map[string]bool{}
 	for i, m := range mods {
-		name := m.Name()
-		for _, r := range reservedBuiltins {
-			if name == r {
+		for _, name := range append([]string{m.Name()}, aliases(m)...) {
+			if slices.Contains(reservedBuiltins, name) {
 				return nil, fmt.Errorf("protocol module %q: the name is reserved", name)
 			}
+			if seen[name] {
+				return nil, fmt.Errorf("protocol module name %q is registered twice", name)
+			}
+			seen[name] = true
 		}
-		if seen[name] {
-			return nil, fmt.Errorf("protocol module %q is registered twice", name)
-		}
-		seen[name] = true
-		ms.props = append(ms.props, lazyProp{name, func(vu *VU) goja.Value { return vu.newModuleObject(i) }})
+		ms.props = append(ms.props, lazyProp{m.Name(), func(vu *VU) goja.Value { return vu.newModuleObject(i) }})
 	}
 	return ms, nil
 }
 
-// index returns the index of the module imported as path ("loadtool/ws").
+// index returns the index of the module imported as path ("loadtool/ws"),
+// by its name or one of its aliases.
 func (ms *moduleSet) index(path string) (int, bool) {
 	if ms == nil {
 		return 0, false
@@ -65,11 +66,18 @@ func (ms *moduleSet) index(path string) (int, bool) {
 		return 0, false
 	}
 	for i, m := range ms.all {
-		if m.Name() == name {
+		if m.Name() == name || slices.Contains(aliases(m), name) {
 			return i, true
 		}
 	}
 	return 0, false
+}
+
+func aliases(m protocol.Module) []string {
+	if a, ok := m.(protocol.Aliased); ok {
+		return a.Aliases()
+	}
+	return nil
 }
 
 // markImported records that the script imports module i.
@@ -97,6 +105,9 @@ func (ms *moduleSet) names() []string {
 	if ms != nil {
 		for _, m := range ms.all {
 			names = append(names, fmt.Sprintf("%q", "loadtool/"+m.Name()))
+			for _, a := range aliases(m) {
+				names = append(names, fmt.Sprintf("%q", "loadtool/"+a))
+			}
 		}
 	}
 	return names
@@ -124,6 +135,7 @@ func (p *Program) StartModules(env protocol.RunEnv) ([]metrics.Def, error) {
 		return nil, err
 	}
 	env.Families = fams
+	env.Warn = p.warn.once // once per run, however many VUs report it
 	for i, m := range ms.all {
 		if !ms.imported[i] {
 			continue
@@ -214,6 +226,16 @@ func (vu *VU) beginIteration(rec *metrics.Recorder) {
 	for _, inst := range vu.insts {
 		if inst != nil {
 			inst.BeginIteration()
+		}
+	}
+}
+
+// endIteration tells every instance this VU built that the iteration (or
+// setup, or teardown) returned. It runs while the context is still set.
+func (vu *VU) endIteration() {
+	for _, inst := range vu.insts {
+		if inst != nil {
+			inst.EndIteration()
 		}
 	}
 }

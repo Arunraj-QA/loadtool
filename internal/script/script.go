@@ -494,6 +494,7 @@ func (vu *VU) Iterate(ctx context.Context, rec *metrics.Recorder) {
 	if err == nil {
 		_, err = settle(v) // an async function's errors are in its Promise
 	}
+	vu.endIteration()
 	stop()
 	vu.ctx, vu.rec = nil, nil
 

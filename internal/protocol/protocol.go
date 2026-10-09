@@ -39,6 +39,12 @@ type Module interface {
 	NewRun(RunEnv) (Run, error)
 }
 
+// Aliased is implemented by a module that can also be imported under
+// other names, such as "loadtool/websocket" for "loadtool/ws".
+type Aliased interface {
+	Aliases() []string
+}
+
 // RunEnv is what a module gets from the run. It carries no scenario or
 // command-line state.
 type RunEnv struct {
@@ -71,6 +77,10 @@ type Instance interface {
 	// BeginIteration is called at the start of each of the VU's
 	// iterations.
 	BeginIteration()
+	// EndIteration is called when an iteration (or setup, or teardown)
+	// returns, while its context is still set, so the instance can
+	// release what the script left open in it.
+	EndIteration()
 	// Close releases the instance's resources. It must be idempotent and
 	// return within ctx's deadline.
 	Close(ctx context.Context) error

@@ -87,6 +87,7 @@ func (h *Harness) Run(src string) (goja.Value, error) {
 			h.vu.rt.ClearInterrupt()
 		}()
 	}
+	defer h.inst.EndIteration()
 	return h.vu.rt.RunString(src)
 }
 
