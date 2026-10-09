@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs every example against the demo API and fails if one exits
-# non-zero, has script errors, sends no requests, has failed requests or
-# fails a check. CI runs it so the examples keep working.
+# non-zero, has script errors, sends no requests (HTTP or WebSocket), has
+# failed requests or WebSocket sessions, or fails a check. CI runs it so
+# the examples keep working.
 #
 #   go run ./examples/server &       # the demo API, on 127.0.0.1:8090
 #   scripts/smoke-examples.sh bin/loadtool
@@ -58,8 +59,9 @@ for entry in "${runs[@]}"; do
   fi
   problem=$("$jq" -r '
     if .metrics.script_errors.count > 0 then "script errors: \(.metrics.script_errors.first)"
-    elif .metrics.http_reqs.count == 0 then "no requests"
+    elif .metrics.http_reqs.count == 0 and ((.metrics.ws_sessions.count // 0) == 0) then "no requests or sessions"
     elif .metrics.http_req_failed.failed > 0 then "failed requests: \(.metrics.http_req_failed.failed)"
+    elif (.metrics.ws_session_failed.trues // 0) > 0 then "failed WebSocket sessions: \(.metrics.ws_session_failed.trues)"
     elif .metrics.checks.fails > 0 then "failed checks: \([.checks[] | select(.fails > 0) | .name] | join(", "))"
     else "" end' "$summary")
   if [ -n "$problem" ]; then
