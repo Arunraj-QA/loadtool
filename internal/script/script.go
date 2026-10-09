@@ -174,6 +174,9 @@ func compileIn(filename, dir string, src []byte, modules []protocol.Module) (*Pr
 	if err != nil {
 		return nil, err
 	}
+	if mods != nil {
+		mods.seal()
+	}
 	prog, err := goja.Compile(filename, code, true)
 	if err != nil {
 		return nil, fmt.Errorf("compile %s: %w", filename, err)
@@ -407,9 +410,9 @@ func (p *Program) NewVUExec(ctx context.Context, id int, exec string, client *ht
 	rt.SetMaxCallStackSize(maxCallStackSize)
 	vu := &VU{rt: rt, id: int64(id), exec: exec, discardBodies: p.discardBodies, keepCookies: p.keepCookies, warn: p.warn, mods: p.mods}
 	props := builtinProps
-	if p.mods != nil {
+	if p.mods.importsAny() {
 		vu.insts = make([]protocol.Instance, len(p.mods.all))
-		props = append(slices.Clip(builtinProps), p.mods.props...)
+		props = p.mods.vuProps
 	}
 	if client != nil {
 		// Shares client's transport (and connection pool); keeps its own

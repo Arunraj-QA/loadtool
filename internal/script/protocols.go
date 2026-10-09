@@ -26,6 +26,10 @@ type moduleSet struct {
 	// props are the builtin object's properties for the modules; built
 	// once, shared by every VU.
 	props []lazyProp
+	// vuProps are a VU's builtin object properties: the core ones and
+	// those of the modules the script imports, so a module it does not
+	// import costs its VUs nothing. Set by seal, after bundling.
+	vuProps []lazyProp
 
 	mu       sync.Mutex // guards imported while esbuild resolves imports
 	imported []bool     // by index in all
@@ -79,6 +83,20 @@ func aliases(m protocol.Module) []string {
 	}
 	return nil
 }
+
+// seal sets vuProps from the imports bundling found. It runs once, before
+// any VU is created.
+func (ms *moduleSet) seal() {
+	ms.vuProps = builtinProps
+	for i, imp := range ms.imported {
+		if imp {
+			ms.vuProps = append(slices.Clip(ms.vuProps), ms.props[i])
+		}
+	}
+}
+
+// importsAny reports whether the script imports any protocol module.
+func (ms *moduleSet) importsAny() bool { return ms != nil && len(ms.vuProps) > len(builtinProps) }
 
 // markImported records that the script imports module i.
 func (ms *moduleSet) markImported(i int) {
