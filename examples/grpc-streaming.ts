@@ -15,6 +15,7 @@ import { check } from "loadtool";
 
 const GRPC_ADDR = __ENV.GRPC_ADDR || "127.0.0.1:8091";
 const client = new grpc.Client();
+let connected = false;
 
 export const options = {
   thresholds: {
@@ -25,10 +26,11 @@ export const options = {
 };
 
 export default function (): void {
-  if (__ITER === 0) {
+  if (!connected) {
     // reflect: true asks the server to describe its services.
     const conn = client.connect(GRPC_ADDR, { plaintext: true, reflect: true });
     if (conn.error !== "") throw new Error(`connect: ${conn.error}`);
+    connected = true;
   }
 
   // Server streaming: one request, many replies.

@@ -514,9 +514,14 @@ import { check } from "loadtool";
 
 const client = new grpc.Client();
 client.load(["proto"], "greeter.proto"); // top-level code: parsed once per run
+let connected = false; // per VU
 
 export default function () {
-  if (__ITER === 0) client.connect("127.0.0.1:8091", { plaintext: true });
+  if (!connected) {
+    const conn = client.connect("127.0.0.1:8091", { plaintext: true });
+    if (conn.error !== "") throw new Error(conn.error); // retried next iteration
+    connected = true;
+  }
   const res = client.invoke("greeter.Greeter/SayHello", { name: "Ada" }, {
     metadata: { "x-request-id": "1" }, timeout: "2s",
   });
@@ -530,7 +535,7 @@ export default function () {
 |---|---|
 | `new grpc.Client()` | A client for this VU; allowed in top-level code |
 | `load(importPaths, ...files)` | Parse `.proto` files (paths relative to the script); allowed in top-level code. A parse error throws. |
-| `connect(address, { plaintext, reflect, timeout })` | Connect and wait until ready. `plaintext: true` for gRPC without TLS; `reflect: true` describes the methods by server reflection. Returns `{ error, error_code }`. The connection is kept across iterations: connect once (`__ITER === 0`). |
+| `connect(address, { plaintext, reflect, timeout })` | Connect and wait until ready. `plaintext: true` for gRPC without TLS; `reflect: true` describes the methods by server reflection. Returns `{ error, error_code }`. Refused attempts are retried until the timeout (default 30 s). The connection is kept across iterations: connect once per VU, and again if it failed (see the example). |
 | `invoke(method, request, { metadata, timeout })` | One unary call to `"package.Service/Method"` |
 | `stream(method, { metadata, timeout })` | Open a stream (any streaming kind) |
 | `close()` | Close the connection; the end of the test does this too |

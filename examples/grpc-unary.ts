@@ -16,6 +16,7 @@ const GRPC_ADDR = __ENV.GRPC_ADDR || "127.0.0.1:8091";
 
 const client = new grpc.Client();
 client.load(["proto"], "greeter.proto"); // relative to this script
+let connected = false; // each VU has its own
 
 export const options = {
   thresholds: {
@@ -27,10 +28,12 @@ export const options = {
 
 export default function (): void {
   // Connect once per VU; the connection is kept across iterations and
-  // closed at the end of the test.
-  if (__ITER === 0) {
+  // closed at the end of the test. If connecting fails, the iteration ends
+  // and the next one tries again.
+  if (!connected) {
     const conn = client.connect(GRPC_ADDR, { plaintext: true });
     if (conn.error !== "") throw new Error(`connect: ${conn.error}`);
+    connected = true;
   }
 
   const res = client.invoke(

@@ -59,8 +59,10 @@ import grpc from "loadtool/grpc";
 const client = new grpc.Client();
 client.load(["proto"], "greeter.proto");          // top-level code: parse once, cached for the run
 
+let connected = false;                            // per VU
+
 export default function () {
-  if (__ITER === 0) client.connect("127.0.0.1:8091", { plaintext: true });    // or { reflect: true }
+  if (!connected) connected = client.connect("127.0.0.1:8091", { plaintext: true }).error === "";  // or { reflect: true }
   const res = client.invoke("greeter.Greeter/SayHello", { name: "Ada" }, {
     metadata: { "x-request-id": "1" }, timeout: "2s",
   });
@@ -80,7 +82,7 @@ export default function () {
 |---|---|
 | `new grpc.Client()` | A client in the VU that creates it; allowed in top-level code |
 | `client.load(importPaths, ...files)` | Parses `.proto` files (relative to the script's directory), cached in the run, so 1,000 VUs parse once. Allowed in top-level code. |
-| `client.connect(address, { plaintext, reflect, timeout, tls })` | Dials and waits until the connection is ready (default timeout 30 s). With `reflect: true`, it fetches the server's descriptors by reflection; these are cached in the run, per address. Returns `{ error, error_code }`, and does not throw on network failure. |
+| `client.connect(address, { plaintext, reflect, timeout })` | Dials and waits until the connection is ready (default timeout 30 s). A refused attempt is retried with grpc-go's backoff until the timeout (see the amendment). With `reflect: true`, it fetches the server's descriptors by reflection; these are cached in the run, per address. Returns `{ error, error_code }`, and does not throw on network failure. |
 | `client.invoke(method, request, { metadata, timeout })` | One unary call (default timeout 30 s), returning the result above. `message` is converted from protobuf when first read. |
 | `client.stream(method, { metadata, timeout })` | Opens a stream for a streaming method of any kind, and returns a stream object |
 | `client.close()` | Closes the connection |
@@ -205,3 +207,28 @@ so the examples run locally.
   - per-message receive timeouts;
   - load balancing across several addresses;
   - `grpc.Stream` with event callbacks, as in k6.
+
+## Amendment (2026-10-09): connect retries, found by the benchmark
+
+**What happened.** The first benchmark session failed about 95 % of
+calls at 500 and 1,000 VUs (`benchmarks/results/2026-10-09-grpc-unary/`,
+session 1). Two things combined:
+
+- **`connect` gave up on the first failed attempt.** When hundreds of
+  VUs connect at once, some attempts are refused while the server's
+  listen backlog is full; grpc-go would have retried them a moment later.
+- **The script connected only when `__ITER === 0`.** After a failed
+  connect, every later iteration called an unconnected client and failed
+  in microseconds. The high calls-per-second figures were these failures.
+
+**The decision:**
+
+- **`connect` waits until the connection is ready or the timeout
+  passes,** treating a failed attempt as retryable, as blocking dials in
+  grpc-go do. If the timeout passes after a failed attempt, the error is
+  `dial`, otherwise `timeout`.
+- **Scripts connect until connected:** a `connected` flag per VU. The
+  examples, the docs and the benchmark script use this pattern.
+- **`TestConnectRetriesUntilTimeout`** covers a server that starts after
+  the first attempt.
+

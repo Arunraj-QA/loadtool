@@ -130,7 +130,7 @@ this fail the test.
 | `client.load: … could not … greeter.proto` | The `.proto` file was not found | Paths are relative to the script; pass the directory as an import path: `client.load(["proto"], "greeter.proto")` |
 | `connect` returns `error_code` `dial` | Nothing listens there, or TLS failed | Check the address; for a server without TLS add `plaintext: true` |
 | `error_code` `invalid`: `unknown method` | No loaded `.proto` or reflection describes it | Load the right `.proto` file, or `connect(…, { reflect: true })`; write the method as `"package.Service/Method"` |
-| `error_code` `invalid`: `not connected` | `invoke` before `connect` | Connect once per VU: `if (__ITER === 0) client.connect(…)` |
+| `error_code` `invalid`: `not connected` | `invoke` before `connect`, or after a `connect` that failed | Connect until it succeeds: keep a `connected` flag per VU and connect while it is false (see `examples/grpc-unary.ts`). With `if (__ITER === 0)`, one failed connect leaves the VU unconnected for the whole test |
 | `error_code` `timeout`, `status_text` `DeadlineExceeded` | The call took longer than its timeout (default 30 s) | Raise `timeout`, or look at the server |
 | `is a streaming method; use client.stream` | `invoke` on a streaming method | Use `client.stream` |
 | Warning `grpc: a stream was still open when the iteration ended` | A stream was not read to the end or closed | Read until `recv()` returns `null`, or call `stream.close()` |
