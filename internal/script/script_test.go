@@ -18,6 +18,7 @@ import (
 	"github.com/Arunraj-QA/loadtool/internal/httpclient"
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
 	"github.com/Arunraj-QA/loadtool/internal/protocol"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/graphql"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc"
 	"github.com/Arunraj-QA/loadtool/internal/protocols/ws"
 )
@@ -955,7 +956,7 @@ export default function () {
 // as client.load) work.
 func loadWithModules(t *testing.T, path string) *Program {
 	t.Helper()
-	p, err := Load(path, ws.Module{}, grpc.Module{})
+	p, err := Load(path, ws.Module{}, grpc.Module{}, graphql.Module{})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
