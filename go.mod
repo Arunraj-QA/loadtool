@@ -16,7 +16,12 @@ require (
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
 	github.com/graphql-go/graphql v0.8.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/klauspost/compress v1.20.0 // indirect
+	github.com/pierrec/lz4/v4 v4.1.30 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
+	github.com/twmb/franz-go v1.22.1 // indirect
+	github.com/twmb/franz-go/pkg/kfake v0.0.0-20261007040850-d3792b34935a // indirect
+	github.com/twmb/franz-go/pkg/kmsg v1.14.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
