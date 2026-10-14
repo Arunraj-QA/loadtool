@@ -32,6 +32,8 @@ runs=(
   "http2.ts|--vus 2 --duration 2s"
   "websocket.ts|--vus 2 --duration 2s"
   "websocket-request-reply.ts|--vus 2 --duration 2s"
+  "websocket-basic.ts|--vus 2 --duration 2s"
+  "websocket-chat.ts|--vus 4 --duration 2s"
   "grpc-unary.ts|--vus 2 --duration 2s"
   "grpc-streaming.ts|--vus 2 --duration 2s"
   "graphql-query.ts|--vus 2 --duration 2s"
@@ -41,6 +43,7 @@ runs=(
   "kafka-consumer.ts|"
   "kafka-throughput.ts|--vus 2 --duration 2s"
   "kafka-errors.ts|--vus 1 --duration 6s|failures-ok"
+  "mixed-http-websocket.ts|--vus 2 --duration 2s"
   "mixed-protocols.ts|--vus 2 --duration 2s"
   "scenarios.ts|"
 )
