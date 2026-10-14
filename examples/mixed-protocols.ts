@@ -17,7 +17,7 @@ import { check } from "loadtool";
 //   Kafka      produce to "orders"           consume from "orders"
 //
 // Checks, thresholds, the console summary and the JSON and HTML reports
-// cover all of them. The execution flow is in docs/mixed-protocols.md.
+// cover all of them. The execution flow is in docs/examples/mixed-protocol.md.
 //
 // Start the demo API (HTTP and WebSocket on 8090, gRPC on 8091, an
 // in-process Kafka on 9092), then run:

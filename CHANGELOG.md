@@ -6,8 +6,14 @@ does.
 
 ## Unreleased
 
-### Phase 2: protocol breadth (in progress)
+### Phase 2: protocol breadth
 
+- **Documentation:** a page per protocol (`docs/protocols/`), split out
+  of the script API page; `docs/architecture/protocol-system.md` on how
+  protocol modules plug into the engine; and the mixed-protocol page,
+  moved to `docs/examples/mixed-protocol.md`.
+- **More examples:** `websocket-basic.ts`, `websocket-chat.ts` and
+  `mixed-http-websocket.ts`. The demo API serves a chat at `/ws/chat`.
 - **WebSocket** (`loadtool/ws`, ADR-019):
   - connect, send, receive and close, with handlers and timers in the
     session;
@@ -51,7 +57,7 @@ does.
 - **Mixed-protocol tests:** `examples/mixed-protocols.ts` uses HTTP,
   GraphQL, WebSocket, gRPC and Kafka in one iteration, with shared setup,
   checks, thresholds and reports. An end-to-end test runs it, and covers
-  cancellation and per-VU state. `docs/mixed-protocols.md` describes the
+  cancellation and per-VU state. `docs/examples/mixed-protocol.md` describes the
   execution flow.
 - **Fixed:** a script whose scenarios name `exec` functions could not
   import protocol modules.

@@ -100,10 +100,10 @@ runs.
 **Protocol metric families** (Phase 2,
 [ADR-015](decisions/ADR-015-metric-families.md)) are additional keys in
 `metrics`, written by protocol modules: `ws_*`
-([WebSocket](script-api.md#loadtoolws)), `grpc_*`
-([gRPC](script-api.md#loadtoolgrpc)), `graphql_*`
-([GraphQL](script-api.md#loadtoolgraphql)) and `kafka_*`
-([Kafka](script-api.md#loadtoolkafka)).
+([WebSocket](protocols/websocket.md)), `grpc_*`
+([gRPC](protocols/grpc.md)), `graphql_*`
+([GraphQL](protocols/graphql.md)) and `kafka_*`
+([Kafka](protocols/kafka.md)).
 
 - **Where they appear:** after the keys above, in a fixed order, and
   only when they recorded something. A run without them writes exactly

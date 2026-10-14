@@ -9,6 +9,8 @@ describe the code in detail as it stands at the end of Phase 0 (October
   and are dated, because they were taken at different commits.
 - **Workflows:** step-by-step diagrams of a test run, of development and
   of benchmarking are in [workflows.md](workflows.md).
+- **Protocols (Phase 2):** how WebSocket, gRPC, GraphQL and Kafka plug
+  into the engine is in [The protocol system](architecture/protocol-system.md).
 
 ## Architecture by phase
 

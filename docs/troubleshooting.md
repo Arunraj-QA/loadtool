@@ -45,7 +45,7 @@ requests): none succeeded`.
 
 **A status of 400 or more** is a response, but it counts as a failed
 request. For example, a 401 means the request was not logged in: see
-[Cookies and sessions](script-api.md#cookies-and-sessions).
+[Cookies and sessions](protocols/http.md#cookies-and-sessions).
 
 ## Some requests fail
 

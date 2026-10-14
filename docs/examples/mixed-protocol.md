@@ -1,7 +1,10 @@
 # Mixed-protocol tests
 
-One LoadTool test can use several protocols in the same iteration.
-[`examples/mixed-protocols.ts`](../examples/mixed-protocols.ts) uses five
+One LoadTool test can use several protocols in the same iteration. The
+simplest case is HTTP and WebSocket:
+[`examples/mixed-http-websocket.ts`](../../examples/mixed-http-websocket.ts)
+reads a product over HTTP, then sends its name over a WebSocket.
+[`examples/mixed-protocols.ts`](../../examples/mixed-protocols.ts) uses five
 of them in one user journey, two operations each. It logs in over HTTP
 first, and the other steps use that session's token:
 
@@ -19,7 +22,7 @@ loadtool run examples/mixed-protocols.ts --vus 10 --duration 10s
 ```
 
 This page describes how such a test runs. Each protocol's API is in the
-[Script API](script-api.md).
+[Script API](../script-api.md).
 
 ## The execution flow
 

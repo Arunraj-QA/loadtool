@@ -24,10 +24,10 @@ export const options = {
 | `stages` | | Ramping shorthand: `[{ duration: "30s", target: 10 }, ...]` ([Scenarios](#scenarios)) |
 | `scenarios` | | Named workloads ([Scenarios](#scenarios)) |
 | `thresholds` | | Pass/fail criteria ([Thresholds](#thresholds)) |
-| `discardResponseBodies` | `true` | Drop response bodies after reading them; `false` keeps them for `res.body` and `res.json()` ([Script API](script-api.md#responses)) |
-| `noCookiesReset` | `false` | Keep each VU's cookies across iterations ([Script API](script-api.md#cookies-and-sessions)) |
+| `discardResponseBodies` | `true` | Drop response bodies after reading them; `false` keeps them for `res.body` and `res.json()` ([Script API](protocols/http.md#responses)) |
+| `noCookiesReset` | `false` | Keep each VU's cookies across iterations ([Script API](protocols/http.md#cookies-and-sessions)) |
 | `noConnectionReuse` | `false` | Open a new connection for every request |
-| `httpVersion` | `"auto"` | `"auto"`, `"1.1"` or `"2"` ([Script API](script-api.md#http-versions-and-connections)) |
+| `httpVersion` | `"auto"` | `"auto"`, `"1.1"` or `"2"` ([Script API](protocols/http.md#http-versions-and-connections)) |
 | `setupTimeout` | `"60s"` | Time limit for `setup()` |
 | `teardownTimeout` | `"60s"` | Time limit for `teardown()` |
 
@@ -163,10 +163,10 @@ An expression is `<aggregate> <op> <number>`, with `<`, `<=`, `>`, `>=`,
 | `checks` | `rate` | Passed checks ÷ checks run (0–1) |
 | `iterations` | `count`, `rate` | Iterations that ran to their end |
 | `dropped_iterations` | `count`, `rate` | Arrival-rate starts that found no free VU |
-| `ws_*` | by kind: trend `avg`, `min`, `max`, `med`, `p(N)`; counter `count`, `rate`; rate `rate` | WebSocket metrics, in scripts that import `loadtool/ws` ([list](script-api.md#loadtoolws)) |
-| `grpc_*` | by kind, as above | gRPC metrics, in scripts that import `loadtool/grpc` ([list](script-api.md#loadtoolgrpc)) |
-| `graphql_*` | by kind, as above | GraphQL metrics, in scripts that import `loadtool/graphql` ([list](script-api.md#loadtoolgraphql)) |
-| `kafka_*` | by kind, as above | Kafka metrics, in scripts that import `loadtool/kafka` ([list](script-api.md#loadtoolkafka)) |
+| `ws_*` | by kind: trend `avg`, `min`, `max`, `med`, `p(N)`; counter `count`, `rate`; rate `rate` | WebSocket metrics, in scripts that import `loadtool/ws` ([list](protocols/websocket.md)) |
+| `grpc_*` | by kind, as above | gRPC metrics, in scripts that import `loadtool/grpc` ([list](protocols/grpc.md)) |
+| `graphql_*` | by kind, as above | GraphQL metrics, in scripts that import `loadtool/graphql` ([list](protocols/graphql.md)) |
+| `kafka_*` | by kind, as above | Kafka metrics, in scripts that import `loadtool/kafka` ([list](protocols/kafka.md)) |
 
 **Rules:**
 
