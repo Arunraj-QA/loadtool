@@ -3,6 +3,7 @@ package script
 import (
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/dop251/goja"
 
@@ -85,8 +86,17 @@ func TestUnimportedModulesCostVUsNothing(t *testing.T) {
 		if strings.Join(keys, ",") != strings.Join(tc.want, ",") {
 			t.Errorf("builtin properties %v; want %v", keys, tc.want)
 		}
-		if imported := len(tc.want) > 3; (vu.insts != nil) != imported {
-			t.Errorf("module instance slots allocated: %v; want %v", vu.insts != nil, imported)
+		if imported := len(tc.want) > 3; (vu.proto != nil) != imported {
+			t.Errorf("module state allocated: %v; want %v", vu.proto != nil, imported)
 		}
+	}
+}
+
+// A VU without protocol modules stays in Go's 144-byte allocation size
+// class, as in Phase 1: a field added to VU that crosses it costs every VU
+// 48 bytes. Module state belongs in vuModules instead.
+func TestVUFitsItsSizeClass(t *testing.T) {
+	if size := unsafe.Sizeof(VU{}); size > 144 {
+		t.Errorf("sizeof(VU) = %d B; want at most 144 (the next size class is 192)", size)
 	}
 }

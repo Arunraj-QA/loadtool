@@ -199,7 +199,7 @@ func (p *Program) CloseModules(ctx context.Context) error {
 // with goja's constructor form. The object is built on first access, like
 // every builtin module.
 func (vu *VU) newModuleObject(i int) goja.Value {
-	m := vu.mods.all[i]
+	m := vu.proto.set.all[i]
 	props := make([]lazyProp, 0, len(m.Exports()))
 	for _, e := range m.Exports() {
 		if isClassName(e) {
@@ -220,17 +220,17 @@ func isClassName(name string) bool { return name != "" && name[0] >= 'A' && name
 // instanceFor returns this VU's instance of module i, creating it on first
 // use.
 func (vu *VU) instanceFor(i int) protocol.Instance {
-	inst := vu.insts[i]
+	inst := vu.proto.insts[i]
 	if inst == nil {
-		run := vu.mods.runs[i]
+		run := vu.proto.set.runs[i]
 		if run == nil {
-			panic(vu.rt.NewGoError(fmt.Errorf("loadtool/%s cannot be used before the test starts", vu.mods.all[i].Name())))
+			panic(vu.rt.NewGoError(fmt.Errorf("loadtool/%s cannot be used before the test starts", vu.proto.set.all[i].Name())))
 		}
 		var err error
 		if inst, err = run.NewInstance(vu); err != nil {
-			panic(vu.rt.NewGoError(fmt.Errorf("loadtool/%s: %w", vu.mods.all[i].Name(), err)))
+			panic(vu.rt.NewGoError(fmt.Errorf("loadtool/%s: %w", vu.proto.set.all[i].Name(), err)))
 		}
-		vu.insts[i] = inst
+		vu.proto.insts[i] = inst
 	}
 	return inst
 }
@@ -240,7 +240,7 @@ func (vu *VU) constructModule(i int, name string, call goja.ConstructorCall) *go
 	inst := vu.instanceFor(i)
 	ctor, ok := goja.AssertConstructor(inst.Value().ToObject(vu.rt).Get(name))
 	if !ok {
-		panic(vu.rt.NewTypeError("loadtool/%s has no class %s", vu.mods.all[i].Name(), name))
+		panic(vu.rt.NewTypeError("loadtool/%s has no class %s", vu.proto.set.all[i].Name(), name))
 	}
 	obj, err := ctor(nil, call.Arguments...)
 	if err != nil {
@@ -255,7 +255,7 @@ func (vu *VU) callModule(i int, name string, call goja.FunctionCall) goja.Value 
 	inst := vu.instanceFor(i)
 	fn, ok := goja.AssertFunction(inst.Value().ToObject(vu.rt).Get(name))
 	if !ok {
-		panic(vu.rt.NewTypeError("loadtool/%s has no function %s", vu.mods.all[i].Name(), name))
+		panic(vu.rt.NewTypeError("loadtool/%s has no function %s", vu.proto.set.all[i].Name(), name))
 	}
 	v, err := fn(call.This, call.Arguments...)
 	if err != nil {
@@ -267,13 +267,13 @@ func (vu *VU) callModule(i int, name string, call goja.FunctionCall) goja.Value 
 // beginIteration attaches the run's families to rec and tells every
 // instance this VU built that an iteration starts.
 func (vu *VU) beginIteration(rec *metrics.Recorder) {
-	if vu.mods == nil {
+	if vu.proto == nil {
 		return
 	}
-	if fams := vu.mods.families; fams != nil {
+	if fams := vu.proto.set.families; fams != nil {
 		rec.UseFamilies(fams)
 	}
-	for _, inst := range vu.insts {
+	for _, inst := range vu.proto.insts {
 		if inst != nil {
 			inst.BeginIteration()
 		}
@@ -283,7 +283,10 @@ func (vu *VU) beginIteration(rec *metrics.Recorder) {
 // endIteration tells every instance this VU built that the iteration (or
 // setup, or teardown) returned. It runs while the context is still set.
 func (vu *VU) endIteration() {
-	for _, inst := range vu.insts {
+	if vu.proto == nil {
+		return
+	}
+	for _, inst := range vu.proto.insts {
 		if inst != nil {
 			inst.EndIteration()
 		}
@@ -294,17 +297,20 @@ func (vu *VU) endIteration() {
 // registered with OnClose. It is idempotent; the VU must not iterate
 // again.
 func (vu *VU) Close(ctx context.Context) error {
+	if vu.proto == nil {
+		return nil
+	}
 	var errs []error
-	for i, inst := range vu.insts {
+	for i, inst := range vu.proto.insts {
 		if inst != nil {
 			errs = append(errs, inst.Close(ctx))
-			vu.insts[i] = nil
+			vu.proto.insts[i] = nil
 		}
 	}
-	for _, c := range vu.closers {
+	for _, c := range vu.proto.closers {
 		errs = append(errs, c.Close())
 	}
-	vu.closers = nil
+	vu.proto.closers = nil
 	return errors.Join(errs...)
 }
 
@@ -316,7 +322,7 @@ func (vu *VU) Runtime() *goja.Runtime   { return vu.rt }
 func (vu *VU) ID() int64                { return vu.id }
 func (vu *VU) Context() context.Context { return vu.ctx }
 func (vu *VU) HTTPClient() *http.Client { return vu.client }
-func (vu *VU) OnClose(c io.Closer)      { vu.closers = append(vu.closers, c) }
+func (vu *VU) OnClose(c io.Closer)      { vu.proto.closers = append(vu.proto.closers, c) }
 func (vu *VU) Warn(msg string)          { vu.warn.once(msg) }
 
 func (vu *VU) Recorder() *metrics.Recorder {

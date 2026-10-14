@@ -382,10 +382,19 @@ type VU struct {
 	// data is this VU's copy of the setup data, passed to every iteration;
 	// undefined without setup data.
 	data goja.Value
-	// mods are the program's protocol modules; insts are this VU's
+	// proto is the VU's protocol module state; nil unless its script
+	// imports a protocol module.
+	proto *vuModules
+}
+
+// vuModules is a VU's protocol module state (ADR-018). It is a separate
+// allocation, made only for scripts that import a protocol module, so a
+// VU without one is as small as before Phase 2.
+type vuModules struct {
+	// set is the program's protocol modules; insts are this VU's
 	// instances of them (by module index, nil until first use), and
 	// closers the resources its scripts registered (ADR-018 §9).
-	mods    *moduleSet
+	set     *moduleSet
 	insts   []protocol.Instance
 	closers []io.Closer
 }
@@ -408,10 +417,10 @@ func (p *Program) NewVUExec(ctx context.Context, id int, exec string, client *ht
 	}
 	rt := goja.New()
 	rt.SetMaxCallStackSize(maxCallStackSize)
-	vu := &VU{rt: rt, id: int64(id), exec: exec, discardBodies: p.discardBodies, keepCookies: p.keepCookies, warn: p.warn, mods: p.mods}
+	vu := &VU{rt: rt, id: int64(id), exec: exec, discardBodies: p.discardBodies, keepCookies: p.keepCookies, warn: p.warn}
 	props := builtinProps
 	if p.mods.importsAny() {
-		vu.insts = make([]protocol.Instance, len(p.mods.all))
+		vu.proto = &vuModules{set: p.mods, insts: make([]protocol.Instance, len(p.mods.all))}
 		props = p.mods.vuProps
 	}
 	if client != nil {
