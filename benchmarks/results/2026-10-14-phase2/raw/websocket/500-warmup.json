@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "loadtool",
+    "version": "dev"
+  },
+  "script": "D:\\AI Training\\Claude Workspace\\loadtool\\benchmarks\\loadtool\\websocket.ts",
+  "status": "completed",
+  "outcome": {
+    "passed": true,
+    "exitCode": 0,
+    "reasons": []
+  },
+  "startedAt": "2026-10-14T15:27:08.825Z",
+  "elapsedMs": 11020.0514,
+  "teardownError": "",
+  "config": {
+    "vus": 500,
+    "durationMs": 10000,
+    "scenarios": [
+      {
+        "name": "default",
+        "executor": "constant-vus",
+        "exec": "default",
+        "startTimeMs": 0,
+        "gracefulStopMs": 1000,
+        "vus": 500,
+        "durationMs": 10000
+      }
+    ]
+  },
+  "metrics": {
+    "http_reqs": {
+      "count": 0,
+      "rate": 0
+    },
+    "http_req_failed": {
+      "rate": null,
+      "failed": 0,
+      "count": 0
+    },
+    "http_req_duration": null,
+    "http_req_duration_successful": null,
+    "iterations": {
+      "count": 11867,
+      "rate": 1076.8552313648918
+    },
+    "dropped_iterations": {
+      "count": 0,
+      "rate": 0
+    },
+    "checks": {
+      "rate": null,
+      "passes": 0,
+      "fails": 0,
+      "count": 0
+    },
+    "script_errors": {
+      "count": 0,
+      "first": ""
+    },
+    "http_protocols": {
+      "http1": 0,
+      "http2": 0,
+      "other": 0
+    },
+    "ws_connecting": {
+      "kind": "trend",
+      "count": 12367,
+      "failed": 11867,
+      "min": 0,
+      "avg": 35.981229,
+      "max": 1125.0629,
+      "p50": 19.267584,
+      "p90": 28.966912,
+      "p95": 33.816576,
+      "p99": 960.495616
+    },
+    "ws_sessions": {
+      "kind": "counter",
+      "count": 12367,
+      "rate": 1122.2270705561318
+    },
+    "ws_session_failed": {
+      "kind": "rate",
+      "rate": 1,
+      "trues": 11867,
+      "count": 11867
+    },
+    "ws_msgs_sent": {
+      "kind": "counter",
+      "count": 4620,
+      "rate": 419.2357941270582
+    },
+    "ws_msgs_received": {
+      "kind": "counter",
+      "count": 4619,
+      "rate": 419.14505044867576
+    },
+    "ws_msg_latency": {
+      "kind": "trend",
+      "count": 4619,
+      "failed": 0,
+      "min": 10.0001,
+      "avg": 10.441169,
+      "max": 15.9801,
+      "p50": 10.420224,
+      "p90": 10.81344,
+      "p95": 10.944512,
+      "p99": 11.599872
+    }
+  },
+  "checks": [],
+  "thresholds": [],
+  "series": [
+    {
+      "atMs": 1045.2832,
+      "vus": 500,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 2045.2832,
+      "vus": 500,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 3045.2832,
+      "vus": 500,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 4045.2832,
+      "vus": 500,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 5045.2832,
+      "vus": 500,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 6045.2832,
+      "vus": 500,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 7045.2832,
+      "vus": 500,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 8045.2832,
+      "vus": 500,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 9045.2832,
+      "vus": 500,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 10045.2832,
+      "vus": 0,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 11020.0514,
+      "vus": 0,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    }
+  ]
+}

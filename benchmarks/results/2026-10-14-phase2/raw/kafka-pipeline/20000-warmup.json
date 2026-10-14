@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "loadtool",
+    "version": "dev"
+  },
+  "script": "D:\\AI Training\\Claude Workspace\\loadtool\\benchmarks\\loadtool\\kafka-pipeline.ts",
+  "status": "completed",
+  "outcome": {
+    "passed": true,
+    "exitCode": 0,
+    "reasons": []
+  },
+  "startedAt": "2026-10-14T15:55:23.964Z",
+  "elapsedMs": 18004.8957,
+  "teardownError": "",
+  "config": {
+    "vus": 203,
+    "durationMs": 18000,
+    "scenarios": [
+      {
+        "name": "consume",
+        "executor": "constant-vus",
+        "exec": "consume",
+        "startTimeMs": 0,
+        "gracefulStopMs": 1000,
+        "vus": 3,
+        "durationMs": 18000
+      },
+      {
+        "name": "produce",
+        "executor": "constant-arrival-rate",
+        "exec": "produce",
+        "startTimeMs": 5000,
+        "gracefulStopMs": 5000,
+        "durationMs": 10000,
+        "rate": 20000,
+        "timeUnitMs": 1000,
+        "preAllocatedVUs": 200
+      }
+    ]
+  },
+  "metrics": {
+    "http_reqs": {
+      "count": 0,
+      "rate": 0
+    },
+    "http_req_failed": {
+      "rate": null,
+      "failed": 0,
+      "count": 0
+    },
+    "http_req_duration": null,
+    "http_req_duration_successful": null,
+    "iterations": {
+      "count": 258020,
+      "rate": 14330.54677456421
+    },
+    "dropped_iterations": {
+      "count": 2878,
+      "rate": 159.8454136004798
+    },
+    "checks": {
+      "rate": null,
+      "passes": 0,
+      "fails": 0,
+      "count": 0
+    },
+    "script_errors": {
+      "count": 0,
+      "first": ""
+    },
+    "http_protocols": {
+      "http1": 0,
+      "http2": 0,
+      "other": 0
+    },
+    "kafka_produce_duration": {
+      "kind": "trend",
+      "count": 197122,
+      "failed": 0,
+      "min": 0,
+      "avg": 0.759962,
+      "max": 187.8873,
+      "p50": 0,
+      "p90": 1.482752,
+      "p95": 2.8672,
+      "p99": 8.290304
+    },
+    "kafka_messages_produced": {
+      "kind": "counter",
+      "count": 197122,
+      "rate": 10948.244482193808
+    },
+    "kafka_produce_failed": {
+      "kind": "rate",
+      "rate": 0,
+      "trues": 0,
+      "count": 197122
+    },
+    "kafka_consume_latency": {
+      "kind": "trend",
+      "count": 197122,
+      "failed": 0,
+      "min": 0.0002,
+      "avg": 1.633895,
+      "max": 188.5802,
+      "p50": 0.872448,
+      "p90": 2.899968,
+      "p95": 5.07904,
+      "p99": 12.517376
+    },
+    "kafka_messages_consumed": {
+      "kind": "counter",
+      "count": 197122,
+      "rate": 10948.244482193808
+    },
+    "kafka_consume_failed": {
+      "kind": "rate",
+      "rate": 0,
+      "trues": 0,
+      "count": 60898
+    }
+  },
+  "checks": [],
+  "thresholds": [],
+  "series": [
+    {
+      "atMs": 1001.6278,
+      "vus": 3,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 2001.6278,
+      "vus": 3,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 3001.6278,
+      "vus": 3,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 4001.6278,
+      "vus": 3,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 5001.6278,
+      "vus": 203,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 6001.6278,
+      "vus": 203,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 7001.6278,
+      "vus": 203,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 8001.6278,
+      "vus": 203,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 9001.6278,
+      "vus": 203,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 10001.6278,
+      "vus": 203,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 11001.6278,
+      "vus": 203,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 12001.6278,
+      "vus": 203,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 13001.6278,
+      "vus": 203,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 14001.6278,
+      "vus": 203,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 15001.6278,
+      "vus": 3,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 16001.6278,
+      "vus": 3,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 17001.6278,
+      "vus": 3,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 18001.6278,
+      "vus": 0,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    },
+    {
+      "atMs": 18004.8957,
+      "vus": 0,
+      "http_reqs": 0,
+      "http_req_failed": 0,
+      "http_req_duration": null
+    }
+  ]
+}

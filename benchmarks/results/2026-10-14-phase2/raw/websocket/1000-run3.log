@@ -1,0 +1,21 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\loadtool\websocket.ts
+  VUs:         1000
+  Duration:    30s (elapsed 31.04s)
+  Status:      completed
+
+  Requests:    0 (0.0 req/s)
+  Success:     0
+  Errors:      0 (0.00%)
+  Script errs: 0
+
+  Latency:     no requests were sent
+  Protocol metrics:
+    ws_connecting      4,620 samples, 3,620 failed  avg=48.74ms p50=21.89ms p95=193.99ms p99=304.09ms max=360.76ms
+    ws_sessions        4,620 (148.8/s)
+    ws_session_failed  100.00% (3,620 of 3,620)
+    ws_msgs_sent       30,000 (966.4/s)
+    ws_msgs_received   30,000 (966.4/s)
+    ws_msg_latency     30,000 samples  avg=10.44ms p50=10.42ms p95=10.81ms p99=11.08ms max=14.15ms

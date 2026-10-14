@@ -1,0 +1,19 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\loadtool\graphql.ts
+  VUs:         500
+  Duration:    10s (elapsed 10.04s)
+  Status:      completed
+
+  Requests:    0 (0.0 req/s)
+  Success:     0
+  Errors:      0 (0.00%)
+  Script errs: 360
+    first:     Error: Post "http://127.0.0.1:8090/graphql": dial tcp 127.0.0.1:8090: connectex: No connection could be made because the target machine actively refused it. at graphql_default2 (graphql.ts:11:21(22))
+
+  Latency:     no requests were sent
+  Protocol metrics:
+    graphql_req_duration  96,699 samples, 360 failed  avg=51.36ms p50=40.11ms p95=115.87ms p99=183.50ms max=1.74s
+    graphql_reqs          96,699 (9631.3/s)
+    graphql_req_failed    0.37% (360 of 96,699)

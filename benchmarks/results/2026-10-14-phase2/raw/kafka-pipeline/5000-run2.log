@@ -1,0 +1,24 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\loadtool\kafka-pipeline.ts
+  VUs:         53
+  Duration:    38s (elapsed 38.50s)
+  Scenarios:   consume: constant-vus, 3 VUs for 38s, exec consume
+               produce: constant-arrival-rate, 5000 iterations per 1s for 30s, 50 VUs, starting at 5s, exec produce
+  Status:      completed
+
+  Requests:    0 (0.0 req/s)
+  Success:     0
+  Errors:      0 (0.00%)
+  Script errs: 0
+  Dropped:     56 iterations (no free VU; raise preAllocatedVUs)
+
+  Latency:     no requests were sent
+  Protocol metrics:
+    kafka_produce_duration   149,944 samples  avg=24.20µs p50=0.00µs p95=0.00µs p99=569.34µs max=26.44ms
+    kafka_messages_produced  149,944 (3894.8/s)
+    kafka_produce_failed     0.00% (0 of 149,944)
+    kafka_consume_latency    149,944 samples  avg=558.96µs p50=536.58µs p95=995.33µs p99=1.52ms max=27.37ms
+    kafka_messages_consumed  149,944 (3894.8/s)
+    kafka_consume_failed     0.00% (0 of 114,917)

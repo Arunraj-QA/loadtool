@@ -1,0 +1,18 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\loadtool\grpc-unary.ts
+  VUs:         500
+  Duration:    30s (elapsed 30.03s)
+  Status:      completed
+
+  Requests:    0 (0.0 req/s)
+  Success:     0
+  Errors:      0 (0.00%)
+  Script errs: 0
+
+  Latency:     no requests were sent
+  Protocol metrics:
+    grpc_req_duration  748,890 samples  avg=19.71ms p50=17.43ms p95=36.44ms p99=47.45ms max=108.03ms
+    grpc_reqs          748,890 (24941.8/s)
+    grpc_req_failed    0.00% (0 of 748,890)
