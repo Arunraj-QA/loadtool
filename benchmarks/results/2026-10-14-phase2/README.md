@@ -7,8 +7,8 @@ met by CI; see `docs/mixed-protocols.md`.
 
 | Criterion | Result |
 |---|---|
-| 2. No HTTP regression against the Phase 1 build; memory below JMeter's | **Met.** Memory, CPU and requests/s are within run-to-run variation; peak memory 176–193 MB against JMeter's 1,366–1,399 MB |
-| 3. No per-VU cost for unused modules | **Not met as worded.** Unused modules cost nothing, but every Phase 2 VU retains 48 B more than Phase 1's, script imports or not ([§3](#3-exit-criterion-3-retained-memory-per-vu)) |
+| 2. No HTTP regression against the Phase 1 build; memory below JMeter's | **Met.** Memory, CPU and requests/s are within run-to-run variation, on `3d1c14d` and again on the final build `0011e52`; peak memory 176–193 MB against JMeter's 1,366–1,399 MB |
+| 3. No per-VU cost for unused modules | **Met after a fix.** The first measurement found 48 B more per VU than Phase 1's, whatever the script imports. Commit `0011e52` fixed it, and the re-measurement matches Phase 1 exactly ([§3](#3-exit-criterion-3-retained-memory-per-vu)) |
 | 4. Each protocol measured at 1,000 VUs | **Met.** HTTP, WebSocket, gRPC, GraphQL and Kafka, below |
 
 ## Environment
@@ -78,6 +78,33 @@ warm-up per tool, then three rounds of 60 s runs.
 and throughput columns describe this setup only, not a tool comparison:
 one laptop runs the tools and the target, and the tools measure latency
 slightly differently.
+
+### Again on the final build
+
+After the fix for criterion 3 (`0011e52`, §3), the A/B ran again on that
+build, at 21:46–21:53 (`raw-ab-final/`):
+
+| Build | Peak private MB | CPU % of machine | Requests/s | Errors |
+|---|---|---|---|---|
+| Phase 1 (`cf35298`) | 172.0 (159.2–182.5) | 44.2 (42.5–45.6) | 48,221 (46,864–57,561) | 0.01–0.11 % |
+| Phase 2 (`0011e52`) | 186.2 (172.7–186.7) | 45.5 (44.4–46.2) | 45,475 (44,470–52,024) | 0.06–0.13 % |
+| Difference of medians | +14.2 (wider range 23.3) | +1.3 (wider range 3.1) | −2,746 (wider range 10,697) | |
+
+**Within run-to-run variation again.** Across both sessions, though,
+Phase 2 leaned the same way: CPU 1–2 points higher and requests/s 6–7 %
+lower. To see whether that is a real cost, two micro-benchmarks ran
+alternately on both builds, five rounds each (`raw-micro/micro.txt`):
+
+| Benchmark | Phase 1 | Phase 2 |
+|---|---|---|
+| `BenchmarkDo` (one HTTP request) | 72,063 ns (69,147–73,997), 69 allocs, ~5,735 B | 72,333 ns (68,016–74,039), 69 allocs, ~5,737 B |
+| `BenchmarkIterateHTTPGet` (one VU iteration with one `http.get`) | 77,889 ns (75,174–87,349), 81 allocs, ~6,470 B | 81,708 ns (75,396–101,628), 81 allocs, ~6,488 B |
+
+The HTTP request itself costs the same. An iteration makes the same
+number of allocations and 18 B more per iteration (0.3 %). Its time
+ranges overlap widely, so there is no measured slowdown. The lean in the
+1,000-VU runs is within what this laptop's noise allows, and the only
+measured per-iteration cost is those 18 bytes.
 
 ## 2. Protocols at several levels
 
@@ -218,9 +245,26 @@ Run-to-run variation is at most 15 B.
   registered, as the runner registers them, an HTTP-only VU retains
   exactly what it does without them (5,096 B). Before commit `7176dd6`
   they added about 300 B per VU.
-- **Every Phase 2 VU retains 48 B more than Phase 1's,** whatever the
-  script imports. This is outside run-to-run variation, so **the
-  criterion is not met as worded**. The cause: the `VU` struct grew from
-  136 to 192 bytes, because Phase 2 added three fields (module list,
-  module instances, closers). That moved it from Go's 144-byte allocation
-  size class to the 192-byte one. That is 48 KB at 1,000 VUs.
+- **Every Phase 2 VU retained 48 B more than Phase 1's,** whatever the
+  script imports. This is outside run-to-run variation, so the criterion
+  was not met as worded. The cause: the `VU` struct grew from 136 to 192
+  bytes, because Phase 2 added three fields (module list, module
+  instances, closers). That moved it from Go's 144-byte allocation size
+  class to the 192-byte one. That is 48 KB at 1,000 VUs.
+
+### After the fix
+
+Commit `0011e52` moved those three fields into a separate struct,
+allocated only when the script imports a protocol module. `VU` is 144
+bytes again, and a test (`TestVUFitsItsSizeClass`) keeps it there. The
+same five alternating rounds then ran again (`raw-criterion3-fix/`):
+
+| Script | Phase 1 | Phase 2 (`0011e52`) | Phase 2, all four modules registered |
+|---|---|---|---|
+| No imports | 4,768 | 4,773 | |
+| HTTP only | 5,048 | 5,048 | 5,048 |
+| HTTP + sleep | 6,024 | 6,024 | |
+| HTTP + setup/teardown | 5,048 | 5,048 | |
+
+**Phase 2 now retains the same per VU as Phase 1,** within 5 B, with or
+without the protocol modules registered. **Criterion 3 is met.**

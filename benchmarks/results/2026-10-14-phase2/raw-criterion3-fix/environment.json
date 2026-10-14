@@ -1,0 +1,8 @@
+﻿{
+    "commit":  "0011e52",
+    "phase1Build":  "cf35298",
+    "go":  "go version go1.27.0 windows/amd64",
+    "machine":  "12th Gen Intel(R) Core(TM) i5-1235U",
+    "powerOnline":  true,
+    "backgroundCpuBefore":  "35, 35, 26, 23, 23, 24"
+}
