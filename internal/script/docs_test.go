@@ -2,6 +2,7 @@ package script
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -21,7 +22,14 @@ func TestDocSnippetsLoad(t *testing.T) {
 	if d := os.Getenv("LOADTOOL_DOCS_DIR"); d != "" {
 		dir = d // lets a test run over a CRLF copy of the docs
 	}
-	docs, err := filepath.Glob(filepath.Join(dir, "*.md"))
+	// Every page, protocol pages (docs/protocols/...) included.
+	var docs []string
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && strings.HasSuffix(path, ".md") {
+			docs = append(docs, path)
+		}
+		return err
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +46,8 @@ func TestDocSnippetsLoad(t *testing.T) {
 			if !strings.Contains(code, "import ") || !strings.Contains(code, "export default function") {
 				continue
 			}
-			name := filepath.Base(doc) + "#" + string(rune('a'+i))
+			rel, _ := filepath.Rel(dir, doc)
+			name := filepath.ToSlash(rel) + "#" + string(rune('a'+i))
 			t.Run(name, func(t *testing.T) {
 				dir := t.TempDir()
 				path := filepath.Join(dir, "snippet.ts")
