@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/coder/websocket"
 	"google.golang.org/grpc"
@@ -245,5 +246,62 @@ func TestGraphQL(t *testing.T) {
 	}
 	if code, body := post(`{"query":"{ product(id: 9) { name } }"}`); code != 200 || !strings.Contains(body, `"errors"`) {
 		t.Errorf("error: %d %s", code, body)
+	}
+}
+
+// /ws/chat sends each message to everyone in the sender's room, the sender
+// included, and to no one else; a room is gone once its clients leave.
+func TestWebSocketChat(t *testing.T) {
+	h := newChat()
+	srv := httptest.NewServer(http.HandlerFunc(h.serve))
+	t.Cleanup(srv.Close)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	dial := func(room string) *websocket.Conn {
+		c, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/?room="+room, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	a, b, other := dial("r1"), dial("r1"), dial("r2")
+	// Every client has joined once its room has the expected size.
+	for deadline := time.Now().Add(2 * time.Second); ; {
+		h.mu.Lock()
+		joined := len(h.rooms["r1"]) == 2 && len(h.rooms["r2"]) == 1
+		h.mu.Unlock()
+		if joined || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err := a.Write(ctx, websocket.MessageText, []byte("hi")); err != nil {
+		t.Fatal(err)
+	}
+	for name, c := range map[string]*websocket.Conn{"sender": a, "same room": b} {
+		if _, data, err := c.Read(ctx); err != nil || string(data) != "hi" {
+			t.Errorf("%s got %q, %v; want hi", name, data, err)
+		}
+	}
+	quiet, stop := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer stop()
+	if _, data, err := other.Read(quiet); err == nil {
+		t.Errorf("another room got %q", data)
+	}
+	for _, c := range []*websocket.Conn{a, b} {
+		c.Close(websocket.StatusNormalClosure, "")
+	}
+	other.CloseNow()
+	for deadline := time.Now().Add(2 * time.Second); ; {
+		h.mu.Lock()
+		n := len(h.rooms)
+		h.mu.Unlock()
+		if n == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d rooms left after every client left", n)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

@@ -209,13 +209,17 @@ type api struct {
 	delay  time.Duration
 	signer signer
 	orders atomic.Int64
+	chat   *chat
 }
 
-func newAPI(delay time.Duration, s signer) *api { return &api{delay: delay, signer: s} }
+func newAPI(delay time.Duration, s signer) *api {
+	return &api{delay: delay, signer: s, chat: newChat()}
+}
 
 func (a *api) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /ws/echo", a.wsEcho)
+	mux.HandleFunc("GET /ws/chat", a.chat.serve)
 	gql, err := graphqltest.Handler(a.delay)
 	if err != nil {
 		panic(err) // the schema is fixed: an error is a bug
