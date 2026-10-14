@@ -81,6 +81,30 @@ Phase 2 is complete until all four are measured and recorded.
 4. **Each protocol is measured at 1,000 VUs** against a local target, and
    peak memory, throughput and errors are recorded under `benchmarks/`.
 
+Status: all four met, measured on 2026-10-14 in
+`benchmarks/results/2026-10-14-phase2/`:
+
+1. The mixed-protocol example (HTTP, GraphQL, WebSocket, gRPC and Kafka
+   in one iteration) and every other example pass in CI, and the Action
+   self-test passes.
+2. At 1,000 VUs, against the Phase 1 build in the same session, peak
+   memory, CPU and requests per second were within run-to-run variation,
+   on the final build `0011e52` too. LoadTool's peak memory was
+   176–193 MB against JMeter's 1,366–1,399 MB.
+3. An HTTP-only VU retains the same as in Phase 1 (5,048 B), with all
+   four protocol modules registered. The first measurement found 48 B
+   more per VU; commit `0011e52` fixed it.
+4. HTTP, WebSocket and gRPC were measured at 100 to 5,000 VUs, GraphQL
+   at 100 to 1,000, and Kafka in messages/s, MB/s and producer and
+   consumer latency.
+
+Caveats as before: one laptop with the servers on the same machine,
+JMeter with its default JVM settings, Kafka against an in-process broker
+(kfake), and security agents adding background CPU. Across both A/B
+sessions Phase 2 leaned 1–2 CPU points higher and 6–7 % lower in
+requests per second. That is within variation, and micro-benchmarks show
+the same HTTP request cost and 18 B more per iteration.
+
 ## Phase 1 — MVP Core Engine (complete)
 
 ### Phase 1 Goals
