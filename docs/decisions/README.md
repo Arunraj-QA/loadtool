@@ -22,7 +22,7 @@ Significant architecture decisions are recorded here as
 | [ADR-015](ADR-015-metric-families.md) | Metric families (Trend, Counter, Rate) for protocols; reports and thresholds | Accepted |
 | [ADR-016](ADR-016-error-normalization.md) | Normalized errors: `error` and `error_code` across protocols | Accepted |
 | [ADR-017](ADR-017-async-model.md) | Asynchronous protocols: blocking calls and session-scoped loops, no global event loop | Accepted |
-| [ADR-018](ADR-018-protocol-architecture.md) | Phase 2 protocol architecture: packages, interfaces, lifecycle, ownership, errors, metrics, cleanup, concurrency | Accepted |
+| [ADR-018](ADR-018-protocol-architecture.md) | Phase 2 protocol architecture: packages, interfaces, lifecycle, ownership, errors, metrics, cleanup, concurrency | Accepted (amended 2026-10-09, 2026-10-15) |
 | [ADR-019](ADR-019-websocket.md) | WebSocket module: callback and blocking styles, reply latency, metrics, errors | Accepted |
 | [ADR-020](ADR-020-grpc.md) | gRPC module: grpc-go, protobuf and protocompile; unary and blocking streams; .proto or reflection | Accepted |
 | [ADR-021](ADR-021-graphql.md) | GraphQL module: HTTP-based (httpclient.Send over the VU's session); HTTP vs GraphQL success | Accepted |

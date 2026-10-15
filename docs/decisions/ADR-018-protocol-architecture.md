@@ -205,15 +205,18 @@ HTTP is adapted, not moved or rewritten:
 |---|---|---|---|---|
 | HTTP/1.1, HTTP/2 | Pooled connections in the shared transport | Run (runner, as now) | Cookie jar | VU; reset each iteration unless `noCookiesReset` |
 | GraphQL | The VU's HTTP session (`VU.HTTPClient()`) | Shared with HTTP | The HTTP cookie jar | As HTTP |
-| WebSocket | One connection per `ws.connect` call | The call: closed before `connect` returns | Callbacks, timers, buffered frames | The call |
+| WebSocket | One connection per `ws.connect` call | Callback style: the call, closed before `connect` returns. Blocking style: the iteration, until `close()` or `EndIteration` (amended 2026-10-09) | Callbacks, timers, buffered frames | The call, or the iteration |
 | gRPC | One connection per client object that the script connects (scope decision 3: per VU) | The VU, via `VU.OnClose`; it persists across iterations until `client.close()` | Metadata the script sets per call | The call |
 | gRPC descriptors | Parsed `.proto` files | Run: read-only, shared by VUs | — | — |
-| Kafka | One client per broker configuration (scope decision 4: per run) | Run; goroutine-safe client | Consumer position, where per-VU | VU instance |
+| Kafka | One franz-go client per `Producer` or `Consumer`, and per configuration for the one-off calls (ADR-022; amended 2026-10-15, was one per run) | The VU, via `VU.OnClose`; persists across iterations until `close()` | Consumer position and group membership | The VU's client |
 
 **Rules behind the table:**
 
-- **Heavy, goroutine-safe clients are run-owned.** Per-user state is
-  VU-owned. Anything tied to one exchange is call-owned.
+- **Heavy, goroutine-safe clients are run-owned** unless the protocol's
+  ADR decides otherwise. Per-user state is VU-owned. Anything tied to one
+  exchange is call-owned. (Amended 2026-10-15: no protocol uses a
+  run-owned client now. Kafka's client is goroutine-safe but per VU, by
+  ADR-022.)
 - **The run owns a resource only if the third-party library documents
   it as safe for concurrent use.**
 - **Each protocol ADR (019–022) confirms its row.** The gRPC row is
@@ -332,12 +335,17 @@ Cleanup happens at three scopes:
 - **Call scope:** a call releases everything it opened before returning,
   including on errors and cancellation. A WebSocket session closes its
   socket and **waits for its reader goroutine to exit.**
-- **VU scope:** Go resources a script creates and keeps (a gRPC client)
-  are registered with `VU.OnClose`. They are closed with the VU's
+- **Iteration scope** (amended 2026-10-09): `Instance.EndIteration`
+  closes what an iteration left open, such as a blocking-style
+  WebSocket, with a warning.
+- **VU scope:** Go resources a script creates and keeps (a gRPC client;
+  Kafka producers and consumers, amended 2026-10-15) are registered with
+  `VU.OnClose`. They are closed with the VU's
   instances (section 4, step 7), after the instances' own `Close`. A script's `close()` releases them early and makes
   the later close a no-op. Garbage collection of the JavaScript object
   never closes anything.
-- **Run scope:** `Run.Close` releases shared clients and caches.
+- **Run scope:** `Run.Close` releases shared clients and caches (now
+  caches only, such as gRPC descriptors; amended 2026-10-15).
 
 **Requirements on every close:**
 
@@ -346,7 +354,10 @@ Cleanup happens at three scopes:
 - safe to call on a VU that never iterated.
 
 **Leak tests:** every protocol's tests assert that the number of
-goroutines returns to its starting value after `Close`.
+goroutines returns to its starting value after `Close`. (Amended
+2026-10-15: GraphQL starts no goroutines of its own, so its check is the
+end-to-end test's, `TestMixedProtocolsEndToEnd`, which covers every
+protocol.)
 
 ### 10. Concurrency model
 
@@ -356,14 +367,17 @@ goroutines returns to its starting value after `Close`.
    - **inside a call, joined before the call returns** (the WebSocket
      reader);
    - **owned by a `Run` or `Instance` and stopped by its `Close`** (a
-     Kafka client's internal goroutines).
+     Kafka client's internal goroutines, owned by the VU since
+     2026-10-15).
 
    They never touch goja or a `Recorder`. They talk to the VU's
    goroutine through channels, bounded where messages arrive from the
    network.
-3. **Run-scoped state is either immutable after `NewRun`** (descriptors)
-   **or safe for concurrent use** (the Kafka client, the HTTP
-   transport).
+3. **Run-scoped state is either immutable after `NewRun`** **or safe
+   for concurrent use** (the HTTP transport; the gRPC descriptor cache,
+   filled on first use under a mutex). Amended 2026-10-15: descriptors
+   are cached on first load, not built in `NewRun`, and the Kafka client
+   is no longer run-scoped.
 4. **Every blocking call selects on `VU.Context()`.**
    `Runtime.Interrupt` cannot reach Go code. When the test stops, the
    call returns quickly and records nothing.
@@ -495,3 +509,38 @@ Added for the gRPC module (ADR-020):
   - It gains `Dir`, the script's directory, for files a module reads.
   - It loses `MaxVUs`, which no module used and which is not known that
     early.
+
+## Amendment (2026-10-15): Kafka ownership and unused modules
+
+Brings this record in line with what was built and measured. Sections 6,
+9 and 10 are corrected in place, each marked "amended 2026-10-15".
+
+- **Kafka clients are owned by the VU** (ADR-022). The Kafka
+  requirements of 2026-10-09 asked for VU-owned client state, so scope
+  decision 4 changed from one client per run to one per `Producer` or
+  `Consumer`, registered with `VU.OnClose`. It costs about 0.8 MB per VU
+  (`benchmarks/results/2026-10-09-kafka/`). No protocol now uses a
+  run-owned client; the run keeps caches only.
+- **A module the script does not import costs its VUs nothing.**
+  ADR-014 intended this, and the Phase 2 benchmark found two ways it was
+  not true:
+  - **About 300 B per VU:** each VU built its own list of built-in module
+    properties with every registered module. Now the list is built once,
+    after bundling, from the modules the script imports, and shared by
+    every VU (`moduleSet.seal`).
+  - **48 B per VU, whatever the script imports:** the VU's module state
+    (module list, instance slots, closers) moved `VU` from Go's 144-byte
+    allocation size class to the 192-byte one. That state is now one
+    pointer to `vuModules`, allocated only when the script imports a
+    protocol module.
+
+  An HTTP-only VU now retains exactly what it did in Phase 1, with all
+  four modules registered (Phase 2 exit criterion 3,
+  `benchmarks/results/2026-10-14-phase2/`).
+  `TestUnimportedModulesCostVUsNothing` and `TestVUFitsItsSizeClass`
+  keep it so.
+- **gRPC descriptors are cached on first load,** under a mutex in the
+  run, rather than built in `NewRun`. A `.proto` set or a server's
+  reflection is loaded once, however many VUs ask.
+- **The description as built** is in
+  [`docs/architecture/protocol-system.md`](../architecture/protocol-system.md).
