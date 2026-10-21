@@ -33,5 +33,6 @@ func NewRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	root.SetErr(stderr)
 
 	root.AddCommand(newRunCmd())
+	root.AddCommand(newUICmd())
 	return root
 }
