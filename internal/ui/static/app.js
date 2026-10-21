@@ -7,17 +7,25 @@
 const $ = (id) => document.getElementById(id);
 
 // The session token arrives in the URL fragment, which the browser never
-// sends; keep it for this tab and remove it from the address bar.
-const token = (() => {
+// sends; keep it for this tab and remove it from the address bar. A new
+// URL pasted into the same tab (after restarting loadtool ui) changes
+// only the fragment, so read it again then.
+let token = "";
+function readToken() {
   const m = location.hash.match(/token=([0-9a-f]+)/);
   try {
     if (m) sessionStorage.setItem("loadtoolToken", m[1]);
-    history.replaceState(null, "", location.pathname);
-    return m ? m[1] : sessionStorage.getItem("loadtoolToken") || "";
+    if (location.hash) history.replaceState(null, "", location.pathname);
+    token = m ? m[1] : sessionStorage.getItem("loadtoolToken") || "";
   } catch {
-    return m ? m[1] : "";
+    if (m) token = m[1];
   }
-})();
+}
+readToken();
+window.addEventListener("hashchange", () => {
+  readToken();
+  setText("formError", "");
+});
 
 async function api(path, body) {
   const opts = { method: body === undefined ? "GET" : "POST", headers: { "X-LoadTool-Token": token } };
@@ -126,11 +134,14 @@ function render(st) {
   setText("runError", st.error || "");
   $("warnings").replaceChildren(...(st.warnings || []).map((w) => Object.assign(document.createElement("li"), { textContent: w })));
 
+  // Charts skip points covering under half a second (the run's last
+  // fraction of a second): divided by a short interval, their rate would
+  // spike. Totals still include them.
   const pts = st.live.points;
   const xs = [], rps = [], p95 = [];
   pts.forEach((p, i) => {
-    const prev = i ? pts[i - 1].atMs : 0;
-    const secs = Math.max((p.atMs - prev) / 1000, 0.001);
+    const secs = (p.atMs - (i ? pts[i - 1].atMs : 0)) / 1000;
+    if (secs < 0.5) return;
     xs.push(p.atMs / 1000);
     rps.push(p.requests / secs);
     p95.push(p.p95Ms);
@@ -147,7 +158,7 @@ function render(st) {
   setText("requests", fmtInt(st.live.requests));
   setText("failed", fmtInt(st.live.failed));
   setText("errRate", st.live.requests ? fmtPct(st.live.failed / st.live.requests) : "–");
-  setText("rps", last ? fmtInt(rps[rps.length - 1]) : "–");
+  setText("rps", rps.length ? fmtInt(rps[rps.length - 1]) : "–");
   setText("latHint", "latest second while running; whole run at the end");
   setText("avg", last ? fmtMs(last.meanMs) : "–");
   setText("p50", last ? fmtMs(last.p50Ms) : "–");
