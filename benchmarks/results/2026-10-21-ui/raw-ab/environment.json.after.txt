@@ -1,0 +1,1 @@
+﻿background CPU after: 56, 55, 42, 28, 29, 27

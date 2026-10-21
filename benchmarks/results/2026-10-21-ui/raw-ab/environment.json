@@ -1,0 +1,8 @@
+﻿{
+    "commit":  "496e200",
+    "base":  "bin/loadtool-base.exe",
+    "new":  "bin/loadtool.exe",
+    "go":  "go version go1.27.0 windows/amd64",
+    "power":  "Online",
+    "backgroundCpuBefore":  "50, 57, 49, 39, 38, 37"
+}

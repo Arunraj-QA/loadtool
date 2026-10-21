@@ -48,9 +48,39 @@ Medians of five runs, with ranges:
 The counters add no memory per VU. They live in the 16 shared shards,
 4.8 KB each, about 77 KB per run whatever the VU count.
 
-## Not yet measured
+## Whole-run A/B at 1,000 VUs: inconclusive (machine not idle)
 
-This covers the request path, not a whole run. For Phase 2 exit
-criterion 5 to say `loadtool run` is unchanged, a regression run at
-1,000 VUs against the Phase 2 build, measured as for criterion 2, would
-confirm it at the process level.
+`ab.ps1` (this folder) ran the audited Phase 2 build (`0b8f9b4`, "base")
+against the UI build (`496e200`, "new"). It used the HTTP exit scenario:
+1,000 VUs, 60 s, three rounds alternating the order, `benchmarks/server`
+with a 10 ms delay. Raw data is in `raw-ab/`.
+
+The rule, as for criterion 2: the two builds' ranges overlap, and the
+medians differ by no more than the wider range.
+
+| | base runs | new runs | Median Δ | Wider range | By the rule |
+|---|---|---|---|---|---|
+| Peak private MB | 202.9, 196.9, 186.5 | 189.9, 199.3, 185.5 | −7.0 | 16.4 | within |
+| CPU % of machine | 34.6, 30.1, 29.2 | 28.5, 29.1, 28.2 | −1.6 | 5.4 | outside, but **lower** for the new build |
+| Requests/s | 40,675, 27,753, 25,598 | 19,515, 27,004, 21,775 | −5,977 (−22 %) | 15,077 | within |
+
+All runs exited 0, with errors of 0.12–0.32 %.
+
+**This run does not meet the benchmark conditions.** The laptop was on
+AC power, but not idle:
+
+- **Background CPU** was 37–57 % before the runs and 27–56 % after.
+  Microsoft Defender (`mssense`, `MsMpEng`) was scanning, probably the
+  newly built binaries. In the 2026-10-14 sessions it was 5–36 %.
+- **Throughput fell for both builds:** 20,000–41,000 req/s, against
+  45,000–49,000 on 2026-10-14. That points to the machine, not a build.
+
+So it neither shows nor rules out a change in throughput.
+
+**What it does show:**
+
+- **Memory per run is unchanged**, within variation.
+- **The request path costs the same** (the micro-benchmarks above).
+
+**Still needed for criterion 5:** run `ab.ps1` again once the scanning
+has stopped and background CPU is back near the 2026-10-14 level.
