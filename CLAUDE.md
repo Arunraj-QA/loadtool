@@ -34,6 +34,8 @@ HTTP path, the VU engine and the scenario engine as they are.
 4. Kafka module
 5. Common protocol module interface
 6. A single test file that mixes HTTP and at least one non-HTTP protocol
+7. A local UI that load-tests one public HTTP API without a script
+   (added 2026-10-21; exit criterion 5)
 
 ### Phase 2 Scope Decisions (agreed 2026-10-08)
 
@@ -64,7 +66,7 @@ GraphQL, ADR-022 Kafka.
 ### Phase 2 Exit Criteria
 
 Agreed on 2026-10-08, before the Phase 2 benchmark run. Do not claim
-Phase 2 is complete until all four are measured and recorded.
+Phase 2 is complete until all of them are measured and recorded.
 
 1. **Mixed protocols work end to end:** an example script that uses HTTP
    and WebSocket in the same iteration, and every other Phase 2 example,
@@ -80,8 +82,19 @@ Phase 2 is complete until all four are measured and recorded.
    variation of the Phase 1 build.
 4. **Each protocol is measured at 1,000 VUs** against a local target, and
    peak memory, throughput and errors are recorded under `benchmarks/`.
+5. **Single-API UI gate** (added 2026-10-21 at the user's request): a user
+   enters one publicly hosted HTTP API in a local UI (`loadtool ui`),
+   configures VUs and duration, runs it with the existing runner and
+   HTTP client, and sees the results in a dashboard, without writing a
+   script. The dashboard's numbers come from the existing metrics, the
+   JSON and HTML reports match `loadtool run`'s, and `loadtool run` is
+   unchanged (the criterion 2 regression check still holds). The design
+   is ADR-023.
 
-Status: all four met, measured on 2026-10-14 in
+Status: criteria 1–4 met, measured on 2026-10-14 (below); criterion 5
+was added on 2026-10-21 and is not met yet, so Phase 2 is open again.
+
+Criteria 1–4, measured on 2026-10-14 in
 `benchmarks/results/2026-10-14-phase2/`:
 
 1. The mixed-protocol example (HTTP, GraphQL, WebSocket, gRPC and Kafka

@@ -27,6 +27,7 @@ Significant architecture decisions are recorded here as
 | [ADR-020](ADR-020-grpc.md) | gRPC module: grpc-go, protobuf and protocompile; unary and blocking streams; .proto or reflection | Accepted |
 | [ADR-021](ADR-021-graphql.md) | GraphQL module: HTTP-based (httpclient.Send over the VU's session); HTTP vs GraphQL success | Accepted |
 | [ADR-022](ADR-022-kafka.md) | Kafka module: franz-go (kfake for tests); per-VU producers and consumers; end-to-end consume latency | Accepted |
+| [ADR-023](ADR-023-local-ui-controller.md) | Local UI for one HTTP API: loopback controller, fixed script, destination guard, status codes, live progress | Proposed |
 
 The numbering was reorganized on 2026-09-24 when the records moved from
 `docs/adr/`. Each record lists its previous path.
