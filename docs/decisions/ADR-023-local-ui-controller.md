@@ -1,6 +1,6 @@
 # ADR-023: Local UI for testing one HTTP API
 
-- Status: Proposed (2026-10-21, Phase 2)
+- Status: Accepted (2026-10-21, Phase 2)
 - Date: 2026-10-21
 - Builds on: ADR-008 (lifecycle), ADR-009 (sessions and connections),
   ADR-012 (time series), ADR-013 (response bodies)
