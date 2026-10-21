@@ -167,8 +167,9 @@ func Do(ctx context.Context, client *http.Client, r Request, rec *metrics.Record
 	}
 	if ctx.Err() == nil {
 		rec.Record(res.Duration, res.OK())
-		if res.Proto != "" {
+		if res.Proto != "" { // a response was received
 			rec.RecordProtocol(res.Proto)
+			rec.RecordStatus(res.Status)
 		}
 	}
 	return res

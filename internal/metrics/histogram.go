@@ -72,10 +72,17 @@ func (h *histogram) record(d time.Duration) {
 }
 
 // shard is the unit VUs share: one histogram for successful requests and
-// one for failed requests that were sent.
+// one for failed requests that were sent, and the responses' status codes.
 type shard struct {
 	ok, failed *histogram
+	// statuses counts responses by status code: index c for codes 100 to
+	// 599, index 0 for any other code. Shared, like the histograms, so
+	// counting costs one atomic add and no memory per VU (ADR-023).
+	statuses [maxStatus + 1]atomic.Uint64
 }
+
+// maxStatus is the largest status code counted on its own.
+const maxStatus = 599
 
 func newShard() *shard {
 	return &shard{ok: newHistogram(), failed: newHistogram()}

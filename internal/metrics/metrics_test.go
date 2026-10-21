@@ -376,3 +376,27 @@ func TestPercentileRankIsExact(t *testing.T) {
 		}
 	}
 }
+
+// Status codes are counted across recorders and shards, in code order;
+// codes outside 100 to 599 count as code 0.
+func TestStatusCodes(t *testing.T) {
+	recs := NewRecorders(40) // more recorders than shards
+	codes := []int{200, 200, 404, 200, 503, 200, 99, 404, 700, 200}
+	for i, c := range codes {
+		recs[i%len(recs)].RecordStatus(c)
+		recs[(i+17)%len(recs)].RecordStatus(c)
+	}
+	got := Merge(recs).StatusCodes
+	want := []StatusCount{{0, 4}, {200, 10}, {404, 4}, {503, 2}}
+	if !slices.Equal(got, want) {
+		t.Errorf("StatusCodes = %v, want %v", got, want)
+	}
+	if s := Merge(NewRecorders(3)); s.StatusCodes != nil {
+		t.Errorf("no responses: StatusCodes = %v, want nil", s.StatusCodes)
+	}
+	var zero Recorder // a zero-value recorder gets its own shard
+	zero.RecordStatus(201)
+	if got := Merge([]*Recorder{&zero}).StatusCodes; !slices.Equal(got, []StatusCount{{201, 1}}) {
+		t.Errorf("zero-value recorder: %v", got)
+	}
+}

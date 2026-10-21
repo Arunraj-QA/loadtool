@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -495,5 +496,36 @@ func TestDialControlAndNoProxy(t *testing.T) {
 	}
 	if tr := plain.Transport.(*http.Transport); tr.Proxy == nil {
 		t.Error("the default client lost the proxy environment")
+	}
+}
+
+// Do counts each response's status code; a request without a response
+// (refused, or never sent) is not counted.
+func TestDoCountsStatusCodes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/missing":
+			w.WriteHeader(http.StatusNotFound)
+		case "/broken":
+			w.WriteHeader(http.StatusServiceUnavailable)
+		case "/moved":
+			http.Redirect(w, r, "/", http.StatusFound) // not followed
+		}
+	}))
+	defer srv.Close()
+	client := New(1, 5*time.Second)
+	recs := metrics.NewRecorders(1)
+	for _, path := range []string{"/", "/", "/missing", "/broken", "/moved"} {
+		Do(context.Background(), client, Request{Method: "GET", URL: srv.URL + path}, recs[0])
+	}
+	Do(context.Background(), client, Request{Method: "GET", URL: "http://127.0.0.1:1/"}, recs[0]) // refused
+	Do(context.Background(), client, Request{Method: "GET", URL: "::not a url"}, recs[0])         // never sent
+	s := metrics.Merge(recs)
+	want := []metrics.StatusCount{{Code: 200, Count: 2}, {Code: 302, Count: 1}, {Code: 404, Count: 1}, {Code: 503, Count: 1}}
+	if !slices.Equal(s.StatusCodes, want) {
+		t.Errorf("StatusCodes = %v, want %v", s.StatusCodes, want)
+	}
+	if s.Requests != 7 {
+		t.Errorf("Requests = %d, want 7 (status codes are a breakdown of responses only)", s.Requests)
 	}
 }
