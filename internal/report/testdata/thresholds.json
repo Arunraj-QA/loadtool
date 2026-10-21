@@ -71,7 +71,8 @@
       "http1": 100,
       "http2": 2900,
       "other": 0
-    }
+    },
+    "http_status_codes": {}
   },
   "checks": [],
   "thresholds": [

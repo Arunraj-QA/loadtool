@@ -115,6 +115,10 @@ type jsonMetrics struct {
 	// HTTPProtocols counts responses by HTTP version (added in Phase 1,
 	// additive).
 	HTTPProtocols jsonProtocols `json:"http_protocols"`
+	// HTTPStatusCodes counts responses by status code ("other" for codes
+	// outside 100 to 599); empty when there were no responses (added in
+	// Phase 2, additive).
+	HTTPStatusCodes map[string]int `json:"http_status_codes"`
 
 	// families are the used protocol metric families (ADR-015), written
 	// after the fields above, in declaration order (additive).
@@ -210,6 +214,14 @@ func (m jsonMetrics) MarshalJSON() ([]byte, error) {
 		out = append(out, bytes.TrimRight(b.Bytes(), "\n")...)
 	}
 	return append(out, '}'), nil
+}
+
+func statusCodesJSON(codes []metrics.StatusCount) map[string]int {
+	m := make(map[string]int, len(codes)) // {} rather than null when empty
+	for _, c := range codes {
+		m[statusName(c.Code)] = c.Count
+	}
+	return m
 }
 
 type jsonProtocols struct {
@@ -344,6 +356,7 @@ func buildJSON(r Result, version string) jsonSummary {
 			Checks:            jsonRate{Rate: fraction(checkPasses, checkTotal), Passes: checkPasses, Fails: checkTotal - checkPasses, Count: checkTotal},
 			ScriptErrors:      jsonScriptErr{Count: s.ScriptErrors, First: s.FirstScriptError},
 			HTTPProtocols:     jsonProtocols{HTTP1: s.Protocols.HTTP1, HTTP2: s.Protocols.HTTP2, Other: s.Protocols.Other},
+			HTTPStatusCodes:   statusCodesJSON(s.StatusCodes),
 			families:          familiesJSON(s.Families, perSecond),
 		},
 		Checks:     checks,

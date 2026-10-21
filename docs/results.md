@@ -17,6 +17,7 @@ LoadTool summary
   Success:     9,245
   Errors:      0 (0.00%)
   Script errs: 0
+  Statuses:    200 9,245
 
   Checks:      9,245 / 9,245 passed (100.00%)
     ✓ status is 200  9,245 / 9,245  100.00%
@@ -54,6 +55,9 @@ benchmark server (which answers after 10 ms).
 - A request that could not even be sent (an invalid URL) counts as an
   error but has no latency.
 - Requests in `setup` and `teardown` are **not** counted.
+- **Statuses** break down the responses received by HTTP status code
+  (`other` for codes outside 100–599). Requests without a response, such
+  as refused connections, are errors but have no status code.
 
 **Script errors** are iterations that threw. The first message is shown.
 

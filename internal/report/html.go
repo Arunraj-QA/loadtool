@@ -75,6 +75,7 @@ type htmlData struct {
 	ScriptErrors, FirstScriptError          string
 	Dropped                                 string
 	Protocols                               string
+	Statuses                                string
 }
 
 type htmlCard struct{ Label, Value, Note string }
@@ -116,6 +117,7 @@ func buildHTML(r Result, version string) htmlData {
 		d.Dropped = formatCount(s.DroppedIterations)
 	}
 	d.Protocols = protocolsLine(s.Protocols)
+	d.Statuses = statusLine(s.StatusCodes)
 	// The same verdict as the exit code and the JSON outcome.
 	outcome := Verdict(r)
 	d.Failed, d.ExitCode, d.Reasons = !outcome.Passed, outcome.ExitCode, outcome.Reasons
@@ -426,7 +428,7 @@ footer { color: var(--muted); font-size: .8rem; margin-top: 40px; }
 
 {{end}}<h2>Run</h2>
 <div class="scroll"><table><tbody>
-{{if .Protocols}}<tr><th scope="row">Protocols</th><td>{{.Protocols}}</td></tr>
+{{if .Protocols}}<tr><th scope="row">Protocols</th><td>{{.Protocols}}</td></tr>{{end}}{{if .Statuses}}<tr><th scope="row">Status codes</th><td>{{.Statuses}}</td></tr>
 {{end}}<tr><th scope="row">Script errors</th><td>{{.ScriptErrors}}{{if .FirstScriptError}}<div class="err">first: {{.FirstScriptError}}</div>{{end}}</td></tr>
 {{range $i, $s := .Scenarios}}<tr><th scope="row">{{if eq $i 0}}Scenarios{{end}}</th><td>{{$s}}</td></tr>
 {{end}}</tbody></table></div>

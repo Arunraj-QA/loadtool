@@ -83,6 +83,9 @@ func Console(w io.Writer, r Result) {
 	if line := protocolsLine(s.Protocols); line != "" {
 		fmt.Fprintf(w, "  Protocols:   %s\n", line)
 	}
+	if line := statusLine(s.StatusCodes); line != "" {
+		fmt.Fprintf(w, "  Statuses:    %s\n", line)
+	}
 	if s.FirstScriptError != "" {
 		fmt.Fprintf(w, "    first:     %s\n", s.FirstScriptError)
 	}
@@ -179,6 +182,25 @@ func protocolsLine(p metrics.Protocols) string {
 		parts = append(parts, "other "+formatCount(p.Other))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// statusLine lists the responses' status codes with their counts, or ""
+// when there were no responses.
+func statusLine(codes []metrics.StatusCount) string {
+	parts := make([]string, len(codes))
+	for i, c := range codes {
+		parts[i] = statusName(c.Code) + " " + formatCount(c.Count)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// statusName is a status code as reports show it: "other" for codes
+// outside 100 to 599.
+func statusName(code int) string {
+	if code == 0 {
+		return "other"
+	}
+	return strconv.Itoa(code)
 }
 
 // isShorthand reports whether scenarios are just the vus/duration

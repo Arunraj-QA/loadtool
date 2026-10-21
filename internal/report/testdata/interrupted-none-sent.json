@@ -55,7 +55,8 @@
       "http1": 0,
       "http2": 0,
       "other": 0
-    }
+    },
+    "http_status_codes": {}
   },
   "checks": [],
   "thresholds": [],

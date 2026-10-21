@@ -45,7 +45,7 @@
     "metrics": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["http_reqs", "http_req_failed", "http_req_duration", "http_req_duration_successful", "iterations", "dropped_iterations", "checks", "script_errors", "http_protocols"],
+      "required": ["http_reqs", "http_req_failed", "http_req_duration", "http_req_duration_successful", "iterations", "dropped_iterations", "checks", "script_errors", "http_protocols", "http_status_codes"],
       "patternProperties": {
         "^(ws|grpc|graphql|kafka)_[a-z0-9_]+$": {
           "anyOf": [{ "$ref": "#/$defs/familyTrend" }, { "$ref": "#/$defs/familyCounter" }, { "$ref": "#/$defs/familyRate" }]
@@ -112,6 +112,14 @@
             "http1": { "type": "integer", "minimum": 0 },
             "http2": { "type": "integer", "minimum": 0 },
             "other": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "http_status_codes": {
+          "description": "Responses by HTTP status code; \"other\" for codes outside 100 to 599. Empty when there were no responses (added in Phase 2).",
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^([1-5][0-9][0-9]|other)$": { "type": "integer", "minimum": 1 }
           }
         }
       }
