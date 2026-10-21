@@ -5,6 +5,7 @@
 | Page | What it covers |
 |---|---|
 | [Getting started](getting-started.md) | Install, a first test, checks, thresholds, result files |
+| [Testing one API from the browser](ui.md) | `loadtool ui`: configure, run and view a test of one HTTP API without a script |
 | [Script API](script-api.md) | A test script, `check`/`sleep`/`group`, globals, imports, setup/teardown |
 | Protocols | [HTTP](protocols/http.md) (requests, responses, cookies, HTTP/2), [WebSocket](protocols/websocket.md), [gRPC](protocols/grpc.md), [GraphQL](protocols/graphql.md), [Kafka](protocols/kafka.md) |
 | [Mixed-protocol tests](examples/mixed-protocol.md) | Several protocols in one test, and how it runs |

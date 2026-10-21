@@ -8,6 +8,17 @@ does.
 
 ### Phase 2: protocol breadth
 
+- **`loadtool ui`** (ADR-023): load-test one HTTP API from a local page
+  without a script.
+  - Request, VUs, duration, expected status and thresholds; a one-request
+    preflight; live progress; final results from the JSON report; JSON and
+    HTML downloads.
+  - Public destinations only by default (checked on every connection);
+    secrets masked and kept out of reports and logs; the page answers only
+    this machine's browser with a session token.
+- **Status codes:** the summary, the JSON report
+  (`metrics.http_status_codes`) and the HTML report count responses by
+  HTTP status code.
 - **Documentation:** a page per protocol (`docs/protocols/`), split out
   of the script API page; `docs/architecture/protocol-system.md` on how
   protocol modules plug into the engine; and the mixed-protocol page,
