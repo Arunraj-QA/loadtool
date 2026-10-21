@@ -5,12 +5,14 @@
 package runner
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"syscall"
 	"time"
 
 	"github.com/Arunraj-QA/loadtool/internal/config"
@@ -44,6 +46,14 @@ type Params struct {
 	// a user option: tests use it to trust a local test server's
 	// certificate.
 	TLSConfig *tls.Config
+	// DialControl and NoProxy, if set, apply to the HTTP client
+	// (httpclient.Options): the UI uses them to keep a test to public
+	// destinations (ADR-023). loadtool run sets neither.
+	DialControl func(network, address string, c syscall.RawConn) error
+	NoProxy     bool
+	// RequestTimeout bounds each HTTP request; 0 means
+	// httpclient.DefaultTimeout.
+	RequestTimeout time.Duration
 }
 
 // Run executes a test through its lifecycle (ADR-008):
@@ -131,10 +141,12 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	// VU wraps it in a client with its own cookie jar (ADR-009).
 	client := httpclient.NewWithOptions(httpclient.Options{
 		MaxConnsPerHost:   cfg.VUs,
-		Timeout:           httpclient.DefaultTimeout,
+		Timeout:           cmp.Or(p.RequestTimeout, httpclient.DefaultTimeout),
 		NoConnectionReuse: cfg.NoConnectionReuse,
 		HTTPVersion:       cfg.HTTPVersion,
 		TLSConfig:         p.TLSConfig,
+		DialControl:       p.DialControl,
+		NoProxy:           p.NoProxy,
 	})
 	defer client.CloseIdleConnections()
 

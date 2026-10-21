@@ -6,8 +6,10 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
+	"net"
 	"net/http"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
@@ -49,6 +51,12 @@ type Options struct {
 	// TLSConfig, if set, replaces the default TLS settings; tests use it
 	// to trust a test server's certificate.
 	TLSConfig *tls.Config
+	// DialControl, if set, is called for every connection with its
+	// resolved address and may refuse it (netguard.Control; ADR-023).
+	DialControl func(network, address string, c syscall.RawConn) error
+	// NoProxy ignores the proxy environment variables, so every
+	// connection goes to the target itself (and through DialControl).
+	NoProxy bool
 }
 
 // HTTP versions for Options.HTTPVersion and options.httpVersion.
@@ -92,6 +100,14 @@ func NewWithOptions(o Options) *http.Client {
 	t.Protocols = protocols(o.HTTPVersion)
 	if o.TLSConfig != nil {
 		t.TLSClientConfig = o.TLSConfig.Clone()
+	}
+	if o.DialControl != nil {
+		// The default transport's dialer settings, plus the check.
+		d := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Control: o.DialControl}
+		t.DialContext = d.DialContext
+	}
+	if o.NoProxy {
+		t.Proxy = nil
 	}
 
 	return &http.Client{

@@ -2,12 +2,14 @@ package httpclient
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -461,5 +463,37 @@ func BenchmarkDoKeepBody(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		Do(ctx, client, req, rec)
+	}
+}
+
+// DialControl sees every connection's resolved address and can refuse it;
+// without it (as in loadtool run) the same server is reachable. NoProxy
+// drops the proxy environment.
+func TestDialControlAndNoProxy(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	defer srv.Close()
+	refuse := errors.New("refused by test")
+	var seen []string
+	guarded := NewWithOptions(Options{MaxConnsPerHost: 1, Timeout: 5 * time.Second, NoProxy: true,
+		DialControl: func(network, address string, _ syscall.RawConn) error {
+			seen = append(seen, address)
+			return refuse
+		}})
+	res, sent := Send(context.Background(), guarded, Request{Method: "GET", URL: srv.URL})
+	if !sent || !errors.Is(res.Err, refuse) || res.Status != 0 {
+		t.Errorf("guarded request: sent=%v status=%d err=%v; want refused", sent, res.Status, res.Err)
+	}
+	if len(seen) != 1 || seen[0] != srv.Listener.Addr().String() {
+		t.Errorf("DialControl saw %v; want the server's resolved address", seen)
+	}
+	if tr := guarded.Transport.(*http.Transport); tr.Proxy != nil {
+		t.Error("NoProxy left the proxy function set")
+	}
+	plain := NewWithOptions(Options{MaxConnsPerHost: 1, Timeout: 5 * time.Second})
+	if res, _ := Send(context.Background(), plain, Request{Method: "GET", URL: srv.URL}); res.Err != nil || res.Status != 200 {
+		t.Errorf("unguarded request: status %d, err %v", res.Status, res.Err)
+	}
+	if tr := plain.Transport.(*http.Transport); tr.Proxy == nil {
+		t.Error("the default client lost the proxy environment")
 	}
 }

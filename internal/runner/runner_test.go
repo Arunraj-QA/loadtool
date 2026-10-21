@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -207,5 +209,38 @@ export default function (): void {
 				}
 			}
 		})
+	}
+}
+
+// The UI's HTTP options reach the run's client: DialControl sees (and
+// here refuses) every connection, and RequestTimeout bounds each request.
+func TestRunAppliesGuardAndRequestTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/slow" {
+			time.Sleep(500 * time.Millisecond)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	run := func(url string, p Params) report.Result {
+		t.Helper()
+		p.Config = config.Config{Script: getScript(t, url, ""), GracefulStop: time.Second}
+		p.Overrides = config.Overrides{VUs: intp(1), Duration: durp(300 * time.Millisecond)}
+		res, err := Run(context.Background(), p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+	var dials atomic.Int64
+	refused := run(srv.URL, Params{NoProxy: true, DialControl: func(string, string, syscall.RawConn) error {
+		dials.Add(1)
+		return errors.New("refused by test")
+	}})
+	if s := refused.Summary; s.Requests == 0 || s.Successes != 0 || dials.Load() == 0 {
+		t.Errorf("guarded run: %d requests, %d succeeded, %d dials; want every request refused at dial", s.Requests, s.Successes, dials.Load())
+	}
+	slow := run(srv.URL+"/slow", Params{RequestTimeout: 100 * time.Millisecond})
+	if s := slow.Summary; s.Requests == 0 || s.Successes != 0 {
+		t.Errorf("100 ms timeout against a 500 ms server: %d requests, %d succeeded; want all timed out", s.Requests, s.Successes)
 	}
 }
