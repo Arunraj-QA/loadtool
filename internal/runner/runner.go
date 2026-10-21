@@ -18,6 +18,7 @@ import (
 	"github.com/Arunraj-QA/loadtool/internal/config"
 	"github.com/Arunraj-QA/loadtool/internal/engine"
 	"github.com/Arunraj-QA/loadtool/internal/httpclient"
+	"github.com/Arunraj-QA/loadtool/internal/metrics"
 	"github.com/Arunraj-QA/loadtool/internal/protocol"
 	"github.com/Arunraj-QA/loadtool/internal/report"
 	"github.com/Arunraj-QA/loadtool/internal/script"
@@ -54,6 +55,9 @@ type Params struct {
 	// RequestTimeout bounds each HTTP request; 0 means
 	// httpclient.DefaultTimeout.
 	RequestTimeout time.Duration
+	// OnSample, if set, receives each time-series point while the load
+	// phase runs (engine.RunScenariosSampled); it must return quickly.
+	OnSample func(metrics.Point)
 }
 
 // Run executes a test through its lifecycle (ADR-008):
@@ -160,7 +164,7 @@ func Run(ctx context.Context, p Params) (report.Result, error) {
 	prog = prog.WithSetupData(data)
 
 	var vus []*script.VU
-	res, runErr := engine.RunScenarios(ctx, engineScenarios(ctx, prog, client, cfg.Scenarios, &vus))
+	res, runErr := engine.RunScenariosSampled(ctx, engineScenarios(ctx, prog, client, cfg.Scenarios, &vus), p.OnSample)
 	// Read before teardown: a Ctrl+C during teardown does not make the
 	// load phase interrupted.
 	interrupted := ctx.Err() != nil

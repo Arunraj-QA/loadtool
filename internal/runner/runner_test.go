@@ -3,12 +3,15 @@ package runner
 import (
 	"context"
 	"errors"
+	"github.com/Arunraj-QA/loadtool/internal/metrics"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -242,5 +245,41 @@ func TestRunAppliesGuardAndRequestTimeout(t *testing.T) {
 	slow := run(srv.URL+"/slow", Params{RequestTimeout: 100 * time.Millisecond})
 	if s := slow.Summary; s.Requests == 0 || s.Successes != 0 {
 		t.Errorf("100 ms timeout against a 500 ms server: %d requests, %d succeeded; want all timed out", s.Requests, s.Successes)
+	}
+}
+
+// OnSample receives every time-series point while the test runs: the
+// same points, in order, as the result's series, the first one well
+// before the run ends.
+func TestRunStreamsSamples(t *testing.T) {
+	srv := okServer(t)
+	var (
+		mu     sync.Mutex
+		points []metrics.Point
+		first  time.Time
+	)
+	res, err := Run(context.Background(), Params{
+		Config:    config.Config{Script: getScript(t, srv.URL, ""), GracefulStop: time.Second},
+		Overrides: config.Overrides{VUs: intp(2), Duration: durp(2500 * time.Millisecond)},
+		OnSample: func(p metrics.Point) {
+			mu.Lock()
+			defer mu.Unlock()
+			if points == nil {
+				first = time.Now()
+			}
+			points = append(points, p)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ended := time.Now()
+	mu.Lock()
+	defer mu.Unlock()
+	if !slices.Equal(points, res.Series) || len(points) < 3 {
+		t.Fatalf("OnSample got %d points, the series has %d; want the same, at least 3", len(points), len(res.Series))
+	}
+	if ended.Sub(first) < time.Second {
+		t.Errorf("first point %v before the end; want it while the run was going", ended.Sub(first))
 	}
 }

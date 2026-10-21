@@ -68,6 +68,15 @@ type scenarioRun struct {
 // Each VU's iterations count in the merged Summary; Summary.Iterations
 // counts only iterations that returned before their context ended.
 func RunScenarios(ctx context.Context, scenarios []Scenario) (Result, error) {
+	return RunScenariosSampled(ctx, scenarios, nil)
+}
+
+// RunScenariosSampled is RunScenarios that also hands each time-series
+// point to onSample (if not nil) as it is sampled, the final one
+// included: live progress for a UI (ADR-023). onSample runs on the
+// sampler goroutine, concurrently with the caller, and must return
+// quickly; the points are the same as those in Result.Series.
+func RunScenariosSampled(ctx context.Context, scenarios []Scenario, onSample func(metrics.Point)) (Result, error) {
 	if len(scenarios) == 0 {
 		return Result{}, errors.New("no scenarios to run")
 	}
@@ -113,7 +122,7 @@ func RunScenarios(ctx context.Context, scenarios []Scenario) (Result, error) {
 	// it stops, and is waited for, once they have all returned.
 	stopSampling := make(chan struct{})
 	seriesDone := make(chan []metrics.Point)
-	go func() { seriesDone <- sample(sampler, start, scenarios, stopSampling) }()
+	go func() { seriesDone <- sample(sampler, start, scenarios, stopSampling, onSample) }()
 	wg.Wait()
 	elapsed := time.Since(start)
 	close(stopSampling)
@@ -157,18 +166,24 @@ const SampleInterval = time.Second
 
 // sample records a time-series point every SampleInterval until stop is
 // closed, then a last point for the final, partial interval.
-func sample(sampler *metrics.Sampler, start time.Time, scenarios []Scenario, stop <-chan struct{}) []metrics.Point {
+func sample(sampler *metrics.Sampler, start time.Time, scenarios []Scenario, stop <-chan struct{}, onSample func(metrics.Point)) []metrics.Point {
 	var series []metrics.Point
+	add := func(at time.Duration) {
+		p := sampler.Sample(at, activeVUs(scenarios, at))
+		series = append(series, p)
+		if onSample != nil {
+			onSample(p)
+		}
+	}
 	ticker := time.NewTicker(SampleInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case now := <-ticker.C:
-			at := now.Sub(start)
-			series = append(series, sampler.Sample(at, activeVUs(scenarios, at)))
+			add(now.Sub(start))
 		case <-stop:
-			at := time.Since(start)
-			return append(series, sampler.Sample(at, activeVUs(scenarios, at)))
+			add(time.Since(start))
+			return series
 		}
 	}
 }
