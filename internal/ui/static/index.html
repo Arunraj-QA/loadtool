@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoadTool UI</title>
+<link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <h1>LoadTool <span class="sub">single-API load test</span></h1>
+  <p class="warn">Only test APIs you are authorized to load-test. Load is sent from this machine.</p>
+</header>
+<main class="layout">
+<section class="panel" aria-labelledby="req-title">
+  <h2 id="req-title">Request</h2>
+  <form id="form" novalidate>
+    <div class="row">
+      <label class="method">Method
+        <select id="method">
+          <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option>
+        </select>
+      </label>
+      <label class="grow">URL
+        <input id="url" type="url" placeholder="https://api.example.com/v1/items" autocomplete="off" required>
+      </label>
+    </div>
+
+    <fieldset>
+      <legend>Query parameters</legend>
+      <div id="query" class="fields"></div>
+      <button type="button" class="link" data-add="query">+ Add parameter</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Headers</legend>
+      <div id="headers" class="fields"></div>
+      <button type="button" class="link" data-add="headers">+ Add header</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Authentication</legend>
+      <label>Type
+        <select id="authType">
+          <option value="none">None</option>
+          <option value="bearer">Bearer token</option>
+          <option value="basic">Basic</option>
+        </select>
+      </label>
+      <label class="auth bearer" hidden>Token
+        <input id="token" type="password" autocomplete="off">
+      </label>
+      <div class="row auth basic" hidden>
+        <label class="grow">User name <input id="username" type="text" autocomplete="off"></label>
+        <label class="grow">Password <input id="password" type="password" autocomplete="off"></label>
+      </div>
+    </fieldset>
+
+    <label>JSON body <span class="hint">(POST, PUT, PATCH, DELETE)</span>
+      <textarea id="body" rows="5" spellcheck="false" placeholder='{"name": "example"}'></textarea>
+    </label>
+
+    <h2>Load</h2>
+    <div class="row">
+      <label>Virtual users <input id="vus" type="number" min="1" value="5"></label>
+      <label>Duration <input id="duration" type="text" value="30s" placeholder="30s"></label>
+      <label>Expected status
+        <span class="pair"><input id="minStatus" type="number" min="100" max="599" value="200"> – <input id="maxStatus" type="number" min="100" max="599" value="299"></span>
+      </label>
+    </div>
+    <div class="row">
+      <label>p95 threshold (ms) <input id="p95" type="number" min="0" placeholder="none"></label>
+      <label>Max error rate (%) <input id="errPct" type="number" min="0" max="100" step="0.1" placeholder="none"></label>
+    </div>
+    <label class="check"><input id="authorized" type="checkbox"> I am authorized to load-test this API</label>
+
+    <div class="actions">
+      <button type="button" id="preflightBtn">Send one request</button>
+      <button type="submit" id="startBtn" class="primary">Start test</button>
+      <button type="button" id="cancelBtn" disabled>Cancel</button>
+    </div>
+    <p id="formError" class="error" role="alert"></p>
+  </form>
+
+  <div id="preflight" class="preflight" hidden>
+    <h3>One request</h3>
+    <p id="pfSummary"></p>
+    <details><summary>Response headers and body</summary><pre id="pfDetail"></pre></details>
+  </div>
+</section>
+
+<section class="panel" aria-labelledby="dash-title" aria-live="polite">
+  <div class="dash-head">
+    <h2 id="dash-title">Results</h2>
+    <span id="state" class="badge idle">idle</span>
+  </div>
+  <p id="label" class="label"></p>
+  <div class="tiles">
+    <div class="tile"><span class="k">Elapsed</span><span id="elapsed" class="v">–</span></div>
+    <div class="tile"><span class="k">VUs (active / configured)</span><span id="vusOut" class="v">–</span></div>
+    <div class="tile"><span class="k">Requests</span><span id="requests" class="v">–</span></div>
+    <div class="tile"><span class="k">Requests/s</span><span id="rps" class="v">–</span></div>
+    <div class="tile"><span class="k">Failed</span><span id="failed" class="v">–</span></div>
+    <div class="tile"><span class="k">Error rate</span><span id="errRate" class="v">–</span></div>
+  </div>
+
+  <h3>Latency <span class="hint" id="latHint">per second while running; whole run at the end</span></h3>
+  <div class="tiles">
+    <div class="tile"><span class="k">Average</span><span id="avg" class="v">–</span></div>
+    <div class="tile"><span class="k">p50</span><span id="p50" class="v">–</span></div>
+    <div class="tile"><span class="k">p90</span><span id="p90" class="v">–</span></div>
+    <div class="tile"><span class="k">p95</span><span id="p95v" class="v">–</span></div>
+    <div class="tile"><span class="k">p99</span><span id="p99" class="v">–</span></div>
+  </div>
+
+  <div class="charts">
+    <figure><figcaption>Requests per second</figcaption><svg id="chartRps" viewBox="0 0 400 140" role="img" aria-label="Requests per second over time"></svg></figure>
+    <figure><figcaption>p95 latency (ms) per second</figcaption><svg id="chartP95" viewBox="0 0 400 140" role="img" aria-label="p95 latency over time"></svg></figure>
+  </div>
+
+  <div id="finalBlock" hidden>
+    <h3>Status codes</h3>
+    <table id="codes" class="table"><thead><tr><th scope="col">Code</th><th scope="col">Responses</th></tr></thead><tbody></tbody></table>
+    <h3>Thresholds and checks</h3>
+    <table id="thresholds" class="table"><thead><tr><th scope="col"></th><th scope="col">Metric</th><th scope="col">Condition</th><th scope="col">Observed</th></tr></thead><tbody></tbody></table>
+    <div class="actions">
+      <button type="button" id="dlJson">Download JSON report</button>
+      <button type="button" id="dlHtml">Download HTML report</button>
+    </div>
+  </div>
+  <p id="runError" class="error" role="alert"></p>
+  <ul id="warnings" class="warnings"></ul>
+</section>
+</main>
+</body>
+</html>
