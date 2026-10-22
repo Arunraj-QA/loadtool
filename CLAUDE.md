@@ -91,8 +91,20 @@ Phase 2 is complete until all of them are measured and recorded.
    unchanged (the criterion 2 regression check still holds). The design
    is ADR-023.
 
-Status: criteria 1–4 met, measured on 2026-10-14 (below); criterion 5
-was added on 2026-10-21 and is not met yet, so Phase 2 is open again.
+Status: all five met. Criteria 1–4 were measured on 2026-10-14
+(below). Criterion 5, added on 2026-10-21, was met on 2026-10-22
+(`benchmarks/results/2026-10-21-ui/`):
+
+- **The UI works end to end.** `loadtool ui` runs a test of one HTTP API
+  through the runner. That is tested in `internal/ui`, and was checked in
+  a browser against the demo API.
+- **The numbers come from the existing metrics.** The dashboard's final
+  values are the JSON report's, and its downloads are `report.JSON` and
+  `report.HTML` output.
+- **`loadtool run` is unchanged.** At 1,000 VUs against the Phase 2
+  build `0b8f9b4`, peak memory, CPU and requests per second were within
+  run-to-run variation, and micro-benchmarks show the same cost per
+  request.
 
 Criteria 1–4, measured on 2026-10-14 in
 `benchmarks/results/2026-10-14-phase2/`:
