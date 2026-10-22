@@ -82,5 +82,29 @@ So it neither shows nor rules out a change in throughput.
 - **Memory per run is unchanged**, within variation.
 - **The request path costs the same** (the micro-benchmarks above).
 
-**Still needed for criterion 5:** run `ab.ps1` again once the scanning
-has stopped and background CPU is back near the 2026-10-14 level.
+## Whole-run A/B at 1,000 VUs, again on an idle machine (2026-10-22)
+
+The same `ab.ps1` and builds: base `0b8f9b4`, new `496e200`. The commits
+since the new build change only docs and results. Raw data is in
+`raw-ab-2/`.
+
+- **Power:** AC.
+- **Background CPU:** 3–10 % before the runs, below the 2026-10-14
+  level. It rose to 27–45 % by the end.
+
+| | base runs | new runs | Median Δ | Wider range | By the rule |
+|---|---|---|---|---|---|
+| Peak private MB | 177.4, 182.1, 183.4 | 176.1, 200.2, 191.7 | +9.6 (+5.3 %) | 24.1 | within |
+| CPU % of machine | 43.7, 40.0, 43.2 | 43.9, 44.5, 43.6 | +0.7 | 3.7 | within |
+| Requests/s | 58,411, 35,906, 34,282 | 25,589, 33,912, 36,305 | −1,994 (−5.6 %) | 24,129 | within |
+
+All runs exited 0, with errors of 0.01–0.18 %.
+
+**All three are within run-to-run variation**, so `loadtool run` is
+unchanged by the UI work, as Phase 2 exit criterion 5 requires.
+
+- **Throughput varied a lot in round 1:** base 58,411 req/s, then new
+  25,589. In rounds 2 and 3 the builds are within 6 % of each other, with
+  the new build ahead in round 3. Background load rose during the
+  session.
+- **The micro-benchmarks agree:** the request path costs the same.
