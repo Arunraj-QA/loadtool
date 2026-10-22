@@ -6,10 +6,80 @@ does.
 
 ## Unreleased
 
+### Phase 2: protocol breadth
+
+- **`loadtool ui`** (ADR-023): load-test one HTTP API from a local page
+  without a script.
+  - Request, VUs, duration, expected status and thresholds; a one-request
+    preflight; live progress; final results from the JSON report; JSON and
+    HTML downloads.
+  - Public destinations only by default (checked on every connection);
+    secrets masked and kept out of reports and logs; the page answers only
+    this machine's browser with a session token.
+- **Status codes:** the summary, the JSON report
+  (`metrics.http_status_codes`) and the HTML report count responses by
+  HTTP status code.
+- **Documentation:** a page per protocol (`docs/protocols/`), split out
+  of the script API page; `docs/architecture/protocol-system.md` on how
+  protocol modules plug into the engine; and the mixed-protocol page,
+  moved to `docs/examples/mixed-protocol.md`.
+- **More examples:** `websocket-basic.ts`, `websocket-chat.ts` and
+  `mixed-http-websocket.ts`. The demo API serves a chat at `/ws/chat`.
+- **WebSocket** (`loadtool/ws`, ADR-019):
+  - connect, send, receive and close, with handlers and timers in the
+    session;
+  - per-message reply latency (`send(…, { reply: true })`);
+  - `ws_*` metrics in the summary, the JSON and HTML reports and
+    thresholds.
+  - It can be mixed with HTTP in one iteration
+    (`examples/websocket.ts`), and the demo API has a `/ws/echo`
+    endpoint.
+  - A blocking style for request/reply tests: `ws.connect(url)` returns a
+    socket with `send`, `receive(timeout)` and `close`
+    (`examples/websocket-request-reply.ts`).
+  - The module can also be imported as `loadtool/websocket`.
+- **gRPC** (`loadtool/grpc`, ADR-020), on grpc-go:
+  - unary calls and server, client and bidirectional streams (blocking);
+  - methods described by `.proto` files (parsed in Go, no `protoc`) or
+    by server reflection;
+  - metadata and deadlines;
+  - `grpc_*` metrics in the summary, reports and thresholds.
+  - The demo API serves a greeter service on port 8091, and there are two
+    examples (`grpc-unary.ts`, `grpc-streaming.ts`).
+- **GraphQL** (`loadtool/graphql`, ADR-021), built on the HTTP
+  transport (the same connections, HTTP/2 and cookies; no second HTTP
+  client):
+  - queries, mutations, variables, headers and a `Client` with default
+    headers;
+  - results separate HTTP success (`http_ok`) from GraphQL success (`ok`),
+    so HTTP 200 with GraphQL errors is a failed operation;
+  - `graphql_*` metrics (not `http_*`).
+  - The demo API serves `/graphql`, and there are three examples.
+- **Kafka** (`loadtool/kafka`, ADR-022), on franz-go:
+  - `Producer` (`produce`, `produceBatch`) and `Consumer` (`consume`),
+    one client per VU, reused across iterations and closed at the end;
+  - keys, headers, explicit partitions, consumer groups, `startAt`;
+  - results with `ok`, `error` and `error_code`, never exceptions;
+  - `kafka_*` metrics: produce duration, end-to-end consume latency,
+    messages produced and consumed, failure rates.
+  - The demo API runs an in-process broker on port 9092, there are four
+    examples, and CI also tests against a real broker in Docker
+    (`testenv/kafka`).
+- **Mixed-protocol tests:** `examples/mixed-protocols.ts` uses HTTP,
+  GraphQL, WebSocket, gRPC and Kafka in one iteration, with shared setup,
+  checks, thresholds and reports. An end-to-end test runs it, and covers
+  cancellation and per-VU state. `docs/examples/mixed-protocol.md` describes the
+  execution flow.
+- **Fixed:** a script whose scenarios name `exec` functions could not
+  import protocol modules.
+- **Protocol modules** (ADR-014 to ADR-018): a common interface and
+  lifecycle for protocols, with metric families (ADR-015) and
+  normalized error codes (ADR-016).
+
 ### Phase 1: core engine
 
 **Script API**
-([Script API](docs/script-api.md), ADR-005, ADR-007, ADR-008, ADR-009, ADR-010):
+([Script API](docs/script-api.md), ADR-005, ADR-007, ADR-008, ADR-009, ADR-010, ADR-013):
 
 - **Breaking for Phase 0 scripts:** `http` is now imported
   (`import http from "loadtool/http"`) instead of being a global. The
@@ -21,6 +91,13 @@ does.
 - **HTTP:**
   - `http.post`, `put`, `patch`, `del` and `request`.
   - Responses with headers, body, `json()`, cookies and the protocol.
+- **Response bodies are discarded by default** (ADR-013), as in Phase 0.
+  - To read them, set `discardResponseBodies: false`, or
+    `responseType: "text"` in one request's params.
+  - Reading a discarded body warns, and `res.json()` throws a
+    `TypeError` that says how to keep it.
+  - Keeping every body had cost about 2 GB at 1,000 VUs with 1 MB
+    responses; see `benchmarks/results/2026-10-07-response-bodies/`.
 - **Assertions and structure:** `check`, `sleep`, `group`; `setup` and
   `teardown`.
 - **Sessions:** a cookie jar per VU, reset each iteration
@@ -82,6 +159,12 @@ does.
 - A troubleshooting guide and a topic index.
 
 **Fixes found along the way:**
+
+- An `async` default function (or `setup`, `teardown`, or a scenario
+  function) hid every error: its rejected Promise was ignored, so a
+  failing script reported no script errors. Errors in `async` functions
+  are now reported, and one that awaits something that never resolves is
+  a script error that says so.
 
 - A setup cancelled with Ctrl+C could count as successful and start the
   load phase.

@@ -103,7 +103,9 @@ Then read [Getting started](docs/getting-started.md).
 | | |
 |---|---|
 | [Getting started](docs/getting-started.md) | A first test, checks, thresholds, result files |
-| [Script API](docs/script-api.md) | Requests, responses, checks, lifecycle, cookies, HTTP/2 |
+| [Browser UI](docs/ui.md) | `loadtool ui`: test one HTTP API without a script |
+| [Script API](docs/script-api.md) | A test script, checks, globals, imports, lifecycle |
+| [Protocols](docs/script-api.md#protocols) | [HTTP](docs/protocols/http.md), [WebSocket](docs/protocols/websocket.md), [gRPC](docs/protocols/grpc.md), [GraphQL](docs/protocols/graphql.md), [Kafka](docs/protocols/kafka.md), and [several in one test](docs/examples/mixed-protocol.md) |
 | [Options](docs/options.md) | All options, scenarios, thresholds |
 | [Command line](docs/cli.md) | Flags, exit codes, environment |
 | [Results](docs/results.md) | What the numbers mean |

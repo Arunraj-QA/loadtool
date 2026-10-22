@@ -2,13 +2,18 @@ package runner
 
 import (
 	"context"
+	"errors"
+	"github.com/Arunraj-QA/loadtool/internal/metrics"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -158,22 +163,28 @@ func TestRunStartErrors(t *testing.T) {
 	}
 }
 
-// options.discardResponseBodies reaches the VUs, and warnings raised while
-// the test runs reach Params.Warn.
+// Response bodies are discarded unless options.discardResponseBodies is
+// false or a request sets params.responseType "text" (ADR-013). Reading a
+// discarded body warns once, saying how to keep it, and warnings raised
+// while the test runs reach Params.Warn.
 func TestRunAppliesHTTPOptionsAndWarnings(t *testing.T) {
 	srv := okServer(t)
 	for _, tt := range []struct {
-		discard  string
-		wantBody string
+		name, options, params string
+		wantBody              string
+		wantHint              bool
 	}{
-		{"false", "string"},
-		{"true", "object"}, // typeof null
+		{"default", `{}`, `{ timeout: "1s" }`, "object", true}, // typeof null
+		{"discard=false", `{ discardResponseBodies: false }`, `{ timeout: "1s" }`, "string", false},
+		{"discard=true", `{ discardResponseBodies: true }`, `{ timeout: "1s" }`, "object", true},
+		{"responseType=text", `{}`, `{ timeout: "1s", responseType: "text" }`, "string", false},
+		{"responseType=none", `{ discardResponseBodies: false }`, `{ timeout: "1s", responseType: "none" }`, "object", true},
 	} {
-		t.Run("discard="+tt.discard, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			path := scriptFile(t, `import http from "loadtool/http";
-export const options = { discardResponseBodies: `+tt.discard+` };
+export const options = `+tt.options+`;
 export default function (): void {
-	const res = http.get("`+srv.URL+`", { timeout: "1s" });
+	const res = http.get("`+srv.URL+`", `+tt.params+`);
 	if (typeof res.body !== "`+tt.wantBody+`") throw new Error("typeof body is " + typeof res.body);
 }`)
 			var warnings []string
@@ -188,9 +199,87 @@ export default function (): void {
 			if res.Summary.ScriptErrors != 0 {
 				t.Fatalf("script error: %s", res.Summary.FirstScriptError)
 			}
-			if len(warnings) != 1 || !strings.Contains(warnings[0], `"timeout" is not supported`) {
-				t.Errorf("warnings = %q, want one about timeout", warnings)
+			want := []string{`"timeout" is not supported`}
+			if tt.wantHint {
+				want = append(want, `res.body is null: response bodies are discarded by default`)
+			}
+			if len(warnings) != len(want) {
+				t.Fatalf("warnings = %q, want %d", warnings, len(want))
+			}
+			for i, w := range want {
+				if !strings.Contains(warnings[i], w) {
+					t.Errorf("warning %d = %q, want it to contain %q", i, warnings[i], w)
+				}
 			}
 		})
+	}
+}
+
+// The UI's HTTP options reach the run's client: DialControl sees (and
+// here refuses) every connection, and RequestTimeout bounds each request.
+func TestRunAppliesGuardAndRequestTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/slow" {
+			time.Sleep(500 * time.Millisecond)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	run := func(url string, p Params) report.Result {
+		t.Helper()
+		p.Config = config.Config{Script: getScript(t, url, ""), GracefulStop: time.Second}
+		p.Overrides = config.Overrides{VUs: intp(1), Duration: durp(300 * time.Millisecond)}
+		res, err := Run(context.Background(), p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+	var dials atomic.Int64
+	refused := run(srv.URL, Params{NoProxy: true, DialControl: func(string, string, syscall.RawConn) error {
+		dials.Add(1)
+		return errors.New("refused by test")
+	}})
+	if s := refused.Summary; s.Requests == 0 || s.Successes != 0 || dials.Load() == 0 {
+		t.Errorf("guarded run: %d requests, %d succeeded, %d dials; want every request refused at dial", s.Requests, s.Successes, dials.Load())
+	}
+	slow := run(srv.URL+"/slow", Params{RequestTimeout: 100 * time.Millisecond})
+	if s := slow.Summary; s.Requests == 0 || s.Successes != 0 {
+		t.Errorf("100 ms timeout against a 500 ms server: %d requests, %d succeeded; want all timed out", s.Requests, s.Successes)
+	}
+}
+
+// OnSample receives every time-series point while the test runs: the
+// same points, in order, as the result's series, the first one well
+// before the run ends.
+func TestRunStreamsSamples(t *testing.T) {
+	srv := okServer(t)
+	var (
+		mu     sync.Mutex
+		points []metrics.Point
+		first  time.Time
+	)
+	res, err := Run(context.Background(), Params{
+		Config:    config.Config{Script: getScript(t, srv.URL, ""), GracefulStop: time.Second},
+		Overrides: config.Overrides{VUs: intp(2), Duration: durp(2500 * time.Millisecond)},
+		OnSample: func(p metrics.Point) {
+			mu.Lock()
+			defer mu.Unlock()
+			if points == nil {
+				first = time.Now()
+			}
+			points = append(points, p)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ended := time.Now()
+	mu.Lock()
+	defer mu.Unlock()
+	if !slices.Equal(points, res.Series) || len(points) < 3 {
+		t.Fatalf("OnSample got %d points, the series has %d; want the same, at least 3", len(points), len(res.Series))
+	}
+	if ended.Sub(first) < time.Second {
+		t.Errorf("first point %v before the end; want it while the run was going", ended.Sub(first))
 	}
 }

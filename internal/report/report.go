@@ -83,6 +83,9 @@ func Console(w io.Writer, r Result) {
 	if line := protocolsLine(s.Protocols); line != "" {
 		fmt.Fprintf(w, "  Protocols:   %s\n", line)
 	}
+	if line := statusLine(s.StatusCodes); line != "" {
+		fmt.Fprintf(w, "  Statuses:    %s\n", line)
+	}
 	if s.FirstScriptError != "" {
 		fmt.Fprintf(w, "    first:     %s\n", s.FirstScriptError)
 	}
@@ -95,6 +98,11 @@ func Console(w io.Writer, r Result) {
 	printChecks(w, s.Checks)
 	printThresholds(w, r.Thresholds)
 
+	printHTTPLatency(w, s)
+	printFamilies(w, s.Families, r.Elapsed)
+}
+
+func printHTTPLatency(w io.Writer, s metrics.Summary) {
 	if s.Sent == 0 {
 		fmt.Fprintf(w, "  Latency:     no requests were sent\n")
 		return
@@ -117,6 +125,49 @@ func Console(w io.Writer, r Result) {
 	})
 }
 
+// printFamilies prints the protocol metric families that recorded
+// anything (ADR-015), after the HTTP latency. Percentiles are written as
+// "p95=..." so benchmarks/measure.ps1, which reads the first "p95 <value>",
+// never mistakes them for HTTP latency.
+func printFamilies(w io.Writer, fams []metrics.FamilySummary, elapsed time.Duration) {
+	width := 0
+	for _, f := range fams {
+		if f.Used() {
+			width = max(width, len(f.Name))
+		}
+	}
+	if width == 0 {
+		return
+	}
+	fmt.Fprintf(w, "  Protocol metrics:\n")
+	for _, f := range fams {
+		if f.Used() {
+			fmt.Fprintf(w, "    %-*s  %s\n", width, f.Name, familyLine(f, elapsed))
+		}
+	}
+}
+
+// familyLine describes one used family.
+func familyLine(f metrics.FamilySummary, elapsed time.Duration) string {
+	switch f.Kind {
+	case metrics.Trend:
+		failed := ""
+		if f.Failed > 0 {
+			failed = fmt.Sprintf(", %s failed", formatCount(f.Failed))
+		}
+		return fmt.Sprintf("%s samples%s  avg=%s p50=%s p95=%s p99=%s max=%s", formatCount(f.Count), failed,
+			formatDuration(f.Mean), formatDuration(f.P50), formatDuration(f.P95), formatDuration(f.P99), formatDuration(f.Max))
+	case metrics.Rate:
+		return fmt.Sprintf("%s (%s of %s)", percent(f.Trues, f.Count), formatCount(f.Trues), formatCount(f.Count))
+	default: // metrics.Counter
+		var rate float64
+		if secs := elapsed.Seconds(); secs > 0 {
+			rate = float64(f.Count) / secs
+		}
+		return fmt.Sprintf("%s (%.1f/s)", formatCount(f.Count), rate)
+	}
+}
+
 // protocolsLine describes the HTTP versions responses used, or "" when
 // no response used HTTP/2 (plain HTTP/1.1 runs need no line).
 func protocolsLine(p metrics.Protocols) string {
@@ -131,6 +182,25 @@ func protocolsLine(p metrics.Protocols) string {
 		parts = append(parts, "other "+formatCount(p.Other))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// statusLine lists the responses' status codes with their counts, or ""
+// when there were no responses.
+func statusLine(codes []metrics.StatusCount) string {
+	parts := make([]string, len(codes))
+	for i, c := range codes {
+		parts[i] = statusName(c.Code) + " " + formatCount(c.Count)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// statusName is a status code as reports show it: "other" for codes
+// outside 100 to 599.
+func statusName(code int) string {
+	if code == 0 {
+		return "other"
+	}
+	return strconv.Itoa(code)
 }
 
 // isShorthand reports whether scenarios are just the vus/duration

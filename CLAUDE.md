@@ -20,10 +20,120 @@ The long-term goal is to build a differentiated performance-testing platform wit
 
 We are currently implementing:
 
-**Phase 1 — MVP Core Engine**
+**Phase 2 — Protocol Breadth**
 
-Phase 1 extends the Phase 0 engine. Do not rewrite or redesign it: keep
-the Phase 0 components that work and extend them (see `docs/architecture.md`).
+Phase 2 extends the Phase 1 engine. Do not rewrite or redesign it: add
+protocols through the protocol module interface (ADR-014) and keep the
+HTTP path, the VU engine and the scenario engine as they are.
+
+### Phase 2 Goals
+
+1. WebSocket module
+2. gRPC module
+3. GraphQL module
+4. Kafka module
+5. Common protocol module interface
+6. A single test file that mixes HTTP and at least one non-HTTP protocol
+7. A local UI that load-tests one public HTTP API without a script
+   (added 2026-10-21; exit criterion 5)
+
+### Phase 2 Scope Decisions (agreed 2026-10-08)
+
+1. **GraphQL** calls made with `loadtool/graphql` are counted only under
+   `graphql_*` metrics, never under `http_*`.
+2. **gRPC** covers unary calls and server, client and bidirectional
+   streaming, in the blocking style (ADR-020). Changed on 2026-10-09 at
+   the user's request; it was unary only.
+3. **gRPC connections** are one per VU by default; the choice is
+   confirmed by measurement at 1,000 VUs before it is final.
+4. **Kafka** clients are owned by the VU: one per Producer or Consumer
+   (and per configuration for the one-off calls), reused across
+   iterations (ADR-022). Changed on 2026-10-09 by the Kafka
+   requirements (VU-owned client state); it was one client per run.
+5. **Protocol modules are compiled in** and registered explicitly. No
+   runtime or external plugins.
+6. **Asynchronous protocols** use blocking calls with session-scoped
+   loops (WebSocket: `ws.connect(url, params, callback)` blocks until the
+   socket closes, as in k6). No global event loop or Promises.
+7. **Errors** are normalized: results carry `error` and `error_code`, HTTP
+   responses included (ADR-016).
+
+The design is in ADR-014 to ADR-017 (accepted 2026-10-08) and the
+consolidated protocol architecture, ADR-018 (accepted 2026-10-08). Each protocol gets its own
+ADR before it is implemented: ADR-019 WebSocket, ADR-020 gRPC, ADR-021
+GraphQL, ADR-022 Kafka.
+
+### Phase 2 Exit Criteria
+
+Agreed on 2026-10-08, before the Phase 2 benchmark run. Do not claim
+Phase 2 is complete until all of them are measured and recorded.
+
+1. **Mixed protocols work end to end:** an example script that uses HTTP
+   and WebSocket in the same iteration, and every other Phase 2 example,
+   passes in CI against local targets (`scripts/smoke-examples.sh`), and
+   the GitHub Action self-test passes.
+2. **No HTTP regression:** at 1,000 VUs, with the Phase 1 exit scenario
+   (`benchmarks/measure.ps1`), LoadTool's peak memory and requests per
+   second are within run-to-run variation of the Phase 1 build
+   (`cf35298`), measured in the same session, and memory is still below
+   JMeter's.
+3. **No per-VU cost for unused modules:** an HTTP-only script's retained
+   memory per VU (`BenchmarkVURetainedMemory`) is within run-to-run
+   variation of the Phase 1 build.
+4. **Each protocol is measured at 1,000 VUs** against a local target, and
+   peak memory, throughput and errors are recorded under `benchmarks/`.
+5. **Single-API UI gate** (added 2026-10-21 at the user's request): a user
+   enters one publicly hosted HTTP API in a local UI (`loadtool ui`),
+   configures VUs and duration, runs it with the existing runner and
+   HTTP client, and sees the results in a dashboard, without writing a
+   script. The dashboard's numbers come from the existing metrics, the
+   JSON and HTML reports match `loadtool run`'s, and `loadtool run` is
+   unchanged (the criterion 2 regression check still holds). The design
+   is ADR-023.
+
+Frozen on 2026-10-22: merged into `main` and tagged `phase-2-complete`
+after an audit of the architecture, tests, CI and benchmark baselines.
+
+Status: all five met. Criteria 1–4 were measured on 2026-10-14
+(below). Criterion 5, added on 2026-10-21, was met on 2026-10-22
+(`benchmarks/results/2026-10-21-ui/`):
+
+- **The UI works end to end.** `loadtool ui` runs a test of one HTTP API
+  through the runner. That is tested in `internal/ui`, and was checked in
+  a browser against the demo API.
+- **The numbers come from the existing metrics.** The dashboard's final
+  values are the JSON report's, and its downloads are `report.JSON` and
+  `report.HTML` output.
+- **`loadtool run` is unchanged.** At 1,000 VUs against the Phase 2
+  build `0b8f9b4`, peak memory, CPU and requests per second were within
+  run-to-run variation, and micro-benchmarks show the same cost per
+  request.
+
+Criteria 1–4, measured on 2026-10-14 in
+`benchmarks/results/2026-10-14-phase2/`:
+
+1. The mixed-protocol example (HTTP, GraphQL, WebSocket, gRPC and Kafka
+   in one iteration) and every other example pass in CI, and the Action
+   self-test passes.
+2. At 1,000 VUs, against the Phase 1 build in the same session, peak
+   memory, CPU and requests per second were within run-to-run variation,
+   on the final build `0011e52` too. LoadTool's peak memory was
+   176–193 MB against JMeter's 1,366–1,399 MB.
+3. An HTTP-only VU retains the same as in Phase 1 (5,048 B), with all
+   four protocol modules registered. The first measurement found 48 B
+   more per VU; commit `0011e52` fixed it.
+4. HTTP, WebSocket and gRPC were measured at 100 to 5,000 VUs, GraphQL
+   at 100 to 1,000, and Kafka in messages/s, MB/s and producer and
+   consumer latency.
+
+Caveats as before: one laptop with the servers on the same machine,
+JMeter with its default JVM settings, Kafka against an in-process broker
+(kfake), and security agents adding background CPU. Across both A/B
+sessions Phase 2 leaned 1–2 CPU points higher and 6–7 % lower in
+requests per second. That is within variation, and micro-benchmarks show
+the same HTTP request cost and 18 B more per iteration.
+
+## Phase 1 — MVP Core Engine (complete)
 
 ### Phase 1 Goals
 
@@ -135,6 +245,8 @@ Protocols:
 
 * HTTP/1.1 (Phase 0)
 * HTTP/2 (Phase 1)
+* WebSocket, gRPC (unary), GraphQL, Kafka (Phase 2), as protocol modules
+  (ADR-014)
 
 Load model:
 
@@ -155,7 +267,9 @@ License:
 
 ## Important Architecture Principles
 
-1. Keep each phase minimal. Phase 1 extends the Phase 0 engine; do not rewrite it.
+1. Keep each phase minimal. Each phase extends the previous engine; do not
+   rewrite it. Phase 2 adds protocol modules and leaves the HTTP hot path
+   unchanged.
 2. Do not implement distributed execution yet.
 3. Do not implement Kubernetes yet.
 4. Do not implement ClickHouse yet.

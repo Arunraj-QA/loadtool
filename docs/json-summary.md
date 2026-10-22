@@ -52,7 +52,8 @@ The same result always gives the same document:
 - keys appear in a fixed order;
 - arrays keep a defined order (checks in first-run order, thresholds by
   metric and then as written, scenarios by name, series by time);
-- absent values are `null`, not omitted.
+- absent values are `null`, not omitted (protocol metric families are the
+  exception: an unused family is left out).
 
 Only measured values (timings, counts) and `startedAt` differ between
 runs.
@@ -92,9 +93,34 @@ runs.
 | `metrics.checks` | `{rate, passes, fails, count}` | All checks together |
 | `metrics.script_errors` | `{count, first}` | Iterations that threw, and the first message |
 | `metrics.http_protocols` | `{http1, http2, other}` | Responses by HTTP version (added later in Phase 1, additive) |
+| `metrics.http_status_codes` | `{"200": n, "404": n, ..., "other": n}` | Responses by HTTP status code; `other` for codes outside 100–599; `{}` without responses (added in Phase 2, additive) |
 | `checks[]` | `{name, passes, fails, rate, firstError}` | Each check, in the order first run |
 | `thresholds[]` | `{metric, expression, passed, noData, observed, unit, approximate}` | Each threshold; `observed` is `null` with no data; `unit` is `ms`, `fraction`, `per-second` or `count` |
 | `series[]` | `{atMs, vus, http_reqs, http_req_failed, http_req_duration}` | The time series, one point per second plus a final, partial one ([ADR-012](decisions/ADR-012-html-report-and-time-series.md)). Counts are of requests that completed in the interval ending at `atMs`; `vus` is the active VUs at `atMs` (from the scenario definitions); `http_req_duration` is `{avg, p50, p95, p99}`, or `null` for an interval without requests. Added in Phase 1 step 11 (additive). |
+
+**Protocol metric families** (Phase 2,
+[ADR-015](decisions/ADR-015-metric-families.md)) are additional keys in
+`metrics`, written by protocol modules: `ws_*`
+([WebSocket](protocols/websocket.md)), `grpc_*`
+([gRPC](protocols/grpc.md)), `graphql_*`
+([GraphQL](protocols/graphql.md)) and `kafka_*`
+([Kafka](protocols/kafka.md)).
+
+- **Where they appear:** after the keys above, in a fixed order, and
+  only when they recorded something. A run without them writes exactly
+  the document described above.
+- **Names:** `<protocol>_<what>`, with the prefixes `ws_`, `grpc_`,
+  `graphql_` and `kafka_`.
+- **Shapes:** each carries a `kind` that gives its shape:
+
+| `kind` | Fields |
+|---|---|
+| `trend` | `count`, `failed`, `min`, `avg`, `max`, `p50`, `p90`, `p95`, `p99` (milliseconds; every sample, failed ones included) |
+| `counter` | `count`, `rate` (per second) |
+| `rate` | `rate`, `trues`, `count`: the fraction of true samples. For a `*_failed` family, true means failed, so `rate` is the error rate, like `http_req_failed` |
+
+Thresholds can name a family (`thresholds[].metric`) of a module the
+script imports.
 
 **Precision.** Latency percentiles are within ±0.78 %, while `min`, `avg`
 and `max` are exact (ADR-004). `approximate: true` marks a percentile

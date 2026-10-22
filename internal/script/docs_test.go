@@ -2,12 +2,15 @@ package script
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+
+	greeterproto "github.com/Arunraj-QA/loadtool/examples/proto"
 )
 
 // Every complete script in the documentation (a TypeScript block with
@@ -19,7 +22,14 @@ func TestDocSnippetsLoad(t *testing.T) {
 	if d := os.Getenv("LOADTOOL_DOCS_DIR"); d != "" {
 		dir = d // lets a test run over a CRLF copy of the docs
 	}
-	docs, err := filepath.Glob(filepath.Join(dir, "*.md"))
+	// Every page, protocol pages (docs/protocols/...) included.
+	var docs []string
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && strings.HasSuffix(path, ".md") {
+			docs = append(docs, path)
+		}
+		return err
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,16 +46,22 @@ func TestDocSnippetsLoad(t *testing.T) {
 			if !strings.Contains(code, "import ") || !strings.Contains(code, "export default function") {
 				continue
 			}
-			name := filepath.Base(doc) + "#" + string(rune('a'+i))
+			rel, _ := filepath.Rel(dir, doc)
+			name := filepath.ToSlash(rel) + "#" + string(rune('a'+i))
 			t.Run(name, func(t *testing.T) {
-				path := filepath.Join(t.TempDir(), "snippet.ts")
+				dir := t.TempDir()
+				path := filepath.Join(dir, "snippet.ts")
 				if err := os.WriteFile(path, []byte(code), 0o644); err != nil {
 					t.Fatal(err)
 				}
-				p, err := Load(path)
-				if err != nil {
-					t.Fatalf("Load: %v\n%s", err, code)
+				// Snippets load proto/greeter.proto, as the examples do.
+				if err := os.MkdirAll(filepath.Join(dir, "proto"), 0o755); err != nil {
+					t.Fatal(err)
 				}
+				if err := os.WriteFile(filepath.Join(dir, "proto", "greeter.proto"), []byte(greeterproto.Greeter), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				p := loadWithModules(t, path)
 				l, err := p.NewLifecycle(context.Background())
 				if err != nil {
 					t.Fatalf("NewLifecycle: %v", err)

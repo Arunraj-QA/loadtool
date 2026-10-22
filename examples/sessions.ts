@@ -38,7 +38,9 @@ export default function (): void {
   });
 
   // The session cookie is sent automatically.
-  const me = http.get(`${BASE_URL}/api/me`);
+  // responseType "text" keeps the body for the check; bodies are
+  // discarded by default. Cookies work either way.
+  const me = http.get(`${BASE_URL}/api/me`, { responseType: "text" });
   check(me, { "me: logged in as this VU's user": (r) => r.json().username === username });
 
   sleep(0.2);

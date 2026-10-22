@@ -74,27 +74,39 @@ func (vu *VU) request(method string, url, body, params goja.Value) goja.Value {
 		req.Body = body.String()
 	}
 	if isSet(params) {
-		req.Header = vu.readParams(params.ToObject(rt))
+		var keep *bool
+		req.Header, keep = vu.readParams(params.ToObject(rt))
+		if keep != nil {
+			req.KeepBody = *keep
+		}
 	}
 
 	res := httpclient.Do(vu.ctx, vu.client, req, vu.rec)
-	return rt.NewDynamicObject(&response{vu: vu, res: res, url: req.URL})
+	return rt.NewDynamicObject(&response{vu: vu, res: res, url: req.URL, discarded: !req.KeepBody})
 }
+
+// discardedHint says how to keep a body that was discarded (ADR-013).
+const discardedHint = `response bodies are discarded by default; set options.discardResponseBodies: false, or pass { responseType: "text" } in this request's params`
 
 var errInitRequest = errors.New("http requests are not allowed in the script's top-level code; make them inside the default function")
 
 // readParams returns the request headers from params, with params.cookies
-// added to the Cookie header, and warns, once per run, about keys
+// added to the Cookie header, and whether params.responseType asks to keep
+// ("text") or discard ("none") this response's body; nil leaves it to
+// options.discardResponseBodies. It warns, once per run, about keys
 // LoadTool does not support yet.
-func (vu *VU) readParams(params *goja.Object) http.Header {
+func (vu *VU) readParams(params *goja.Object) (http.Header, *bool) {
 	var h http.Header
 	var cookies goja.Value
+	var keep *bool
 	for _, k := range params.Keys() {
 		switch k {
 		case "headers":
 			h = headersFrom(vu.rt, params.Get(k))
 		case "cookies":
 			cookies = params.Get(k)
+		case "responseType":
+			keep = responseType(vu.rt, params.Get(k))
 		default:
 			vu.warn.once(`http params key "` + k + `" is not supported yet and was ignored`)
 		}
@@ -112,7 +124,24 @@ func (vu *VU) readParams(params *goja.Object) http.Header {
 			req.AddCookie(&http.Cookie{Name: name, Value: obj.Get(name).String()})
 		}
 	}
-	return h
+	return h, keep
+}
+
+var keepBody, discardBody = true, false
+
+// responseType reads params.responseType: "text" keeps the body, "none"
+// discards it. "binary" (k6's third value) is not supported.
+func responseType(rt *goja.Runtime, v goja.Value) *bool {
+	if !isSet(v) {
+		return nil
+	}
+	switch v.String() {
+	case "text":
+		return &keepBody
+	case "none":
+		return &discardBody
+	}
+	panic(rt.NewTypeError(`http: params.responseType must be "text" or "none", not %q`, v.String()))
 }
 
 func headersFrom(rt *goja.Runtime, v goja.Value) http.Header {

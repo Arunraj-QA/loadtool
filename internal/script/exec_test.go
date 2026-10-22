@@ -61,7 +61,7 @@ func TestWithExecsDefaultOnlyIsANoOp(t *testing.T) {
 // The entry with execs still binds exports directly: no interop helpers,
 // which would cost every VU memory.
 func TestExecEntryHasNoInteropHelpers(t *testing.T) {
-	code, err := transpileEntry("test.ts", "", []byte(execScript), entryFor([]string{"browse", "order"}))
+	code, err := transpileEntry("test.ts", "", []byte(execScript), entryFor([]string{"browse", "order"}), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

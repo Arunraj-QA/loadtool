@@ -1,0 +1,31 @@
+﻿commit 0011e52 vs cf35298; PowerOnline True
+== p1 round 1
+BenchmarkDo-12    	   34614	     73057 ns/op	    5734 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   33829	     75768 ns/op	    6470 B/op	      81 allocs/op
+== p2 round 1
+BenchmarkDo-12    	   29247	     74039 ns/op	    5733 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   30486	     79733 ns/op	    6490 B/op	      81 allocs/op
+== p2 round 2
+BenchmarkDo-12    	   34158	     72592 ns/op	    5738 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   31836	     75396 ns/op	    6487 B/op	      81 allocs/op
+== p1 round 2
+BenchmarkDo-12    	   33790	     73997 ns/op	    5741 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   30930	     75174 ns/op	    6472 B/op	      81 allocs/op
+== p1 round 3
+BenchmarkDo-12    	   34953	     72063 ns/op	    5734 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   31089	     77889 ns/op	    6469 B/op	      81 allocs/op
+== p2 round 3
+BenchmarkDo-12    	   33420	     68016 ns/op	    5739 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   24330	     84846 ns/op	    6490 B/op	      81 allocs/op
+== p2 round 4
+BenchmarkDo-12    	   34659	     72333 ns/op	    5737 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   20626	    101628 ns/op	    6488 B/op	      81 allocs/op
+== p1 round 4
+BenchmarkDo-12    	   34748	     70723 ns/op	    5733 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   29358	     86119 ns/op	    6468 B/op	      81 allocs/op
+== p1 round 5
+BenchmarkDo-12    	   35034	     69147 ns/op	    5735 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   29013	     87349 ns/op	    6471 B/op	      81 allocs/op
+== p2 round 5
+BenchmarkDo-12    	   33530	     69797 ns/op	    5737 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   31168	     81708 ns/op	    6488 B/op	      81 allocs/op

@@ -132,6 +132,7 @@ func (l *Lifecycle) call(ctx context.Context, client *http.Client, timeout time.
 	vu.ctx, vu.rec, vu.client = callCtx, &metrics.Recorder{}, httpclient.WithJar(client, &vu.jar)
 	release := vu.interruptOn(callCtx)
 	v, err := fn(goja.Undefined(), args...)
+	vu.endIteration()
 	release()
 	vu.ctx, vu.rec, vu.client = nil, nil, nil
 
@@ -144,6 +145,10 @@ func (l *Lifecycle) call(ctx context.Context, client *http.Client, timeout time.
 	case ctx.Err() != nil:
 		return nil, fmt.Errorf("%s interrupted: %w", name, context.Cause(ctx))
 	case err == nil:
+		// An async setup's data, or its error, is in its Promise.
+		if v, err = settle(v); err != nil {
+			return nil, fmt.Errorf("%s: %s", name, err.Error())
+		}
 		return v, nil
 	case errors.Is(callCtx.Err(), context.DeadlineExceeded):
 		return nil, fmt.Errorf("%s did not finish within %s (%s %s)", name, timeoutOption, timeoutOption, timeout)
@@ -183,4 +188,10 @@ func (vu *VU) parseData(data []byte) (goja.Value, error) {
 		return nil, fmt.Errorf("parse setup data: %s", scriptErrorMessage(err))
 	}
 	return v, nil
+}
+
+// Close closes the lifecycle runtime's protocol module instances, after
+// teardown.
+func (l *Lifecycle) Close(ctx context.Context) error {
+	return l.vu.Close(ctx)
 }

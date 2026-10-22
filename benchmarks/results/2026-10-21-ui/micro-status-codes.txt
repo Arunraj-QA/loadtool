@@ -1,0 +1,31 @@
+
+== base round 1
+BenchmarkDo-12    	   24693	     83900 ns/op	    5737 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   25711	    100658 ns/op	    6487 B/op	      81 allocs/op
+== new round 1
+BenchmarkDo-12    	   28627	     83717 ns/op	    5740 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   25388	     97821 ns/op	    6482 B/op	      81 allocs/op
+== new round 2
+BenchmarkDo-12    	   28521	     89194 ns/op	    5741 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   25588	     91621 ns/op	    6493 B/op	      81 allocs/op
+== base round 2
+BenchmarkDo-12    	   23094	     92151 ns/op	    5740 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   22268	    100980 ns/op	    6492 B/op	      81 allocs/op
+== base round 3
+BenchmarkDo-12    	   27466	     85127 ns/op	    5742 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   23884	     98670 ns/op	    6487 B/op	      81 allocs/op
+== new round 3
+BenchmarkDo-12    	   24949	     85193 ns/op	    5741 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   25202	     94162 ns/op	    6490 B/op	      81 allocs/op
+== new round 4
+BenchmarkDo-12    	   28476	     81497 ns/op	    5741 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   24912	    101058 ns/op	    6487 B/op	      81 allocs/op
+== base round 4
+BenchmarkDo-12    	   28456	     86150 ns/op	    5745 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   28620	     87272 ns/op	    6490 B/op	      81 allocs/op
+== base round 5
+BenchmarkDo-12    	   25960	     87108 ns/op	    5736 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   24034	    101626 ns/op	    6488 B/op	      81 allocs/op
+== new round 5
+BenchmarkDo-12    	   24724	     91819 ns/op	    5740 B/op	      69 allocs/op
+BenchmarkIterateHTTPGet-12    	   26274	     95129 ns/op	    6489 B/op	      81 allocs/op

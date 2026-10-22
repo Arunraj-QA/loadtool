@@ -1,0 +1,28 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\loadtool\scenario.ts
+  VUs:         1000
+  Duration:    1m0s (elapsed 60.02s)
+  Status:      completed
+
+  Requests:    1,171,228 (19514.9 req/s)
+  Success:     1,168,216
+  Errors:      3,012 (0.26%)
+  Script errs: 3,012
+  Statuses:    200 1,168,216
+    first:     Error: status 0 Get "http://127.0.0.1:8080/api/test": dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it. at scenario_default (scenario.ts:19:10(21))
+
+  Latency (all requests sent, failed included):
+    min       0.00µs
+    mean     50.78ms
+    p50      36.96ms
+    p90      88.60ms
+    p95     117.96ms
+    p99     210.76ms
+    max        9.86s
+  Latency (successful requests):
+    p50      36.96ms
+    p90      88.60ms
+    p95     117.96ms
+    p99     210.76ms

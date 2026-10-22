@@ -17,6 +17,17 @@ Significant architecture decisions are recorded here as
 | [ADR-010](ADR-010-http2.md) | HTTP/2: `httpVersion` auto/1.1/2, h2c, `res.proto` | Accepted |
 | [ADR-011](ADR-011-json-summary.md) | Versioned JSON summary (`--summary-json`) | Accepted |
 | [ADR-012](ADR-012-html-report-and-time-series.md) | HTML report (`--report-html`) and per-second time series | Accepted |
+| [ADR-013](ADR-013-discard-response-bodies.md) | Discard response bodies by default; `responseType` per request | Accepted |
+| [ADR-014](ADR-014-protocol-modules.md) | Protocol modules: interface, explicit registration, run/VU/iteration lifecycle | Accepted |
+| [ADR-015](ADR-015-metric-families.md) | Metric families (Trend, Counter, Rate) for protocols; reports and thresholds | Accepted |
+| [ADR-016](ADR-016-error-normalization.md) | Normalized errors: `error` and `error_code` across protocols | Accepted |
+| [ADR-017](ADR-017-async-model.md) | Asynchronous protocols: blocking calls and session-scoped loops, no global event loop | Accepted |
+| [ADR-018](ADR-018-protocol-architecture.md) | Phase 2 protocol architecture: packages, interfaces, lifecycle, ownership, errors, metrics, cleanup, concurrency | Accepted (amended 2026-10-09, 2026-10-15) |
+| [ADR-019](ADR-019-websocket.md) | WebSocket module: callback and blocking styles, reply latency, metrics, errors | Accepted |
+| [ADR-020](ADR-020-grpc.md) | gRPC module: grpc-go, protobuf and protocompile; unary and blocking streams; .proto or reflection | Accepted |
+| [ADR-021](ADR-021-graphql.md) | GraphQL module: HTTP-based (httpclient.Send over the VU's session); HTTP vs GraphQL success | Accepted |
+| [ADR-022](ADR-022-kafka.md) | Kafka module: franz-go (kfake for tests); per-VU producers and consumers; end-to-end consume latency | Accepted |
+| [ADR-023](ADR-023-local-ui-controller.md) | Local UI for one HTTP API: loopback controller, fixed script, destination guard, status codes, live progress | Accepted |
 
 The numbering was reorganized on 2026-09-24 when the records moved from
 `docs/adr/`. Each record lists its previous path.

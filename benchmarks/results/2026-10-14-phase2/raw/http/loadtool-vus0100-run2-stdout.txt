@@ -1,0 +1,26 @@
+
+LoadTool summary
+
+  Script:      benchmarks/loadtool/scenario.ts
+  VUs:         100
+  Duration:    30s (elapsed 30.01s)
+  Status:      completed
+
+  Requests:    276,250 (9205.1 req/s)
+  Success:     276,250
+  Errors:      0 (0.00%)
+  Script errs: 0
+
+  Latency (all requests sent, failed included):
+    min      10.00ms
+    mean     10.84ms
+    p50      10.68ms
+    p90      11.60ms
+    p95      12.12ms
+    p99      13.57ms
+    max      27.68ms
+  Latency (successful requests):
+    p50      10.68ms
+    p90      11.60ms
+    p95      12.12ms
+    p99      13.57ms

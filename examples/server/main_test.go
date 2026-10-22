@@ -8,8 +8,15 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/coder/websocket"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	reflectionpb "google.golang.org/grpc/reflection/grpc_reflection_v1"
 )
 
 func newTestServer(t *testing.T) *httptest.Server {
@@ -152,5 +159,149 @@ func TestServesH2CAndHTTP1(t *testing.T) {
 		if res.Proto != tt.proto || res.StatusCode != 200 {
 			t.Errorf("%s: %s %d, want %s 200", tt.name, res.Proto, res.StatusCode, tt.proto)
 		}
+	}
+}
+
+// /ws/echo echoes text and binary messages.
+func TestWebSocketEcho(t *testing.T) {
+	srv := newTestServer(t)
+	ctx := context.Background()
+	c, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/ws/echo", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.CloseNow()
+	for _, m := range []struct {
+		typ  websocket.MessageType
+		data string
+	}{{websocket.MessageText, "hello"}, {websocket.MessageBinary, "\x01\x02"}} {
+		if err := c.Write(ctx, m.typ, []byte(m.data)); err != nil {
+			t.Fatal(err)
+		}
+		typ, data, err := c.Read(ctx)
+		if err != nil || typ != m.typ || string(data) != m.data {
+			t.Errorf("echo of %q: %v %q %v", m.data, typ, data, err)
+		}
+	}
+	if err := c.Close(websocket.StatusNormalClosure, ""); err != nil {
+		t.Errorf("close: %v", err)
+	}
+}
+
+// The demo serves the greeter gRPC service, with reflection.
+func TestServeGRPC(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop, err := serveGRPC(ln, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	conn, err := grpc.NewClient(ln.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	stream, err := reflectionpb.NewServerReflectionClient(conn).ServerReflectionInfo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := stream.Send(&reflectionpb.ServerReflectionRequest{MessageRequest: &reflectionpb.ServerReflectionRequest_ListServices{}}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := stream.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, s := range res.GetListServicesResponse().GetService() {
+		names = append(names, s.GetName())
+	}
+	if !slices.Contains(names, "greeter.Greeter") {
+		t.Errorf("services = %v, want greeter.Greeter", names)
+	}
+}
+
+// /graphql runs queries and mutations, and reports GraphQL errors with
+// HTTP 200.
+func TestGraphQL(t *testing.T) {
+	srv := newTestServer(t)
+	c := srv.Client()
+	post := func(body string) (int, string) {
+		res, err := c.Post(srv.URL+"/graphql", "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, string(b)
+	}
+	if code, body := post(`{"query":"{ product(id: 2) { name } }"}`); code != 200 || !strings.Contains(body, `"Milk frother"`) {
+		t.Errorf("query: %d %s", code, body)
+	}
+	if code, body := post(`{"query":"mutation { placeOrder(productId: 1, quantity: 2) { totalCents } }"}`); code != 200 || !strings.Contains(body, `"totalCents":4980`) {
+		t.Errorf("mutation: %d %s", code, body)
+	}
+	if code, body := post(`{"query":"{ product(id: 9) { name } }"}`); code != 200 || !strings.Contains(body, `"errors"`) {
+		t.Errorf("error: %d %s", code, body)
+	}
+}
+
+// /ws/chat sends each message to everyone in the sender's room, the sender
+// included, and to no one else; a room is gone once its clients leave.
+func TestWebSocketChat(t *testing.T) {
+	h := newChat()
+	srv := httptest.NewServer(http.HandlerFunc(h.serve))
+	t.Cleanup(srv.Close)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	dial := func(room string) *websocket.Conn {
+		c, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/?room="+room, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	a, b, other := dial("r1"), dial("r1"), dial("r2")
+	// Every client has joined once its room has the expected size.
+	for deadline := time.Now().Add(2 * time.Second); ; {
+		h.mu.Lock()
+		joined := len(h.rooms["r1"]) == 2 && len(h.rooms["r2"]) == 1
+		h.mu.Unlock()
+		if joined || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err := a.Write(ctx, websocket.MessageText, []byte("hi")); err != nil {
+		t.Fatal(err)
+	}
+	for name, c := range map[string]*websocket.Conn{"sender": a, "same room": b} {
+		if _, data, err := c.Read(ctx); err != nil || string(data) != "hi" {
+			t.Errorf("%s got %q, %v; want hi", name, data, err)
+		}
+	}
+	quiet, stop := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer stop()
+	if _, data, err := other.Read(quiet); err == nil {
+		t.Errorf("another room got %q", data)
+	}
+	for _, c := range []*websocket.Conn{a, b} {
+		c.Close(websocket.StatusNormalClosure, "")
+	}
+	other.CloseNow()
+	for deadline := time.Now().Add(2 * time.Second); ; {
+		h.mu.Lock()
+		n := len(h.rooms)
+		h.mu.Unlock()
+		if n == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d rooms left after every client left", n)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

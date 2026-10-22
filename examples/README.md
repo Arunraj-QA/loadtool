@@ -1,7 +1,9 @@
 # Examples
 
-Ten runnable scripts. They all run against the demo API in
-[`server/`](server/), a small shop with products, orders and a login, so
+Twenty-five runnable scripts. They all run against the demo API in
+[`server/`](server/), a small shop with products, orders, a login, a
+WebSocket echo, a gRPC greeter, a GraphQL endpoint and an in-process
+Kafka broker, so
 you can try every feature without a server of your own. CI runs every
 example on every change (`scripts/smoke-examples.sh`), so they keep
 working.
@@ -25,6 +27,21 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | [`data-driven.ts`](data-driven.ts) | Test data from a JSON file and a shared module ([`lib/api.ts`](lib/api.ts), [`data/products.json`](data/products.json)) |
 | [`scenarios.ts`](scenarios.ts) | Three workloads at once: `constant-vus`, `ramping-vus` and `constant-arrival-rate` (20 s) |
 | [`http2.ts`](http2.ts) | Requiring HTTP/2 with `httpVersion: "2"`, checking `res.proto` |
+| [`websocket.ts`](websocket.ts) | HTTP and WebSocket in one iteration: log in, then send messages and time each reply; WebSocket thresholds |
+| [`websocket-request-reply.ts`](websocket-request-reply.ts) | WebSocket in the blocking style: `connect`, `send`, `receive`, `close` |
+| [`websocket-basic.ts`](websocket-basic.ts) | The smallest WebSocket test: connect, send one message, check the echo |
+| [`websocket-chat.ts`](websocket-chat.ts) | A chat: VUs share rooms, each posts a message and reads the room until its own comes back |
+| [`grpc-unary.ts`](grpc-unary.ts) | gRPC unary calls from a `.proto` file ([`proto/greeter.proto`](proto/greeter.proto)): metadata, deadline, checks, thresholds |
+| [`grpc-streaming.ts`](grpc-streaming.ts) | gRPC by server reflection: server, client and bidirectional streams |
+| [`graphql-query.ts`](graphql-query.ts) | GraphQL queries with variables, a client with default headers |
+| [`graphql-mutation.ts`](graphql-mutation.ts) | A GraphQL mutation with variables, after an HTTP login (bearer token header) |
+| [`graphql-errors.ts`](graphql-errors.ts) | GraphQL errors with HTTP 200: `http_ok` true, `ok` false, partial data |
+| [`kafka-producer.ts`](kafka-producer.ts) | A Kafka producer per VU: keys, headers, acknowledgement checks and thresholds |
+| [`kafka-consumer.ts`](kafka-consumer.ts) | Producing and consuming at once (two scenarios), a consumer group, end-to-end latency |
+| [`kafka-throughput.ts`](kafka-throughput.ts) | Batches of 100 messages per call; a threshold on messages per second |
+| [`kafka-errors.ts`](kafka-errors.ts) | Kafka errors in results: an unknown topic, an invalid message, an unreachable broker |
+| [`mixed-http-websocket.ts`](mixed-http-websocket.ts) | HTTP and WebSocket in one iteration: read a product, send its name, check the reply; thresholds on both |
+| [`mixed-protocols.ts`](mixed-protocols.ts) | HTTP, GraphQL, WebSocket, gRPC and Kafka in one iteration, two operations each: shared setup, checks and thresholds ([how it runs](../docs/examples/mixed-protocol.md)) |
 
 **By topic:**
 
@@ -40,14 +57,21 @@ loadtool run examples/checks.ts --vus 5 --duration 10s
 | Ramping VUs | `scenarios.ts` |
 | Constant arrival rate | `scenarios.ts` |
 | HTTP/2 | `http2.ts` |
+| WebSocket | `websocket-basic.ts` (smallest), `websocket.ts` (callbacks), `websocket-request-reply.ts` (blocking), `websocket-chat.ts` (rooms) |
+| gRPC | `grpc-unary.ts` (`.proto`), `grpc-streaming.ts` (reflection, streams) |
+| GraphQL | `graphql-query.ts`, `graphql-mutation.ts`, `graphql-errors.ts` |
+| Kafka | `kafka-producer.ts`, `kafka-consumer.ts`, `kafka-throughput.ts`, `kafka-errors.ts` |
+| Several protocols in one test | `mixed-http-websocket.ts` (HTTP + WebSocket), `mixed-protocols.ts` (all five), `websocket.ts` (HTTP login + WebSocket) |
 | Setup and teardown | `auth-token.ts` |
 
 ## Against your own server
 
-Every example reads `BASE_URL` from the environment:
+Every example reads `BASE_URL` from the environment (the gRPC ones
+`GRPC_ADDR`, and the Kafka ones `KAFKA_BROKERS`, comma-separated):
 
 ```bash
 loadtool run -e BASE_URL=https://staging.example.test examples/basic-http.ts
+loadtool run -e KAFKA_BROKERS=broker1:9092,broker2:9092 examples/kafka-producer.ts
 ```
 
 The paths (`/api/products`, `/api/login`, …) are the demo API's; change
@@ -71,6 +95,11 @@ go run ./examples/server -addr 127.0.0.1:8090 -delay 5ms
 | `POST /api/login` | `{"username": "any", "password": "demo"}` gives `{"username", "token"}` and a `session` cookie; 401 for another password |
 | `GET /api/me` | `{"username"}` from the `session` cookie or `Authorization: Bearer <token>`; 401 without one |
 | `POST /api/logout` | 204; deletes the `session` cookie |
+| `GET /ws/echo` | WebSocket: echoes every message (text or binary) after `-delay` |
+| `GET /ws/chat?room=<name>` | WebSocket chat: every text message goes at once to everyone in the room (default `lobby`), the sender included; a client more than 64 messages behind loses messages |
+| `POST /graphql` | GraphQL (after `-delay`): `products`, `product(id)` (an error for an unknown id), `fail(message)`, mutation `placeOrder(productId, quantity)` |
+| gRPC on `-grpc-addr` (`127.0.0.1:8091`) | `greeter.Greeter` from `proto/greeter.proto`, with server reflection: `SayHello` (after `-delay`), `LotsOfReplies` (each reply after `-delay`), `LotsOfGreetings`, `Chat`, `Fail`; `fail_code` on a streaming request ends the stream with that status |
+| Kafka on `127.0.0.1:` `-kafka-port` (`9092`; `0` turns it off) | An in-process broker (franz-go's kfake, not a real Kafka) with the topics `orders` and `events`, 3 partitions each, in memory. The Kafka examples read `KAFKA_BROKERS` to use a real broker instead (`testenv/kafka/up.sh` starts one in Docker) |
 
 **How it behaves:**
 

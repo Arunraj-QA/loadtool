@@ -13,6 +13,7 @@ export interface Product {
 export function getProduct(baseURL: string, product: Product): void {
   const res = http.get(`${baseURL}/api/products/${product.id}`, {
     headers: { Accept: "application/json" },
+    responseType: "text", // keep the body for the checks (discarded by default)
   });
   check(res, {
     "product: status is 200": (r) => r.status === 200,

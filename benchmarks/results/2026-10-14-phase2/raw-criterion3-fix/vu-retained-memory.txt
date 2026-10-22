@@ -1,0 +1,150 @@
+﻿== phase1 round 1
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/script
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkVURetainedMemory/no-imports/after-init-12         	       1	  21381800 ns/op	      4745 retained-B/VU
+BenchmarkVURetainedMemory/no-imports/after-first-iteration-12         	       1	  13949100 ns/op	      4773 retained-B/VU
+BenchmarkVURetainedMemory/http/after-init-12                          	       1	  10195700 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http/after-first-iteration-12               	       1	  12320800 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-init-12                    	       1	  12791100 ns/op	      5976 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-first-iteration-12         	       1	  12485300 ns/op	      6024 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-init-12           	       1	  10242700 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-first-iteration-12         	       1	  12142000 ns/op	      5048 retained-B/VU
+PASS
+== phase2 round 1
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/script
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkVURetainedMemory/no-imports/after-init-12         	       1	  14532400 ns/op	      4740 retained-B/VU
+BenchmarkVURetainedMemory/no-imports/after-first-iteration-12         	       1	  11488400 ns/op	      4768 retained-B/VU
+BenchmarkVURetainedMemory/http/after-init-12                          	       1	  11498600 ns/op	      5005 retained-B/VU
+BenchmarkVURetainedMemory/http/after-first-iteration-12               	       1	  12980900 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-all-modules/after-init-12              	       1	  11521300 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-all-modules/after-first-iteration-12   	       1	  13011700 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-init-12                    	       1	  12374700 ns/op	      5976 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-first-iteration-12         	       1	  14245200 ns/op	      6024 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-init-12           	       1	  12388200 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-first-iteration-12         	       1	  11767800 ns/op	      5048 retained-B/VU
+PASS
+== phase1 round 2
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/script
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkVURetainedMemory/no-imports/after-init-12         	       1	   9528200 ns/op	      4750 retained-B/VU
+BenchmarkVURetainedMemory/no-imports/after-first-iteration-12         	       1	  11146900 ns/op	      4768 retained-B/VU
+BenchmarkVURetainedMemory/http/after-init-12                          	       1	   9953800 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http/after-first-iteration-12               	       1	  10747100 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-init-12                    	       1	  11745200 ns/op	      5976 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-first-iteration-12         	       1	  13873800 ns/op	      6024 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-init-12           	       1	   9847100 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-first-iteration-12         	       1	  11719000 ns/op	      5048 retained-B/VU
+PASS
+== phase2 round 2
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/script
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkVURetainedMemory/no-imports/after-init-12         	       1	  10947500 ns/op	      4750 retained-B/VU
+BenchmarkVURetainedMemory/no-imports/after-first-iteration-12         	       1	  10355700 ns/op	      4768 retained-B/VU
+BenchmarkVURetainedMemory/http/after-init-12                          	       1	  10335300 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http/after-first-iteration-12               	       1	  11299900 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-all-modules/after-init-12              	       1	  11042700 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-all-modules/after-first-iteration-12   	       1	  11236200 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-init-12                    	       1	  11369800 ns/op	      5976 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-first-iteration-12         	       1	  16644100 ns/op	      6024 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-init-12           	       1	  11867400 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-first-iteration-12         	       1	  12420100 ns/op	      5048 retained-B/VU
+PASS
+== phase1 round 3
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/script
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkVURetainedMemory/no-imports/after-init-12         	       1	   9890300 ns/op	      4745 retained-B/VU
+BenchmarkVURetainedMemory/no-imports/after-first-iteration-12         	       1	   9636300 ns/op	      4773 retained-B/VU
+BenchmarkVURetainedMemory/http/after-init-12                          	       1	   9354100 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http/after-first-iteration-12               	       1	  11540700 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-init-12                    	       1	  11773300 ns/op	      5976 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-first-iteration-12         	       1	  13442200 ns/op	      6024 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-init-12           	       1	  11008100 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-first-iteration-12         	       1	  15994000 ns/op	      5048 retained-B/VU
+PASS
+== phase2 round 3
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/script
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkVURetainedMemory/no-imports/after-init-12         	       1	  12290400 ns/op	      4735 retained-B/VU
+BenchmarkVURetainedMemory/no-imports/after-first-iteration-12         	       1	  13668600 ns/op	      4773 retained-B/VU
+BenchmarkVURetainedMemory/http/after-init-12                          	       1	   9971400 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http/after-first-iteration-12               	       1	  13505500 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-all-modules/after-init-12              	       1	  10985000 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-all-modules/after-first-iteration-12   	       1	  21858000 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-init-12                    	       1	  12719000 ns/op	      5976 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-first-iteration-12         	       1	  16553500 ns/op	      6024 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-init-12           	       1	  12947000 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-first-iteration-12         	       1	  13815800 ns/op	      5048 retained-B/VU
+PASS
+== phase1 round 4
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/script
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkVURetainedMemory/no-imports/after-init-12         	       1	   9478100 ns/op	      4745 retained-B/VU
+BenchmarkVURetainedMemory/no-imports/after-first-iteration-12         	       1	  10540600 ns/op	      4768 retained-B/VU
+BenchmarkVURetainedMemory/http/after-init-12                          	       1	  10082900 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http/after-first-iteration-12               	       1	  12126100 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-init-12                    	       1	  12331700 ns/op	      5976 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-first-iteration-12         	       1	  12823600 ns/op	      6024 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-init-12           	       1	  10525700 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-first-iteration-12         	       1	  11079300 ns/op	      5048 retained-B/VU
+PASS
+== phase2 round 4
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/script
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkVURetainedMemory/no-imports/after-init-12         	       1	  12001300 ns/op	      4740 retained-B/VU
+BenchmarkVURetainedMemory/no-imports/after-first-iteration-12         	       1	  12000400 ns/op	      4773 retained-B/VU
+BenchmarkVURetainedMemory/http/after-init-12                          	       1	  10100400 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http/after-first-iteration-12               	       1	  11720100 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-all-modules/after-init-12              	       1	  10399000 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-all-modules/after-first-iteration-12   	       1	  15453400 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-init-12                    	       1	  14500300 ns/op	      5976 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-first-iteration-12         	       1	  15172200 ns/op	      6024 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-init-12           	       1	  13968800 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-first-iteration-12         	       1	  13500400 ns/op	      5048 retained-B/VU
+PASS
+== phase1 round 5
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/script
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkVURetainedMemory/no-imports/after-init-12         	       1	   9238100 ns/op	      4735 retained-B/VU
+BenchmarkVURetainedMemory/no-imports/after-first-iteration-12         	       1	  12457500 ns/op	      4768 retained-B/VU
+BenchmarkVURetainedMemory/http/after-init-12                          	       1	  11460300 ns/op	      5005 retained-B/VU
+BenchmarkVURetainedMemory/http/after-first-iteration-12               	       1	  11548300 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-init-12                    	       1	  11323800 ns/op	      5976 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-first-iteration-12         	       1	  13294900 ns/op	      6024 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-init-12           	       1	  13159100 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-first-iteration-12         	       1	  12050200 ns/op	      5048 retained-B/VU
+PASS
+== phase2 round 5
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/script
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkVURetainedMemory/no-imports/after-init-12         	       1	  12080000 ns/op	      4735 retained-B/VU
+BenchmarkVURetainedMemory/no-imports/after-first-iteration-12         	       1	  11854800 ns/op	      4773 retained-B/VU
+BenchmarkVURetainedMemory/http/after-init-12                          	       1	  11275900 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http/after-first-iteration-12               	       1	  13702600 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-all-modules/after-init-12              	       1	  12097600 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-all-modules/after-first-iteration-12   	       1	  12633900 ns/op	      5048 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-init-12                    	       1	  12772700 ns/op	      5976 retained-B/VU
+BenchmarkVURetainedMemory/http-sleep/after-first-iteration-12         	       1	  13905400 ns/op	      6024 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-init-12           	       1	  10450200 ns/op	      5000 retained-B/VU
+BenchmarkVURetainedMemory/http-setup-teardown/after-first-iteration-12         	       1	  11972100 ns/op	      5048 retained-B/VU
+PASS

@@ -70,10 +70,12 @@ type htmlData struct {
 	Checks                                  []htmlCheck
 	Charts                                  []template.HTML
 	Latency                                 []htmlRow
+	Families                                []htmlFamily
 	Scenarios                               []string
 	ScriptErrors, FirstScriptError          string
 	Dropped                                 string
 	Protocols                               string
+	Statuses                                string
 }
 
 type htmlCard struct{ Label, Value, Note string }
@@ -89,6 +91,9 @@ type htmlCheck struct {
 }
 
 type htmlRow struct{ Name, All, OK string }
+
+// htmlFamily is one used protocol metric family (ADR-015).
+type htmlFamily struct{ Name, Kind, Value string }
 
 func buildHTML(r Result, version string) htmlData {
 	s := r.Summary
@@ -112,6 +117,7 @@ func buildHTML(r Result, version string) htmlData {
 		d.Dropped = formatCount(s.DroppedIterations)
 	}
 	d.Protocols = protocolsLine(s.Protocols)
+	d.Statuses = statusLine(s.StatusCodes)
 	// The same verdict as the exit code and the JSON outcome.
 	outcome := Verdict(r)
 	d.Failed, d.ExitCode, d.Reasons = !outcome.Passed, outcome.ExitCode, outcome.Reasons
@@ -170,6 +176,11 @@ func buildHTML(r Result, version string) htmlData {
 	if !isShorthand(r.Scenarios) {
 		for _, sc := range r.Scenarios {
 			d.Scenarios = append(d.Scenarios, sc.Describe())
+		}
+	}
+	for _, f := range s.Families {
+		if f.Used() {
+			d.Families = append(d.Families, htmlFamily{Name: f.Name, Kind: f.Kind.String(), Value: familyLine(f, r.Elapsed)})
 		}
 	}
 	d.Charts = charts(r.Series)
@@ -409,9 +420,15 @@ footer { color: var(--muted); font-size: .8rem; margin-top: 40px; }
 <p class="meta">Percentiles are within ±0.78 %; min, mean and max are exact.</p>
 {{else}}<p class="meta">No requests were sent.</p>{{end}}
 
-<h2>Run</h2>
+{{if .Families}}<h2>Protocol metrics</h2>
+<div class="scroll"><table>
+<thead><tr><th scope="col">Metric</th><th scope="col">Kind</th><th scope="col">Value</th></tr></thead>
+<tbody>{{range .Families}}<tr><td><code>{{.Name}}</code></td><td>{{.Kind}}</td><td>{{.Value}}</td></tr>
+{{end}}</tbody></table></div>
+
+{{end}}<h2>Run</h2>
 <div class="scroll"><table><tbody>
-{{if .Protocols}}<tr><th scope="row">Protocols</th><td>{{.Protocols}}</td></tr>
+{{if .Protocols}}<tr><th scope="row">Protocols</th><td>{{.Protocols}}</td></tr>{{end}}{{if .Statuses}}<tr><th scope="row">Status codes</th><td>{{.Statuses}}</td></tr>
 {{end}}<tr><th scope="row">Script errors</th><td>{{.ScriptErrors}}{{if .FirstScriptError}}<div class="err">first: {{.FirstScriptError}}</div>{{end}}</td></tr>
 {{range $i, $s := .Scenarios}}<tr><th scope="row">{{if eq $i 0}}Scenarios{{end}}</th><td>{{$s}}</td></tr>
 {{end}}</tbody></table></div>

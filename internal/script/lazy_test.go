@@ -3,8 +3,15 @@ package script
 import (
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/dop251/goja"
+
+	"github.com/Arunraj-QA/loadtool/internal/protocol"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/graphql"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/kafka"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/ws"
 )
 
 func TestConsoleObjectBehavesLikeAnObject(t *testing.T) {
@@ -54,5 +61,42 @@ func TestLazyObjectBuildsOnFirstAccess(t *testing.T) {
 	}
 	if builds["a"] != 1 || builds["b"] != 0 {
 		t.Errorf("builds = %v, want a built once and b never", builds)
+	}
+}
+
+// A registered module the script does not import adds nothing to its VUs
+// (Phase 2 exit criterion 3): the builtin object has only the core
+// properties and the VU no module instance slots. An imported module adds
+// its own property only.
+func TestUnimportedModulesCostVUsNothing(t *testing.T) {
+	mods := []protocol.Module{ws.Module{}, grpc.Module{}, graphql.Module{}, kafka.Module{}}
+	for _, tc := range []struct {
+		src  string
+		want []string
+	}{
+		{`import http from "loadtool/http"; export default function () { if (!http) throw 1; }`, []string{"http", "core", "exec"}},
+		{`import ws from "loadtool/ws"; export default function () { if (!ws) throw 1; }`, []string{"http", "core", "exec", "ws"}},
+	} {
+		p, err := Compile("test.ts", []byte(tc.src), mods...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		vu := newVU(t, p)
+		keys := vu.rt.Get(builtinGlobal).ToObject(vu.rt).Keys()
+		if strings.Join(keys, ",") != strings.Join(tc.want, ",") {
+			t.Errorf("builtin properties %v; want %v", keys, tc.want)
+		}
+		if imported := len(tc.want) > 3; (vu.proto != nil) != imported {
+			t.Errorf("module state allocated: %v; want %v", vu.proto != nil, imported)
+		}
+	}
+}
+
+// A VU without protocol modules stays in Go's 144-byte allocation size
+// class, as in Phase 1: a field added to VU that crosses it costs every VU
+// 48 bytes. Module state belongs in vuModules instead.
+func TestVUFitsItsSizeClass(t *testing.T) {
+	if size := unsafe.Sizeof(VU{}); size > 144 {
+		t.Errorf("sizeof(VU) = %d B; want at most 144 (the next size class is 192)", size)
 	}
 }

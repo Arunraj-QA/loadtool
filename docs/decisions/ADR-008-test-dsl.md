@@ -1,6 +1,9 @@
 # ADR-008: Test DSL — responses, checks, thresholds, scenarios and lifecycle
 
-- Status: Accepted (2026-10-04; implemented in Phase 1 steps 5–7)
+- Status: Accepted (2026-10-04; implemented in Phase 1 steps 5–7).
+  The default of `discardResponseBodies` is superseded by
+  [ADR-013](ADR-013-discard-response-bodies.md): bodies are discarded
+  unless a script asks for them.
 - Date: 2026-10-04
 
 ## Context
@@ -129,7 +132,7 @@ the methods its script uses.
 | `stages` | Shorthand for one `ramping-vus` scenario named `default`. |
 | `scenarios` | Section 6. |
 | `thresholds` | Section 5. |
-| `discardResponseBodies` | `false` by default, as in k6. The benchmark scenario sets it to `true` to match the k6 scenario. |
+| `discardResponseBodies` | `false` by default, as in k6. The benchmark scenario sets it to `true` to match the k6 scenario. **Superseded by ADR-013: `true` by default.** |
 | `setupTimeout`, `teardownTimeout` | Default `"60s"`. |
 
 ### 3. How JavaScript maps to Go
@@ -437,7 +440,9 @@ Mutations to `data` stay inside that VU.
 - **Response bodies are read by default.** This adds per-request
   allocations: the body bytes, plus a string if the script reads it.
   `discardResponseBodies: true` restores Phase 0 behaviour and is used by
-  the benchmark scenario.
+  the benchmark scenario. (Superseded by ADR-013: with large responses
+  this cost gigabytes at 1,000 VUs, so bodies are now discarded by
+  default.)
 - **Retained memory per VU** must stay near the ADR-007 figures.
   `check`, `post` and the rest are lazy, and responses build their fields
   only when read. Setup data is copied into every VU, so large setup data

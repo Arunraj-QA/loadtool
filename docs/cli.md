@@ -2,6 +2,7 @@
 
 ```
 loadtool run [flags] <script>
+loadtool ui [flags]
 loadtool --version
 loadtool --help
 ```
@@ -21,6 +22,19 @@ loadtool --help
 **`--vus` and `--duration`** count only when typed: the defaults shown
 apply when nothing else sets a value (see
 [Options](options.md#where-settings-come-from)).
+
+## `loadtool ui`
+
+Serves a page on 127.0.0.1 for load-testing one HTTP API without a
+script ([guide](ui.md)).
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--port` | `0` | Port on 127.0.0.1; `0` picks a free one |
+| `--max-vus` | `50` | The most VUs a test may use |
+| `--max-duration` | `5m` | The longest a test may run |
+| `--request-timeout` | `10s` | Timeout of each request |
+| `--allow-private-targets` | off | Allow loopback and private-network destinations |
 
 ## Environment variables
 

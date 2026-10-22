@@ -27,7 +27,8 @@ and `setup`/`teardown` need only the import lines changed.
 |---|---|
 | **Redirects** | Never followed; a 3xx is returned and counts as a success. k6 follows up to 10. |
 | **Request bodies** | Strings only. k6 form-encodes an object; LoadTool throws a `TypeError` (use `JSON.stringify`). |
-| **Request params** | `headers` and `cookies` only. Others (`timeout`, `tags`, `redirects`, `responseType`, …) warn and are ignored. The request timeout is 30 s. |
+| **Response bodies** | **Discarded by default**; k6 keeps them. Set `discardResponseBodies: false`, or `responseType: "text"` per request, to read `res.body` or `res.json()`. |
+| **Request params** | `headers`, `cookies` and `responseType` (`"text"` or `"none"`; not `"binary"`). Others (`timeout`, `tags`, `redirects`, …) warn and are ignored. The request timeout is 30 s. |
 | **Responses** | `status`, `proto`, `error`, `headers`, `body`, `json()`, `timings.duration`, `url`, `cookies`. No `html()`, no `json(selector)`, no detailed timings (`waiting`, `connecting`, …). |
 | **Latency** | `timings.duration` and `http_req_duration` include connecting when a new connection is made; k6's `http_req_duration` excludes it. With keep-alive (the default) this only affects first requests. |
 | **`setup` / `teardown` requests** | Not counted in results or thresholds. k6 counts them. |
@@ -38,6 +39,10 @@ and `setup`/`teardown` need only the import lines changed.
 | **Ramping** | VU *n* is active while the stage line is at least *n*: a pure ramp to 10 reaches the 10th VU only at its end. |
 | **Options** | Unknown options warn and are ignored. Options combining `scenarios` with `vus`/`duration`/`stages` are an error. |
 | **HTTP/2** | Negotiated over TLS by default, as in k6. `httpVersion: "2"` also speaks h2c (HTTP/2 without TLS), which k6 does not. |
+| **WebSocket** | `loadtool/ws` follows `k6/ws`: `connect(url, params, fn)`, `on`, `send`, `sendBinary`, `close`, `setTimeout`, `setInterval`. Differences: `send(…, { reply: true })` times a reply (`ws_msg_latency`); `connect` returns `error_code`; no `ping`/`pong` events or `ws_ping` metric; no subprotocols; `params` takes `headers` only. LoadTool also has a blocking style (`connect` without a callback, then `send`/`receive`/`close`), which k6 does not. |
+| **GraphQL** | k6 has no GraphQL module (scripts use `http.post`). `loadtool/graphql` adds `query`, `mutation` and `Client`, separates HTTP success (`http_ok`) from GraphQL success (`ok`), and records `graphql_*` metrics instead of `http_*`. `http.post` still works as in k6. |
+| **gRPC** | `loadtool/grpc` follows `k6/net/grpc` for clients and unary calls: `new grpc.Client()`, `load`, `connect(addr, { plaintext, reflect, timeout })`, `invoke`, `close`. Differences: `connect` returns `{ error, error_code }` instead of throwing; streams are blocking (`client.stream`, then `send`/`closeSend`/`recv`) instead of `grpc.Stream` with events; results carry `status_text` and `error_code`; no `tls` options or `insecureSkipVerify`. |
+| **Kafka** | k6 has no built-in Kafka module (it is an extension, xk6-kafka, built into a custom binary). `loadtool/kafka` is built in, with its own API: `Producer` (`produce`, `produceBatch`), `Consumer` (`consume`) and one-off `kafka.produce`/`kafka.consume`; per-VU clients; results with `ok` and `error_code` instead of exceptions; end-to-end `kafka_consume_latency`. No schema registry, SASL or topic administration. |
 | **Percentiles** | From a histogram, within ±0.78 %. |
 
 ## Not supported (yet)
@@ -61,7 +66,8 @@ and `setup`/`teardown` need only the import lines changed.
 
 **Runtime and modules:**
 
-- Other protocols (WebSocket, gRPC) and browser testing.
+- Other protocols (k6's experimental WebSocket API, Kafka) and browser
+  testing.
 - npm packages and remote (URL) modules.
 - `--out` streaming outputs and k6 Cloud.
 - `insecureSkipTLSVerify` and other TLS options.

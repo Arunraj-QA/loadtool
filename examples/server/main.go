@@ -1,7 +1,8 @@
 // Command server is the demo API the examples run against: a small shop
-// with products, orders and a login. It uses only the standard library,
-// keeps no per-session state (sessions are signed, not stored), so its
-// memory stays flat under load.
+// with products, orders, a login and a WebSocket echo. It uses the
+// standard library and github.com/coder/websocket, and keeps no
+// per-session state (sessions are signed, not stored), so its memory
+// stays flat under load.
 //
 //	go run ./examples/server                  # http://127.0.0.1:8090
 //	go run ./examples/server -addr 127.0.0.1:9000 -delay 20ms
@@ -17,6 +18,15 @@
 //	GET  /api/me               the user of the session cookie or of
 //	                           "Authorization: Bearer <token>"; 401 without one
 //	POST /api/logout           clears the session cookie
+//	GET  /ws/echo              WebSocket: echoes every message, after the
+//	                           -delay (text and binary)
+//	POST /graphql              GraphQL: products, product(id), fail and the
+//	                           placeOrder mutation, after the -delay
+//
+// On -grpc-addr (127.0.0.1:8091) it serves the gRPC greeter service of
+// examples/proto/greeter.proto, with server reflection. On -kafka-port
+// (9092) it runs an in-process Kafka broker (franz-go's kfake) with the
+// topics orders and events, so the Kafka examples need no Docker.
 //
 // It speaks HTTP/1.1 and HTTP/2 without TLS (h2c) on the same port.
 package main
@@ -41,6 +51,13 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/coder/websocket"
+	"google.golang.org/grpc"
+
+	"github.com/Arunraj-QA/loadtool/internal/protocols/graphql/graphqltest"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc/grpctest"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/kafka/kafkatest"
 )
 
 // Password is the one password every demo user has.
@@ -73,7 +90,9 @@ func findProduct(id int) (product, bool) {
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8090", "listen address")
-	delay := flag.Duration("delay", 5*time.Millisecond, "time every /api/ request waits before responding")
+	grpcAddr := flag.String("grpc-addr", "127.0.0.1:8091", "gRPC listen address (greeter service with reflection); empty to turn it off")
+	kafkaPort := flag.Int("kafka-port", 9092, "port of the in-process Kafka broker (topics orders and events); 0 to turn it off")
+	delay := flag.Duration("delay", 5*time.Millisecond, "time every /api/ request, WebSocket echo and gRPC SayHello waits before answering")
 	flag.Parse()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -84,9 +103,48 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("demo API listening on http://%s (HTTP/1.1 and h2c; /api/ delay %s; password %q)\n", ln.Addr(), *delay, Password)
+	if *grpcAddr != "" {
+		gln, err := net.Listen("tcp", *grpcAddr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		stopGRPC, err := serveGRPC(gln, *delay)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer stopGRPC()
+		fmt.Printf("demo gRPC listening on %s (greeter.Greeter, reflection on)\n", gln.Addr())
+	}
+	if *kafkaPort != 0 {
+		cluster, err := kafkatest.NewCluster(*kafkaPort, "orders", "events")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer cluster.Close()
+		fmt.Printf("demo Kafka listening on %s (in-process; topics orders and events, %d partitions each)\n", strings.Join(cluster.ListenAddrs(), ","), kafkatest.Partitions)
+	}
 	if err := serve(ctx, ln, newAPI(*delay, newSigner()).routes()); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// serveGRPC serves the greeter service (examples/proto/greeter.proto, with
+// server reflection) on ln. The returned function stops it, letting calls
+// in progress finish.
+func serveGRPC(ln net.Listener, delay time.Duration) (stop func(), err error) {
+	srv := grpc.NewServer()
+	if err := grpctest.Register(srv, delay); err != nil {
+		return nil, err
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = srv.Serve(ln)
+	}()
+	return func() {
+		srv.GracefulStop()
+		<-done
+	}, nil
 }
 
 // serve runs the server on ln until ctx is done, then shuts it down.
@@ -151,12 +209,22 @@ type api struct {
 	delay  time.Duration
 	signer signer
 	orders atomic.Int64
+	chat   *chat
 }
 
-func newAPI(delay time.Duration, s signer) *api { return &api{delay: delay, signer: s} }
+func newAPI(delay time.Duration, s signer) *api {
+	return &api{delay: delay, signer: s, chat: newChat()}
+}
 
 func (a *api) routes() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /ws/echo", a.wsEcho)
+	mux.HandleFunc("GET /ws/chat", a.chat.serve)
+	gql, err := graphqltest.Handler(a.delay)
+	if err != nil {
+		panic(err) // the schema is fixed: an error is a bug
+	}
+	mux.Handle("POST /graphql", gql)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -287,4 +355,29 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Length", strconv.Itoa(len(b)))
 	w.WriteHeader(status)
 	w.Write(b)
+}
+
+// wsEcho echoes every WebSocket message after the -delay, like a backend
+// that answers each request. It ends when the client closes.
+func (a *api) wsEcho(w http.ResponseWriter, r *http.Request) {
+	c, err := websocket.Accept(w, r, nil)
+	if err != nil {
+		return // Accept has answered the request
+	}
+	defer c.CloseNow()
+	// A hijacked connection's request context is not cancelled when the
+	// client goes away; reads fail instead, which ends the loop.
+	ctx := context.Background()
+	for {
+		typ, data, err := c.Read(ctx)
+		if err != nil {
+			return
+		}
+		if a.delay > 0 {
+			time.Sleep(a.delay)
+		}
+		if err := c.Write(ctx, typ, data); err != nil {
+			return
+		}
+	}
 }

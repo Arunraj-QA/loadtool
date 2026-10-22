@@ -5,13 +5,11 @@ API follows the shape of [k6](https://k6.io)'s. If you know k6, read
 [Differences from k6](k6-differences.md) first.
 
 - [A test script](#a-test-script)
-- [`loadtool/http`](#loadtoolhttp): requests and responses
 - [`loadtool`](#loadtool): `check`, `sleep`, `group`
 - [Globals](#globals): `__ENV`, `__VU`, `__ITER`, `console`
 - [Imports](#imports): your own modules and JSON data
 - [Lifecycle](#lifecycle): `setup` and `teardown`
-- [Cookies and sessions](#cookies-and-sessions)
-- [HTTP versions and connections](#http-versions-and-connections)
+- [Protocols](#protocols): HTTP, WebSocket, gRPC, GraphQL, Kafka
 
 Options (`export const options`) are described in [Options](options.md).
 Type declarations for editors are in
@@ -50,67 +48,21 @@ again until its scenario ends.
   `maximum call stack size of 2500 frames exceeded`, which `try/catch`
   cannot catch.
 
+**`async` functions** (the default function, scenario functions,
+`setup`, `teardown`) work, with errors reported as for other functions.
+LoadTool has no event loop, though, and no LoadTool API returns a
+Promise:
+
+- **`await` on a value that is already available** works:
+  `await Promise.resolve(1)`, or an `async` helper that does not wait on
+  anything.
+- **`await` on something that never resolves** ends the iteration with a
+  script error that says so.
+- **`async` gains nothing.** LoadTool calls are blocking, so a plain
+  function does the same.
+
 **TypeScript** types are removed with esbuild but **not type-checked**.
 Error locations point at the original `.ts` lines.
-
-## `loadtool/http`
-
-```typescript
-import http from "loadtool/http";            // the module object
-import { get, post } from "loadtool/http";   // or single functions
-```
-
-| Function | Notes |
-|---|---|
-| `get(url, params?)` | |
-| `post(url, body?, params?)` | `put`, `patch` and `del` take the same arguments |
-| `request(method, url, body?, params?)` | Any method, e.g. `request("OPTIONS", url)` |
-
-**`body`** is a string.
-
-- To send JSON, use `JSON.stringify(...)` with a
-  `Content-Type: application/json` header.
-- An object body is a `TypeError`, not silently form-encoded.
-
-```typescript
-http.post(`${BASE}/api/orders`, JSON.stringify({ productId: 1, quantity: 2 }), {
-  headers: { "Content-Type": "application/json" },
-});
-```
-
-([`examples/post-json.ts`](../examples/post-json.ts) checks the response.)
-
-**`params`** is `{ headers: { name: value }, cookies: { name: value } }`.
-Other keys (such as `timeout` or `tags`) produce one warning per run and
-are ignored.
-
-**Requests never throw on network errors.**
-
-- A refused connection or a timeout (30 s per request) gives `status: 0`
-  and an `error` message, and counts as a failed request.
-- Redirects are not followed: a 3xx response is returned as it is.
-- LoadTool sends only the headers you set; it does not add
-  `Accept-Encoding: gzip`.
-
-### Responses
-
-| Field | Value |
-|---|---|
-| `status` | HTTP status, or `0` if no response was received |
-| `proto` | `"HTTP/1.1"` or `"HTTP/2.0"`; `""` without a response |
-| `error` | `""`, or the network error |
-| `headers` | `{ "Content-Type": "..." }`, canonical names; repeated headers joined with `", "` |
-| `body` | The body as a string; `null` if bodies are discarded or nothing arrived |
-| `json()` | The body parsed as JSON; throws `SyntaxError` on invalid JSON |
-| `timings.duration` | Milliseconds from sending the request to reading the whole body |
-| `url` | The request URL |
-| `cookies` | Cookies this response set: `{ name: [{ name, value, domain, path, expires, max_age, http_only, secure }] }` |
-
-**Bodies are kept by default.** If a test never reads them, set
-`options.discardResponseBodies: true`: it saves an allocation per
-request, and `body` is then `null`.
-
-A request succeeds when it gets a 2xx or 3xx response.
 
 ## `loadtool`
 
@@ -124,6 +76,8 @@ Runs each condition on `value` and counts a pass or fail per name. It
 returns `true` if all passed.
 
 ```typescript
+// The body is kept for this request so the check can read it.
+const res = http.get(`${BASE}/api/products`, { responseType: "text" });
 const ok = check(res, {
   "status is 200": (r) => r.status === 200,
   "has products": (r) => r.json().products.length > 0,
@@ -252,84 +206,19 @@ export function teardown(data) {
   printed in full first. Its limit is `teardownTimeout`, default `"60s"`.
 - **A second Ctrl+C** exits at once and skips teardown.
 
-## Cookies and sessions
+## Protocols
 
-**Each VU has its own cookie jar**
-([`examples/sessions.ts`](../examples/sessions.ts)):
+Each protocol has its own page:
 
-- Cookies that responses set are stored and sent on later requests to the
-  same site, following their domain, path, expiry and `Secure` rules.
-- Every iteration starts with an empty jar, like a new visitor.
-  `options.noCookiesReset: true` keeps one session per VU for the whole
-  test.
-- VUs never see each other's cookies.
-- `setup` and `teardown` share their own jar, so teardown can log out of
-  setup's session.
-
-```
-VU 1 ─ session 1 ─ cookie jar A ─┐
-VU 2 ─ session 2 ─ cookie jar B ─┼─ one shared connection pool
-VU 3 ─ session 3 ─ cookie jar C ─┘
-```
-
-**Cookie rules** (RFC 6265, as implemented by Go's `net/http/cookiejar`):
-
-| Cookie | Sent to |
+| Module | Page |
 |---|---|
-| No `Domain` (host-only) | The host that set it only; not its subdomains or other hosts |
-| `Domain=app.test` | `app.test` and its subdomains |
-| `Path=/admin` | `/admin` and paths below it |
-| `Secure` | `https://` requests only |
+| `loadtool/http` | [HTTP](protocols/http.md): requests, responses, cookies and sessions, HTTP/2 and connections |
+| `loadtool/ws` | [WebSocket](protocols/websocket.md) |
+| `loadtool/grpc` | [gRPC](protocols/grpc.md) |
+| `loadtool/graphql` | [GraphQL](protocols/graphql.md) |
+| `loadtool/kafka` | [Kafka](protocols/kafka.md) |
 
-**Replacing and deleting:**
-
-- A cookie with the same name, domain and path replaces the earlier one.
-- `Max-Age=0`, a negative `Max-Age` or a past `Expires` deletes it: the
-  usual logout.
-- A cookie without `Max-Age` or `Expires` lasts until the jar is reset.
-- No public-suffix list is used; it matters only for cookies set on
-  domains like `co.uk`, which a test target should not do.
-
-**Script access.** `params.cookies` adds cookies to one request, and
-`res.cookies` shows what a response set. Reading and editing the jar
-directly is not supported yet.
-
-**Headers are per request.** Set them with `params.headers`; there are no
-per-session default headers. For a header on every request, keep a params
-object in a constant and pass it to each call.
-
-## HTTP versions and connections
-
-`options.httpVersion` selects the protocol
-([`examples/http2.ts`](../examples/http2.ts)):
-
-| Value | `http://` | `https://` |
-|---|---|---|
-| `"auto"` (default) | HTTP/1.1 | HTTP/2 if the server offers it, else HTTP/1.1 |
-| `"1.1"` | HTTP/1.1 | HTTP/1.1 |
-| `"2"` | HTTP/2 without TLS (h2c) | HTTP/2 only |
-
-- **No fallback with `"2"`.** A server without HTTP/2 fails the request
-  rather than being measured over HTTP/1.1.
-- **Seeing the protocol.**
-  - `res.proto` shows the protocol each response used.
-  - The summary has a `Protocols:` line (for example `HTTP/2 9,000,
-    HTTP/1.1 12`) whenever HTTP/2 was used, so you can tell whether
-    `"auto"` negotiated it.
-- **Extra connections.** HTTP/2 sends many VUs' requests over one
-  connection. When every connection is at the server's stream limit, a
-  new connection is dialled for each waiting request, so pushing a server
-  far past its limit causes a burst of connections (as HTTP/1.1 does at
-  start-up).
-- **Low stream limits.** A server that allows fewer than 100 concurrent
-  streams can refuse the first requests on a new connection; they count
-  as failed requests.
-
-**Connections:**
-
-- They are kept alive and reused. All VUs share one pool with up to one
-  connection per VU per host; HTTP/2 carries many requests per
-  connection.
-- `options.noConnectionReuse: true` opens a new connection for every
-  request.
-- Certificates are always verified.
+A test can use several of them in one iteration: see
+[Mixed-protocol tests](examples/mixed-protocol.md). How the protocol
+modules fit into the engine is in
+[The protocol system](architecture/protocol-system.md).

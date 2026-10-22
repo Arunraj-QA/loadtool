@@ -14,6 +14,13 @@ import { check, sleep } from "loadtool";
 
 const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8090";
 
+export const options = {
+  // Response bodies are discarded by default, to save memory. This script
+  // checks every body, so it keeps them all. (To keep only some, see
+  // post-json.ts.)
+  discardResponseBodies: false,
+};
+
 export default function (): void {
   const list = http.get(`${BASE_URL}/api/products`);
   check(list, {

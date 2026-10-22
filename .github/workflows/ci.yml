@@ -127,3 +127,32 @@ jobs:
           test "$OUTCOME" = failure
           test "$CODE" = 99
           jq -e '.thresholds | any(.passed | not)' failing-summary.json
+
+  # The Kafka module against a real broker (ADR-022): testenv/kafka runs a
+  # single-node Kafka with Docker Compose. Other tests use an in-process
+  # cluster and run in every job.
+  kafka-real:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Start Kafka
+        run: testenv/kafka/up.sh
+
+      - name: Real-broker tests
+        env:
+          LOADTOOL_KAFKA_BROKERS: 127.0.0.1:9092
+        run: go test -race -count=1 -run Real -v ./internal/protocols/kafka
+
+      - name: Broker logs on failure
+        if: failure()
+        run: docker compose -f testenv/kafka/docker-compose.yml logs --tail 100 kafka
+
+      - name: Stop Kafka
+        if: always()
+        run: docker compose -f testenv/kafka/docker-compose.yml down -v

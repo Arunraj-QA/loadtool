@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Runs every example against the demo API and fails if one exits
-# non-zero, has script errors, sends no requests, has failed requests or
-# fails a check. CI runs it so the examples keep working.
+# non-zero, has script errors, does nothing (no HTTP requests and no
+# protocol activity), has failed requests or protocol operations (any
+# *_failed metric), or fails a check. CI runs it so the examples keep
+# working.
 #
 #   go run ./examples/server &       # the demo API, on 127.0.0.1:8090
+#                                    # (gRPC on :8091, Kafka on :9092)
 #   scripts/smoke-examples.sh bin/loadtool
 #
 # Set BASE_URL if the demo API listens elsewhere.
@@ -15,7 +18,8 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
 
-# script, then loadtool run arguments
+# script, loadtool run arguments, and optionally "failures-ok" for an
+# example whose operations fail on purpose (its checks must still pass)
 runs=(
   "basic-http.ts|--vus 2 --duration 2s"
   "basic-http.js|--vus 2 --duration 2s"
@@ -26,6 +30,21 @@ runs=(
   "sessions.ts|--vus 2 --duration 2s"
   "data-driven.ts|--vus 2 --duration 2s"
   "http2.ts|--vus 2 --duration 2s"
+  "websocket.ts|--vus 2 --duration 2s"
+  "websocket-request-reply.ts|--vus 2 --duration 2s"
+  "websocket-basic.ts|--vus 2 --duration 2s"
+  "websocket-chat.ts|--vus 4 --duration 2s"
+  "grpc-unary.ts|--vus 2 --duration 2s"
+  "grpc-streaming.ts|--vus 2 --duration 2s"
+  "graphql-query.ts|--vus 2 --duration 2s"
+  "graphql-mutation.ts|--vus 2 --duration 2s"
+  "graphql-errors.ts|--vus 2 --duration 2s|failures-ok"
+  "kafka-producer.ts|--vus 2 --duration 2s"
+  "kafka-consumer.ts|"
+  "kafka-throughput.ts|--vus 2 --duration 2s"
+  "kafka-errors.ts|--vus 1 --duration 6s|failures-ok"
+  "mixed-http-websocket.ts|--vus 2 --duration 2s"
+  "mixed-protocols.ts|--vus 2 --duration 2s"
   "scenarios.ts|"
 )
 
@@ -44,7 +63,12 @@ fail() {
 failed=0
 for entry in "${runs[@]}"; do
   script=${entry%%|*}
-  args=${entry#*|}
+  rest=${entry#*|}
+  args=${rest%%|*}
+  failures_ok=false
+  if [ "$rest" != "$args" ] && [ "${rest#*|}" = failures-ok ]; then
+    failures_ok=true
+  fi
   summary="$out/${script}.json"
   code=0
   # shellcheck disable=SC2086
@@ -54,10 +78,12 @@ for entry in "${runs[@]}"; do
     tail -5 "$out/${script}.log"
     continue
   fi
-  problem=$("$jq" -r '
+  problem=$("$jq" -r --argjson failuresOK "$failures_ok" '
     if .metrics.script_errors.count > 0 then "script errors: \(.metrics.script_errors.first)"
-    elif .metrics.http_reqs.count == 0 then "no requests"
+    elif .metrics.http_reqs.count == 0 and ([.metrics[] | objects | select(.kind == "counter") | .count] | add // 0) == 0 then "no requests, sessions or calls"
     elif .metrics.http_req_failed.failed > 0 then "failed requests: \(.metrics.http_req_failed.failed)"
+    elif $failuresOK == false and ([.metrics | to_entries[] | select(.value.kind? == "rate" and (.key | endswith("_failed")) and .value.trues > 0)] | length) > 0
+      then "failures in \([.metrics | to_entries[] | select(.value.kind? == "rate" and (.key | endswith("_failed")) and .value.trues > 0) | .key] | join(", "))"
     elif .metrics.checks.fails > 0 then "failed checks: \([.checks[] | select(.fails > 0) | .name] | join(", "))"
     else "" end' "$summary")
   if [ -n "$problem" ]; then

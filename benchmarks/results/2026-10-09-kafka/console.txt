@@ -1,0 +1,12 @@
+﻿   10 VUs run1  msgs/s   25782.7  p50 0.544768 p95 0.700416 p99 1.18784 ms  failed 0  peak private 132.9 MB  CPU 42.5%  broker 342.1 MB 22.8%  exit 0
+  100 VUs run1  msgs/s   33411.9  p50 2.637824 p95 6.127616 p99 9.764864 ms  failed 0  peak private 193.5 MB  CPU 49%  broker 456.7 MB 24.9%  exit 0
+  500 VUs run1  msgs/s   32210.0  p50 12.910592 p95 29.229056 p99 51.11808 ms  failed 0  peak private 512.8 MB  CPU 47.4%  broker 531.5 MB 25.9%  exit 0
+ 1000 VUs run1  msgs/s   29952.1  p50 25.821184 p95 52.166656 p99 89.653248 ms  failed 0  peak private 904.3 MB  CPU 47.6%  broker 584.5 MB 23.7%  exit 0
+   10 VUs run2  msgs/s   24969.4  p50 0.544768 p95 0.700416 p99 1.18784 ms  failed 0  peak private 134.1 MB  CPU 42.3%  broker 341.5 MB 23.7%  exit 0
+  100 VUs run2  msgs/s   34602.2  p50 2.572288 p95 5.996544 p99 9.371648 ms  failed 0  peak private 191.4 MB  CPU 51.1%  broker 483.2 MB 25.3%  exit 0
+  500 VUs run2  msgs/s   33521.0  p50 13.041664 p95 25.034752 p99 39.583744 ms  failed 0  peak private 453.2 MB  CPU 51.4%  broker 516.4 MB 25.9%  exit 0
+ 1000 VUs run2  msgs/s   31578.3  p50 26.86976 p95 46.923776 p99 77.070336 ms  failed 0  peak private 864.9 MB  CPU 50.4%  broker 605.2 MB 24.5%  exit 0
+   10 VUs run3  msgs/s   24094.2  p50 0.544768 p95  0.7168 p99 1.236992 ms  failed 0  peak private 128.2 MB  CPU 41.9%  broker 341.3 MB 21.6%  exit 0
+  100 VUs run3  msgs/s   33918.8  p50 2.605056 p95 6.127616 p99 9.764864 ms  failed 0  peak private 324.2 MB  CPU 51.1%  broker 457.2 MB 23.9%  exit 0
+  500 VUs run3  msgs/s   33199.2  p50 13.172736 p95 25.296896 p99 40.108032 ms  failed 0  peak private 445 MB  CPU 50.5%  broker 505.1 MB 26%  exit 0
+ 1000 VUs run3  msgs/s   24835.8  p50 25.034752 p95 70.77888 p99 143.654912 ms  failed 0  peak private 930.4 MB  CPU 39.7%  broker 507.1 MB 19.6%  exit 0

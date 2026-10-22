@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -29,6 +30,7 @@ import (
 
 	"github.com/Arunraj-QA/loadtool/internal/httpclient"
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
+	"github.com/Arunraj-QA/loadtool/internal/protocol"
 )
 
 // Program is a compiled test script, safe to share between VUs.
@@ -55,6 +57,8 @@ type Program struct {
 	setupData []byte
 	// warn reports non-fatal problems found while the script runs.
 	warn *warner
+	// mods are the protocol modules (ADR-018); nil without any.
+	mods *moduleSet
 }
 
 // WithSetupData returns a copy of p whose VUs pass data, the JSON that
@@ -100,8 +104,9 @@ func (p *Program) WithEnv(env map[string]string) *Program {
 }
 
 // Load reads and compiles the script at path. Relative imports
-// (./helpers.ts) are resolved from the script's directory.
-func Load(path string) (*Program, error) {
+// (./helpers.ts) are resolved from the script's directory. modules are the
+// protocol modules the script may import as "loadtool/<name>".
+func Load(path string, modules ...protocol.Module) (*Program, error) {
 	src, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -110,7 +115,7 @@ func Load(path string) (*Program, error) {
 	if err != nil {
 		return nil, err
 	}
-	return compileIn(filepath.Base(path), filepath.Dir(abs), src)
+	return compileIn(filepath.Base(path), filepath.Dir(abs), src, modules)
 }
 
 const (
@@ -151,32 +156,42 @@ var ErrNoDefaultExport = errors.New("script must export a default function: `exp
 // .ts are treated as TypeScript, everything else as JavaScript. The script
 // may import built-in modules; relative imports need Load, which knows the
 // script's directory.
-func Compile(filename string, src []byte) (*Program, error) {
-	return compileIn(filename, "", src)
+func Compile(filename string, src []byte, modules ...protocol.Module) (*Program, error) {
+	return compileIn(filename, "", src, modules)
 }
 
 // compileIn is Compile with the directory relative imports resolve from;
 // dir must be absolute, or empty to reject relative imports.
-func compileIn(filename, dir string, src []byte) (*Program, error) {
-	code, err := transpile(filename, dir, src)
+func compileIn(filename, dir string, src []byte, modules []protocol.Module) (*Program, error) {
+	var mods *moduleSet
+	if len(modules) > 0 {
+		var err error
+		if mods, err = newModuleSet(modules); err != nil {
+			return nil, err
+		}
+	}
+	code, err := transpile(filename, dir, src, mods)
 	if err != nil {
 		return nil, err
+	}
+	if mods != nil {
+		mods.seal()
 	}
 	prog, err := goja.Compile(filename, code, true)
 	if err != nil {
 		return nil, fmt.Errorf("compile %s: %w", filename, err)
 	}
-	return &Program{prog: prog, filename: filename, dir: dir, src: src}, nil
+	return &Program{prog: prog, filename: filename, dir: dir, src: src, mods: mods}, nil
 }
 
 // transpile turns the script, and the files it imports, into one plain
 // JavaScript program that stores its default export in defaultExportGlobal.
-func transpile(filename, dir string, src []byte) (string, error) {
-	return transpileEntry(filename, dir, src, entrySource)
+func transpile(filename, dir string, src []byte, mods *moduleSet) (string, error) {
+	return transpileEntry(filename, dir, src, entrySource, mods)
 }
 
 // transpileEntry is transpile with a given generated entry.
-func transpileEntry(filename, dir string, src []byte, entry string) (string, error) {
+func transpileEntry(filename, dir string, src []byte, entry string, mods *moduleSet) (string, error) {
 	loader := api.LoaderJS
 	if strings.EqualFold(filepath.Ext(filename), ".ts") {
 		loader = api.LoaderTS
@@ -189,7 +204,7 @@ func transpileEntry(filename, dir string, src []byte, entry string) (string, err
 		Format:   api.FormatIIFE,
 		Platform: api.PlatformNeutral,
 		Target:   api.ES2017,
-		Plugins:  []api.Plugin{scriptPlugin(filename, dir, string(src), loader)},
+		Plugins:  []api.Plugin{scriptPlugin(filename, dir, string(src), loader, mods)},
 		// Paths in errors and the source map are relative to the script's
 		// directory, so they read "helpers.ts", not a full path.
 		AbsWorkingDir: dir,
@@ -251,8 +266,9 @@ func withInlineSourceMap(files []api.OutputFile) (string, error) {
 }
 
 // scriptPlugin serves the script's source from memory for the entry's
-// import and rejects every other import.
-func scriptPlugin(filename, dir, src string, loader api.Loader) api.Plugin {
+// import and rejects every other import. It records which protocol
+// modules of mods (which may be nil) the script imports.
+func scriptPlugin(filename, dir, src string, loader api.Loader, mods *moduleSet) api.Plugin {
 	return api.Plugin{
 		Name: "loadtool-script",
 		Setup: func(b api.PluginBuild) {
@@ -261,6 +277,9 @@ func scriptPlugin(filename, dir, src string, loader api.Loader) api.Plugin {
 				case args.Importer == "<stdin>" && args.Path == scriptImport:
 					return api.OnResolveResult{Path: filename, Namespace: scriptNamespace}, nil
 				case isBuiltinModule(args.Path):
+					if i, ok := mods.index(args.Path); ok {
+						mods.markImported(i)
+					}
 					return api.OnResolveResult{Path: args.Path, Namespace: builtinNamespace}, nil
 				case isRelativeImport(args.Path):
 					if dir == "" {
@@ -270,13 +289,18 @@ func scriptPlugin(filename, dir, src string, loader api.Loader) api.Plugin {
 					return api.OnResolveResult{}, nil
 				}
 				return api.OnResolveResult{}, fmt.Errorf(
-					"cannot import %q: only built-in modules (\"loadtool\", \"loadtool/http\") and relative paths such as \"./helpers.ts\" can be imported", args.Path)
+					"cannot import %q: only built-in modules (%s) and relative paths such as \"./helpers.ts\" can be imported",
+					args.Path, strings.Join(mods.names(), ", "))
 			})
 			b.OnLoad(api.OnLoadOptions{Filter: ".*", Namespace: scriptNamespace}, func(api.OnLoadArgs) (api.OnLoadResult, error) {
 				return api.OnLoadResult{Contents: &src, Loader: loader, ResolveDir: dir}, nil
 			})
 			b.OnLoad(api.OnLoadOptions{Filter: ".*", Namespace: builtinNamespace}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
-				mod, err := builtinModuleSource(args.Path)
+				if i, ok := mods.index(args.Path); ok {
+					mod := mods.source(i)
+					return api.OnLoadResult{Contents: &mod, Loader: api.LoaderJS}, nil
+				}
+				mod, err := builtinModuleSource(args.Path, mods)
 				if err != nil {
 					return api.OnLoadResult{}, err
 				}
@@ -358,6 +382,21 @@ type VU struct {
 	// data is this VU's copy of the setup data, passed to every iteration;
 	// undefined without setup data.
 	data goja.Value
+	// proto is the VU's protocol module state; nil unless its script
+	// imports a protocol module.
+	proto *vuModules
+}
+
+// vuModules is a VU's protocol module state (ADR-018). It is a separate
+// allocation, made only for scripts that import a protocol module, so a
+// VU without one is as small as before Phase 2.
+type vuModules struct {
+	// set is the program's protocol modules; insts are this VU's
+	// instances of them (by module index, nil until first use), and
+	// closers the resources its scripts registered (ADR-018 §9).
+	set     *moduleSet
+	insts   []protocol.Instance
+	closers []io.Closer
 }
 
 // NewVU is NewVUExec for the default export.
@@ -379,6 +418,11 @@ func (p *Program) NewVUExec(ctx context.Context, id int, exec string, client *ht
 	rt := goja.New()
 	rt.SetMaxCallStackSize(maxCallStackSize)
 	vu := &VU{rt: rt, id: int64(id), exec: exec, discardBodies: p.discardBodies, keepCookies: p.keepCookies, warn: p.warn}
+	props := builtinProps
+	if p.mods.importsAny() {
+		vu.proto = &vuModules{set: p.mods, insts: make([]protocol.Instance, len(p.mods.all))}
+		props = p.mods.vuProps
+	}
 	if client != nil {
 		// Shares client's transport (and connection pool); keeps its own
 		// cookies.
@@ -393,7 +437,7 @@ func (p *Program) NewVUExec(ctx context.Context, id int, exec string, client *ht
 	// Built-in modules and console methods are built on first use, so a
 	// VU only pays memory for what its script uses (see lazyObject).
 	if err := errors.Join(
-		rt.Set(builtinGlobal, vu.newLazyObject(builtinProps)),
+		rt.Set(builtinGlobal, vu.newLazyObject(props)),
 		rt.Set("__ENV", rt.NewDynamicObject(&envObject{rt: rt, base: p.env})),
 		rt.Set("__VU", id),
 		rt.Set("__ITER", 0),
@@ -454,10 +498,15 @@ func (vu *VU) Iterate(ctx context.Context, rec *metrics.Recorder) {
 	if !vu.keepCookies {
 		vu.jar.Reset() // each iteration is a new session
 	}
+	vu.beginIteration(rec)
 	_ = vu.rt.Set("__ITER", vu.iter)
 	vu.iter++
 	stop := context.AfterFunc(ctx, func() { vu.rt.Interrupt(errStopped) })
-	_, err := vu.fn(goja.Undefined(), vu.data)
+	v, err := vu.fn(goja.Undefined(), vu.data)
+	if err == nil {
+		_, err = settle(v) // an async function's errors are in its Promise
+	}
+	vu.endIteration()
 	stop()
 	vu.ctx, vu.rec = nil, nil
 
@@ -469,4 +518,47 @@ func (vu *VU) Iterate(ctx context.Context, rec *metrics.Recorder) {
 // isRelativeImport reports whether path is relative to the importing file.
 func isRelativeImport(path string) bool {
 	return strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../")
+}
+
+var promiseType = reflect.TypeFor[*goja.Promise]()
+
+// errNeverSettled is the error for an async function whose Promise is
+// still pending when it returns: something it awaits never resolves.
+var errNeverSettled = errors.New("the async function did not finish: it awaits something that never resolves " +
+	"(LoadTool has no event loop, so await only works on values that are already available)")
+
+// settle returns the outcome of a function the script exported. A
+// non-Promise value is returned as is. An async function returns a
+// Promise; goja runs its jobs before the call returns, so with no event
+// loop (ADR-017) the Promise is already settled unless it awaits
+// something that never resolves. A rejected Promise is the function's
+// error, which would otherwise be lost and hide every failure.
+func settle(v goja.Value) (goja.Value, error) {
+	// ExportType reads the type without converting the object, so a
+	// function returning a plain object pays nothing here.
+	obj, ok := v.(*goja.Object)
+	if !ok || obj.ExportType() != promiseType {
+		return v, nil
+	}
+	p := obj.Export().(*goja.Promise)
+	switch p.State() {
+	case goja.PromiseStateFulfilled:
+		return p.Result(), nil
+	case goja.PromiseStateRejected:
+		return nil, rejection(p.Result())
+	default:
+		return nil, errNeverSettled
+	}
+}
+
+// rejection describes a Promise's rejection reason: an Error's stack when
+// it has one (it names the script location), else its text.
+func rejection(reason goja.Value) error {
+	msg := reason.String()
+	if o, ok := reason.(*goja.Object); ok {
+		if stack := o.Get("stack"); isSet(stack) && stack.String() != "" {
+			msg = stack.String()
+		}
+	}
+	return errors.New(msg)
 }

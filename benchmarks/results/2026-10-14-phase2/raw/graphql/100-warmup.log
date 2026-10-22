@@ -1,0 +1,18 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\loadtool\graphql.ts
+  VUs:         100
+  Duration:    10s (elapsed 10.02s)
+  Status:      completed
+
+  Requests:    0 (0.0 req/s)
+  Success:     0
+  Errors:      0 (0.00%)
+  Script errs: 0
+
+  Latency:     no requests were sent
+  Protocol metrics:
+    graphql_req_duration  82,611 samples  avg=12.02ms p50=11.60ms p95=15.01ms p99=18.74ms max=62.76ms
+    graphql_reqs          82,611 (8246.4/s)
+    graphql_req_failed    0.00% (0 of 82,611)

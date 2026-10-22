@@ -3,6 +3,7 @@ package script
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,11 @@ import (
 
 	"github.com/Arunraj-QA/loadtool/internal/httpclient"
 	"github.com/Arunraj-QA/loadtool/internal/metrics"
+	"github.com/Arunraj-QA/loadtool/internal/protocol"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/graphql"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/grpc"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/kafka"
+	"github.com/Arunraj-QA/loadtool/internal/protocols/ws"
 )
 
 func compile(t *testing.T, filename, src string) *Program {
@@ -130,7 +136,7 @@ http.get("http://127.0.0.1:1/"); export default function () {}`, "not allowed in
 func TestTranspileHasNoInteropHelpers(t *testing.T) {
 	code, err := transpile("test.ts", "", []byte(`
 let count: number = 0;
-export default function (): void { count++; }`))
+export default function (): void { count++; }`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -441,10 +447,7 @@ func TestExamplesLoad(t *testing.T) {
 			continue
 		}
 		t.Run(filepath.Base(path), func(t *testing.T) {
-			p, err := Load(path)
-			if err != nil {
-				t.Fatalf("Load: %v", err)
-			}
+			p := loadWithModules(t, path)
 			// As the runner does: init code and options in the lifecycle
 			// runtime, then a VU, unless the example's scenarios only
 			// run named functions.
@@ -452,8 +455,34 @@ func TestExamplesLoad(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewLifecycle: %v", err)
 			}
-			if _, err := l.Options(); err != nil {
+			opts, err := l.Options()
+			if err != nil {
 				t.Fatalf("Options: %v", err)
+			}
+			// Scenarios' named exec functions are compiled again with
+			// their own entry, which must resolve the same imports.
+			var o struct {
+				Scenarios map[string]struct{ Exec string }
+			}
+			if opts != nil {
+				if err := json.Unmarshal(opts, &o); err != nil {
+					t.Fatalf("options: %v", err)
+				}
+			}
+			var execs []string
+			for _, s := range o.Scenarios {
+				if s.Exec != "" && s.Exec != "default" {
+					execs = append(execs, s.Exec)
+				}
+			}
+			q, err := p.WithExecs(execs)
+			if err != nil {
+				t.Fatalf("WithExecs(%v): %v", execs, err)
+			}
+			for _, exec := range execs {
+				if _, err := q.NewVUExec(context.Background(), 1, exec, http.DefaultClient); err != nil {
+					t.Fatalf("NewVUExec(%s): %v", exec, err)
+				}
 			}
 			if !l.HasDefault() {
 				return
@@ -623,7 +652,7 @@ func TestBuiltinModulesAddNoInteropHelpers(t *testing.T) {
 import http, { get } from "loadtool/http";
 import lt from "loadtool";
 export const options = { vus: 1 };
-export default function () { http.get("x"); get("y"); return lt; }`))
+export default function () { http.get("x"); get("y"); return lt; }`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -732,7 +761,7 @@ func TestRelativeImportsAddNoInteropHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := transpile("main.ts", dir, src)
+	code, err := transpile("main.ts", dir, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -948,4 +977,20 @@ export default function () {
 	if s.ScriptErrors != 1 || !strings.Contains(s.FirstScriptError, "second argument must be a function") {
 		t.Fatalf("group without a function: got %q", s.FirstScriptError)
 	}
+}
+
+// loadWithModules loads the script at path with the protocol modules and
+// starts their runs, as the runner does, so top-level module calls (such
+// as client.load) work.
+func loadWithModules(t *testing.T, path string) *Program {
+	t.Helper()
+	p, err := Load(path, ws.Module{}, grpc.Module{}, graphql.Module{}, kafka.Module{})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, err := p.StartModules(protocol.RunEnv{}); err != nil {
+		t.Fatalf("StartModules: %v", err)
+	}
+	t.Cleanup(func() { _ = p.CloseModules(context.Background()) })
+	return p
 }

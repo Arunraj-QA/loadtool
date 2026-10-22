@@ -1,0 +1,1 @@
+﻿background CPU after: 34, 27, 33, 35, 45, 36

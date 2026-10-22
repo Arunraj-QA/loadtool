@@ -1,0 +1,27 @@
+
+LoadTool summary
+
+  Script:      D:\AI Training\Claude Workspace\loadtool\benchmarks\loadtool\large-body-keep.ts
+  VUs:         1000
+  Duration:    30s (elapsed 30.12s)
+  Status:      completed
+
+  Requests:    71,810 (2384.3 req/s)
+  Success:     71,489
+  Errors:      321 (0.45%)
+  Script errs: 321
+    first:     Error: status 0 Get "http://127.0.0.1:8080/api/large": dial tcp 127.0.0.1:8080: connectex: No connection could be made because the target machine actively refused it. at large_body_keep_default (large-body-keep.ts:16:10(21))
+
+  Latency (all requests sent, failed included):
+    min       1.16ms
+    mean    404.48ms
+    p50     387.97ms
+    p90     700.45ms
+    p95     792.72ms
+    p99        1.07s
+    max        1.70s
+  Latency (successful requests):
+    p50     387.97ms
+    p90     700.45ms
+    p95     792.72ms
+    p99        1.07s

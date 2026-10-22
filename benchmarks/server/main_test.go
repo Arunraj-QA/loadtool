@@ -35,7 +35,7 @@ func get(t *testing.T, srv *httptest.Server, method, path string) (*http.Respons
 
 func newServer(t *testing.T, delay time.Duration) *httptest.Server {
 	t.Helper()
-	srv := httptest.NewServer(newMux(delay))
+	srv := httptest.NewServer(newMux(delay, minLargeSize+16))
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -63,6 +63,21 @@ func TestAPITest(t *testing.T) {
 	// Allow for coarse clocks (Windows ticks every ~0.5ms).
 	if took < delay-2*time.Millisecond {
 		t.Errorf("responded after %v, want at least ~%v", took, delay)
+	}
+}
+
+// /api/large answers with valid JSON of exactly the configured size.
+func TestAPILarge(t *testing.T) {
+	for _, size := range []int{minLargeSize, 1000, 1 << 20} {
+		srv := httptest.NewServer(newMux(0, size))
+		resp, body := get(t, srv, http.MethodGet, "/api/large")
+		srv.Close()
+		if resp.StatusCode != http.StatusOK || len(body) != size || resp.ContentLength != int64(size) {
+			t.Errorf("size %d: status %d, %d bytes (Content-Length %d)", size, resp.StatusCode, len(body), resp.ContentLength)
+		}
+		if !json.Valid([]byte(body)) {
+			t.Errorf("size %d: body is not valid JSON", size)
+		}
 	}
 }
 
@@ -149,7 +164,7 @@ func TestServeShutsDownOnCancel(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	errc := make(chan error, 1)
-	go func() { errc <- serve(ctx, ln, newMux(0)) }()
+	go func() { errc <- serve(ctx, ln, newMux(0, minLargeSize)) }()
 
 	resp, err := http.Get("http://" + ln.Addr().String() + "/health")
 	if err != nil {

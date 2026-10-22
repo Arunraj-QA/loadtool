@@ -1,0 +1,54 @@
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/metrics
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkRecordCheck-12               	152719552	         7.841 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecord-12            	75126783	        15.88 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecordParallel-12    	510680020	         3.118 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMerge-12                     	    4648	    312473 ns/op	   39784 B/op	      13 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/metrics
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkRecordCheck-12               	140672794	         8.574 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecord-12            	62871333	        16.03 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecordParallel-12    	496002016	         2.640 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMerge-12                     	    5332	    291405 ns/op	   39784 B/op	      13 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/metrics
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkRecordCheck-12               	155356920	         7.726 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecord-12            	63174186	        16.80 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecordParallel-12    	517327005	         2.619 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMerge-12                     	    4400	    301793 ns/op	   39784 B/op	      13 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/metrics
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkRecordCheck-12               	144304152	         8.235 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecord-12            	62510418	        16.05 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecordParallel-12    	483655272	         2.433 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMerge-12                     	   10570	    112214 ns/op	   39784 B/op	      13 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/metrics
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkRecordCheck-12               	148594149	         8.076 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecord-12            	60079604	        16.67 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecordParallel-12    	511748901	         2.714 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMerge-12                     	    4605	    267567 ns/op	   39784 B/op	      13 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/Arunraj-QA/loadtool/internal/metrics
+cpu: 12th Gen Intel(R) Core(TM) i5-1235U
+BenchmarkRecordCheck-12               	129043039	        10.79 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecord-12            	51010388	        21.63 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRecorderRecordParallel-12    	349789980	         4.047 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMerge-12                     	    6766	    168697 ns/op	   39784 B/op	      13 allocs/op
+PASS

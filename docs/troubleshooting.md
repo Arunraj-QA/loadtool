@@ -19,7 +19,7 @@ result files are written.
 
 | Message (start) | Cause | Fix |
 |---|---|---|
-| `load script: …: cannot import "axios": only built-in modules (…) and relative paths …` | npm packages and URLs cannot be imported | Use `loadtool`, `loadtool/http` and your own files (`./lib/api.ts`) |
+| `load script: …: cannot import "axios": only built-in modules (…) and relative paths …` | npm packages and URLs cannot be imported | Use `loadtool`, `loadtool/http`, `loadtool/ws` and your own files (`./lib/api.ts`) |
 | `script init: … http requests are not allowed in the script's top-level code` | A request outside a function | Move it into the default function, or into `setup()` to run it once |
 | `options.thresholds: unknown metric "http_req_duraton"; supported metrics are …` | A typo in a metric name | Use a name from the list in the message |
 | `options.thresholds.http_req_duration: "p95<200": expected "<aggregate> <op> <number>"` | A malformed expression | Write `p(95)<200`; see [Thresholds](options.md#thresholds) |
@@ -45,7 +45,7 @@ requests): none succeeded`.
 
 **A status of 400 or more** is a response, but it counts as a failed
 request. For example, a 401 means the request was not logged in: see
-[Cookies and sessions](script-api.md#cookies-and-sessions).
+[Cookies and sessions](protocols/http.md#cookies-and-sessions).
 
 ## Some requests fail
 
@@ -64,6 +64,7 @@ An iteration threw. The summary shows the count and the first message
 |---|---|---|
 | `TypeError: http: the request body must be a string; use JSON.stringify(...)` | An object passed as a body | `http.post(url, JSON.stringify(obj), { headers: { "Content-Type": "application/json" } })` |
 | `SyntaxError: …` from `json()` | The body is not JSON, such as an HTML error page | Check `status` first, or call `json()` inside a `check` |
+| `the async function did not finish: it awaits something that never resolves …` | An `async` function awaits something that never resolves; LoadTool has no event loop | Remove the `await`: LoadTool calls (`http.get`, `ws.connect`, …) are blocking and return their result directly |
 | `Error: …` from your code | A `throw` in the script | Expected, if the script throws on purpose (see `examples/basic-http.ts`) |
 
 ## Checks fail
@@ -71,6 +72,10 @@ An iteration threw. The summary shows the count and the first message
 The summary lists each check with its pass rate and the first error, such
 as `first error: SyntaxError: …`.
 
+- **`first error: TypeError: res.json(): the body was discarded`:** the
+  body was not kept, which is the default. Add `responseType: "text"` to
+  that request's params, or set `discardResponseBodies: false` in the
+  options.
 - **A condition that throws counts as a failed check.** `r.json().products`
   on an error page fails the check, not the iteration.
 - **Check the status before the body:** a failed request makes every
@@ -81,6 +86,7 @@ as `first error: SyntaxError: …`.
 | Warning | Meaning |
 |---|---|
 | `script option "insecureSkipTLSVerify" is not supported yet and was ignored` | An option LoadTool does not have, often from a k6 script; see [Differences from k6](k6-differences.md) |
+| `res.body is null: response bodies are discarded by default; …` | The script read a body that was not kept. The warning says how to keep it. |
 | `--vus/--duration (or LOADTOOL_VUS/LOADTOOL_DURATION) replace the script's scenarios or stages with one constant-vus scenario` | Typed `--vus`/`--duration` override the script's workload. Leave them out to run the script's scenarios. |
 
 ## Thresholds fail (exit code 99)
@@ -103,6 +109,50 @@ A `constant-arrival-rate` scenario had no free VU when an iteration was
 due, so the start was dropped and the rate was not reached. Raise the
 scenario's `preAllocatedVUs`. `dropped_iterations: ["count==0"]` makes
 this fail the test.
+
+## WebSocket
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `res.status` is 404 (or another HTTP status) and `error_code` is `server` | The server refused the upgrade at that path | Check the WebSocket path, such as `/ws/echo` |
+| `error_code` `invalid` | The URL is not `ws://` or `wss://` | Use `ws://` (or `wss://` for TLS) |
+| `ws.connect` never returns | Nothing closes the session | Close it in a handler, or add a guard: `socket.setTimeout(() => socket.close(), 5000)` |
+| `ws_msg_latency` has no samples | In the callback style, no send was marked `{ reply: true }` | Mark the sends whose replies you want timed |
+| `socket.receive()` returns `null`, `error_code` `timeout` | No message arrived within the timeout (default 30 s) | Check the server answers that message; raise the timeout if replies are slow |
+| Warning `ws: a socket was still open when the iteration ended` | A blocking-style socket was not closed | Call `socket.close()`; LoadTool closed it for you |
+| `on("error")` with `closed`, close code 1006 | The server dropped the connection without a close frame | Check the server's logs and limits |
+| `thresholds … unknown metric "ws_…"` | The script does not import `loadtool/ws` | WebSocket metrics exist only in scripts that import it |
+
+## gRPC
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `client.load: … could not … greeter.proto` | The `.proto` file was not found | Paths are relative to the script; pass the directory as an import path: `client.load(["proto"], "greeter.proto")` |
+| `connect` returns `error_code` `dial` | Nothing listens there, or TLS failed | Check the address; for a server without TLS add `plaintext: true` |
+| `error_code` `invalid`: `unknown method` | No loaded `.proto` or reflection describes it | Load the right `.proto` file, or `connect(…, { reflect: true })`; write the method as `"package.Service/Method"` |
+| `error_code` `invalid`: `not connected` | `invoke` before `connect`, or after a `connect` that failed | Connect until it succeeds: keep a `connected` flag per VU and connect while it is false (see `examples/grpc-unary.ts`). With `if (__ITER === 0)`, one failed connect leaves the VU unconnected for the whole test |
+| `error_code` `timeout`, `status_text` `DeadlineExceeded` | The call took longer than its timeout (default 30 s) | Raise `timeout`, or look at the server |
+| `is a streaming method; use client.stream` | `invoke` on a streaming method | Use `client.stream` |
+| Warning `grpc: a stream was still open when the iteration ended` | A stream was not read to the end or closed | Read until `recv()` returns `null`, or call `stream.close()` |
+
+## GraphQL
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `http_ok` true but `ok` false, `error_code` `server` | The server answered HTTP 200 with GraphQL `errors` | Read `res.errors` (and `res.error`, the first message); `res.data` may hold partial data |
+| `error_code` `protocol` | The response was not GraphQL JSON (an HTML error page, a wrong URL) | Check the endpoint URL |
+| `graphql_reqs` counts but `http_reqs` does not | GraphQL operations are counted under `graphql_*` only | Use `graphql_req_failed` and `graphql_req_duration` in thresholds |
+
+## Kafka
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `producing is not allowed in the script's top-level code` (or `consuming`) | `produce` or `consume` outside an iteration | Create the `Producer`/`Consumer` in top-level code, but call them in the default function (or `setup`/`teardown`) |
+| `error_code` `server`, `UNKNOWN_TOPIC_OR_PARTITION` | The topic does not exist (LoadTool does not create topics) | Create it first (`kafka-topics.sh --create`), or check the name |
+| `error_code` `timeout` or `dial` on every produce | No broker answers at `brokers` | Check the address; a broker in Docker must advertise an address the host can reach (see `testenv/kafka/docker-compose.yml`) |
+| `consume` always returns `[]` | `startAt: "latest"` (the default) reads only messages produced after the consumer joins; or the group already committed the end | Produce while consuming, use `startAt: "earliest"`, or a new `group` |
+| One consumer VU gets messages and the others none | A group has at most one consumer per partition | Give the topic at least as many partitions as consumer VUs |
+| `kafka_consume_latency` is large or negative-looking (clamped to 0) | The producer's and consumer's clocks differ, or the messages were produced before the test | Produce and consume with LoadTool on one machine, or synchronize clocks |
 
 ## Logins and sessions
 
@@ -132,8 +182,8 @@ point LoadTool at extra certificates.
   0.5 ms, so very fast responses (and requests refused at once) show as 0.
 - **No charts in the HTML report:** charts need at least two per-second
   points, so a run of about two seconds or more.
-- **`res.body` is `null`:** `discardResponseBodies: true` is set, or no
-  response arrived.
+- **`res.body` is `null`:** response bodies are discarded by default (a
+  warning says so), or no response arrived. See the next section.
 
 ## Result files are missing
 

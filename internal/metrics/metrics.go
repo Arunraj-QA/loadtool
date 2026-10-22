@@ -15,7 +15,8 @@ import (
 
 // numShards is how many histogram shards VUs are spread over. It keeps
 // atomic updates mostly uncontended while total memory stays at about
-// numShards * 2 * 19 KB, independent of the VU count.
+// numShards * (2 * 19 KB + 4.8 KB of status counters), independent of
+// the VU count.
 const numShards = 16
 
 // Recorder collects results for a single VU. Each Recorder must be used by
@@ -39,6 +40,11 @@ type Recorder struct {
 	checkNames *checkNames
 	checkIndex map[string]int
 	checks     []checkCount
+
+	// fams receives protocol metric families (ADR-015); nil drops them.
+	// shardIndex picks this recorder's family shard.
+	fams       *Families
+	shardIndex int
 }
 
 // NewRecorders returns n Recorders spread over a fixed set of shared
@@ -51,7 +57,7 @@ func NewRecorders(n int) []*Recorder {
 	names := newCheckNames()
 	recs := make([]*Recorder, n)
 	for i := range recs {
-		recs[i] = &Recorder{shard: shards[i%len(shards)], checkNames: names}
+		recs[i] = &Recorder{shard: shards[i%len(shards)], checkNames: names, shardIndex: i % numShards}
 	}
 	return recs
 }
@@ -72,6 +78,17 @@ func (r *Recorder) Record(latency time.Duration, ok bool) {
 // latency sample, so it cannot distort the percentiles.
 func (r *Recorder) RecordUnsent() {
 	r.unsent++
+}
+
+// RecordStatus counts the status code of a response received.
+func (r *Recorder) RecordStatus(code int) {
+	if r.shard == nil {
+		r.shard = newShard()
+	}
+	if code < 100 || code > maxStatus {
+		code = 0
+	}
+	r.shard.statuses[code].Add(1)
 }
 
 // RecordProtocol counts the protocol of a response received, as the
@@ -145,9 +162,18 @@ type Summary struct {
 	// response are not counted.
 	Protocols Protocols
 
+	// StatusCodes counts responses by HTTP status code, in code order;
+	// codes outside 100 to 599 count as Code 0. Requests without a
+	// response are not counted.
+	StatusCodes []StatusCount
 	// DroppedIterations counts arrival-rate starts no VU was free for.
 	// The engine sets it; recorders do not track it.
 	DroppedIterations int
+
+	// Families are the protocol metric families (ADR-015), in declaration
+	// order; nil when the run has none. The runner sets them from its
+	// Families; Merge does not.
+	Families []FamilySummary
 
 	// latency is the merged histogram of every request sent; nil when
 	// none was. It backs Percentile.
@@ -162,6 +188,12 @@ func (s Summary) Percentile(p float64) (d time.Duration, ok bool) {
 		return 0, false
 	}
 	return s.latency.percentile(p), true
+}
+
+// StatusCount is how many responses had one status code.
+type StatusCount struct {
+	Code  int // 0 for codes outside 100 to 599
+	Count int
 }
 
 // Merge aggregates recorders into a Summary. The recorders must no longer
@@ -188,6 +220,7 @@ func Merge(recorders []*Recorder) Summary {
 	}
 
 	s.Checks = mergeChecks(recorders)
+	s.StatusCodes = mergeStatuses(seen)
 
 	ok := combine(okHists)
 	all := combine(append(okHists, failedHists...))
@@ -217,4 +250,21 @@ func Merge(recorders []*Recorder) Summary {
 	s.P95 = all.percentile(95)
 	s.P99 = all.percentile(99)
 	return s
+}
+
+// mergeStatuses sums the shards' status counts, in code order.
+func mergeStatuses(shards map[*shard]bool) []StatusCount {
+	var totals [maxStatus + 1]uint64
+	for sh := range shards {
+		for c := range sh.statuses {
+			totals[c] += sh.statuses[c].Load()
+		}
+	}
+	var out []StatusCount
+	for c, n := range totals {
+		if n > 0 {
+			out = append(out, StatusCount{Code: c, Count: int(n)})
+		}
+	}
+	return out
 }
