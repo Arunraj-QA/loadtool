@@ -91,6 +91,9 @@ Phase 2 is complete until all of them are measured and recorded.
    unchanged (the criterion 2 regression check still holds). The design
    is ADR-023.
 
+Frozen on 2026-10-22: merged into `main` and tagged `phase-2-complete`
+after an audit of the architecture, tests, CI and benchmark baselines.
+
 Status: all five met. Criteria 1–4 were measured on 2026-10-14
 (below). Criterion 5, added on 2026-10-21, was met on 2026-10-22
 (`benchmarks/results/2026-10-21-ui/`):
